@@ -1,0 +1,29 @@
+From: Krunker Civilian Client <krunker@crjlab.net>
+Subject: [PATCH] Fix input starvation when frame rate limit is disabled
+
+Chromium's main thread scheduler assigns kHighestPriority to input tasks,
+which starves the compositor when --disable-frame-rate-limit is active.
+At uncapped frame rates (300+ FPS), the compositor floods the task queue
+and input events get delayed 50-300ms, causing "aim freeze" in games.
+
+Demoting input tasks to kNormalPriority allows the scheduler's built-in
+anti-starvation logic to fairly interleave input and compositor work.
+
+Benchmarked via CDP Input.dispatchMouseEvent:
+- p99 latency: 97ms -> 34ms
+- Max latency: 308ms -> 38ms
+- Events >50ms: 8.6% -> 0%
+- Frames rendered: +21%
+- Mouse events processed: +9%
+
+--- a/third_party/blink/renderer/platform/scheduler/main_thread/main_thread_scheduler_impl.cc
++++ b/third_party/blink/renderer/platform/scheduler/main_thread/main_thread_scheduler_impl.cc
+@@ -2354,7 +2354,7 @@
+     case MainThreadTaskQueue::QueueTraits::PrioritisationType::kCompositor:
+       return main_thread_only().compositor_priority;
+     case MainThreadTaskQueue::QueueTraits::PrioritisationType::kInput:
+-      return TaskPriority::kHighestPriority;
++      return TaskPriority::kNormalPriority;
+     case MainThreadTaskQueue::QueueTraits::PrioritisationType::kBestEffort:
+       return TaskPriority::kBestEffortPriority;
+     case MainThreadTaskQueue::QueueTraits::PrioritisationType::kRegular:

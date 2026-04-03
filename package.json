@@ -1,0 +1,43 @@
+{
+  "name": "krunker-civilian-client",
+  "version": "0.5.6",
+  "description": "Cross-platform Krunker game client",
+  "main": "dist/main/index.js",
+  "homepage": "https://gitea.crjlab.net/bigjakk/krunker-civilian-client",
+  "author": "Krunker Civilian Client <krunker@crjlab.net>",
+  "license": "MIT",
+  "scripts": {
+    "postinstall": "node scripts/download-electron.js",
+    "dev": "vite build --mode development --config vite.main.config.ts && vite build --mode development --config vite.preload.config.ts && electron .",
+    "build:main": "vite build --config vite.main.config.ts",
+    "build:preload": "vite build --config vite.preload.config.ts",
+    "build": "npm run build:main && npm run build:preload",
+    "start": "npm run build && electron .",
+    "download-electron": "node scripts/download-electron.js",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:all": "npm run build && electron-builder --win --linux",
+    "clean": "rimraf dist out",
+    "lint": "eslint src/",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "src/**/*.ts": "eslint --fix"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.0.0",
+    "electron": "npm:electron-nightly@42.0.0-nightly.20260227",
+    "electron-builder": "^26.0.0",
+    "eslint": "^10.0.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.1",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.56.1",
+    "vite": "^6.0.0"
+  }
+}

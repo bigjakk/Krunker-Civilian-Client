@@ -1,0 +1,17 @@
+node_modules/
+dist/
+out/
+*.log
+.env
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+nul
+CLAUDE.md
+Screenshot*
+Trace-*
+*.cpuprofile
+*.heapprofile
+userscripts/

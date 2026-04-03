@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Krunker Civilian Client
+Comment=Cross-platform Krunker game client
+Exec=krunker-civilian-client %U
+Icon=krunker-civilian-client
+Type=Application
+Categories=Game;ActionGame;
+Keywords=krunker;fps;game;
+StartupWMClass=krunker-civilian-client
+MimeType=x-scheme-handler/krunker;

@@ -1,0 +1,228 @@
+import Store from 'electron-store';
+import { detectPlatform } from './platform';
+
+export interface Keybind {
+  key: string;
+  ctrl: boolean;
+  shift: boolean;
+  alt: boolean;
+}
+
+export interface SavedAccount {
+  label: string;
+  username: string;
+  password: string;
+}
+
+export interface AppConfig {
+  window: {
+    width: number;
+    height: number;
+    x: number | undefined;
+    y: number | undefined;
+    maximized: boolean;
+    fullscreen: boolean;
+  };
+  performance: {
+    fpsUnlocked: boolean;
+    hardwareAccel: boolean;
+    gpuPreference: 'high-performance' | 'low-power' | 'default';
+    cpuThrottleGame: number;
+    cpuThrottleMenu: number;
+    processPriority: string;
+  };
+  game: {
+    lastServer: string;
+    socialTabBehaviour: 'New Window' | 'Same Window';
+    joinAsSpectator: boolean;
+    rawInput: boolean;
+    betterChat: boolean;
+    chatHistorySize: number;
+    showPing: boolean;
+    hpEnemyCounter: boolean;
+  };
+  swapper: {
+    enabled: boolean;
+    path: string;
+  };
+  matchmaker: {
+    enabled: boolean;
+    regions: string[];
+    gamemodes: string[];
+    maps: string[];
+    minPlayers: number;
+    maxPlayers: number;
+    minRemainingTime: number;
+    openServerBrowser: boolean;
+    autoJoin: boolean;
+  };
+  keybinds: {
+    reload: Keybind;
+    newMatch: Keybind;
+    copyGameLink: Keybind;
+    joinFromClipboard: Keybind;
+    devTools: Keybind;
+    matchmaker: Keybind;
+    matchmakerAccept: Keybind;
+    matchmakerCancel: Keybind;
+    pauseChat: Keybind;
+    fullscreenToggle: Keybind;
+  };
+  userscripts: {
+    enabled: boolean;
+    path: string;
+  };
+  ui: {
+    showExitButton: boolean;
+    deathscreenAnimation: boolean;
+    hideMenuPopups: boolean;
+    cleanerMenu: boolean;
+    doublePing: boolean;
+    cssTheme: string;
+    loadingTheme: string;
+    backgroundUrl: string;
+    showChangelog: boolean;
+    lastSeenVersion: string;
+  };
+  discord: {
+    enabled: boolean;
+  };
+  translator: {
+    enabled: boolean;
+    targetLanguage: string;
+    showLanguageTag: boolean;
+  };
+  advanced: {
+    removeUselessFeatures: boolean;
+    gpuRasterizing: boolean;
+    helpfulFlags: boolean;
+    disableAccelerated2D: boolean;
+    increaseLimits: boolean;
+    lowLatency: boolean;
+    experimentalFlags: boolean;
+    angleBackend: string;
+    verboseLogging: boolean;
+  };
+  accounts: SavedAccount[];
+  tabWindow: {
+    width: number;
+    height: number;
+    x: number | undefined;
+    y: number | undefined;
+    maximized: boolean;
+  };
+  platform: {
+    detectedOS: string;
+    gpuBackend: string;
+  };
+}
+
+export const DEFAULT_KEYBINDS: AppConfig['keybinds'] = {
+  reload:            { key: 'F5',     ctrl: false, shift: false, alt: false },
+  newMatch:          { key: 'F4',     ctrl: false, shift: false, alt: false },
+  copyGameLink:      { key: 'l',      ctrl: true,  shift: false, alt: false },
+  joinFromClipboard: { key: 'j',      ctrl: true,  shift: false, alt: false },
+  devTools:          { key: 'F12',    ctrl: false, shift: false, alt: false },
+  matchmaker:        { key: 'F6',     ctrl: false, shift: false, alt: false },
+  matchmakerAccept:  { key: 'Enter',  ctrl: false, shift: false, alt: false },
+  matchmakerCancel:  { key: 'Escape', ctrl: false, shift: false, alt: false },
+  pauseChat:         { key: 'F10',    ctrl: false, shift: false, alt: false },
+  fullscreenToggle:  { key: 'F11',    ctrl: false, shift: false, alt: false },
+};
+
+const platformInfo = detectPlatform();
+
+export const config = new Store<AppConfig>({
+  name: 'krunker-civilian-config',
+  defaults: {
+    window: {
+      width: 1600,
+      height: 900,
+      x: undefined,
+      y: undefined,
+      maximized: false,
+      fullscreen: false,
+    },
+    performance: {
+      fpsUnlocked: true,
+      hardwareAccel: true,
+      gpuPreference: 'high-performance',
+      cpuThrottleGame: 1,
+      cpuThrottleMenu: 1.5,
+      processPriority: 'Normal',
+    },
+    game: {
+      lastServer: '',
+      socialTabBehaviour: 'New Window',
+      joinAsSpectator: false,
+      rawInput: true,
+      betterChat: true,
+      chatHistorySize: 200,
+      showPing: true,
+      hpEnemyCounter: true,
+    },
+    swapper: {
+      enabled: true,
+      path: '',
+    },
+    matchmaker: {
+      enabled: true,
+      regions: [],
+      gamemodes: [],
+      maps: [],
+      minPlayers: 1,
+      maxPlayers: 6,
+      minRemainingTime: 120,
+      openServerBrowser: true,
+      autoJoin: false,
+    },
+    keybinds: DEFAULT_KEYBINDS,
+    userscripts: {
+      enabled: true,
+      path: '',
+    },
+    ui: {
+      showExitButton: true,
+      deathscreenAnimation: true,
+      hideMenuPopups: false,
+      cleanerMenu: false,
+      doublePing: true,
+      cssTheme: 'disabled',
+      loadingTheme: 'disabled',
+      backgroundUrl: '',
+      showChangelog: true,
+      lastSeenVersion: '',
+    },
+    discord: {
+      enabled: false,
+    },
+    translator: {
+      enabled: true,
+      targetLanguage: 'en',
+      showLanguageTag: true,
+    },
+    advanced: {
+      removeUselessFeatures: true,
+      gpuRasterizing: false,
+      helpfulFlags: true,
+      disableAccelerated2D: false,
+      increaseLimits: false,
+      lowLatency: false,
+      experimentalFlags: false,
+      angleBackend: 'default',
+      verboseLogging: false,
+    },
+    accounts: [],
+    tabWindow: {
+      width: 1280,
+      height: 720,
+      x: undefined,
+      y: undefined,
+      maximized: true,
+    },
+    platform: {
+      detectedOS: platformInfo.os,
+      gpuBackend: platformInfo.gpuBackend,
+    },
+  },
+});
