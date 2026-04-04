@@ -2,12 +2,10 @@
 #
 # Generate Markdown release notes from conventional commits.
 # Usage: ./scripts/generate-release-notes.sh <tag> [prev-ref]
-#   e.g. ./scripts/generate-release-notes.sh v0.7.0
-#   e.g. ./scripts/generate-release-notes.sh v0.7.0 abc123f
 #
+# Skips version bumps, CI-only changes, and other noise.
 # If prev-ref is not provided, tries git describe to find previous tag.
 # If no previous ref is found, includes all commits up to HEAD.
-# Uses HEAD as the endpoint (tag may not exist in git yet).
 
 set -eo pipefail
 
@@ -21,32 +19,32 @@ fi
 
 if [ -n "$PREV_REF" ]; then
   RANGE="${PREV_REF}..HEAD"
-  COMPARE_TEXT="**Full changelog**: \`${PREV_REF}...${TAG}\`"
 else
   RANGE="HEAD"
-  COMPARE_TEXT="**Initial release**"
 fi
 
 # Collect commits into temp files by category
 TMPDIR_NOTES=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_NOTES"' EXIT
 
-for prefix in feat fix refactor perf docs test chore other; do
+for prefix in feat fix refactor perf other; do
   : > "${TMPDIR_NOTES}/${prefix}"
 done
 
 while IFS= read -r line; do
   [ -z "$line" ] && continue
+
+  # Skip version bump commits (e.g. "v0.6.1", "v0.6.2 — description")
+  [[ "$line" =~ ^v[0-9] ]] && continue
+
+  # Skip chore/docs/test/ci commits — not user-facing
+  [[ "$line" =~ ^(chore|docs|test|ci)(\(.*\))?:  ]] && continue
+
   MATCHED=false
-  for prefix in feat fix refactor perf docs test chore; do
+  for prefix in feat fix refactor perf; do
     if [[ "$line" =~ ^${prefix}(\(.*\))?:\ (.+)$ ]]; then
-      SCOPE="${BASH_REMATCH[1]}"
       MSG="${BASH_REMATCH[2]}"
-      if [ -n "$SCOPE" ]; then
-        echo "- **${SCOPE}**: ${MSG}" >> "${TMPDIR_NOTES}/${prefix}"
-      else
-        echo "- ${MSG}" >> "${TMPDIR_NOTES}/${prefix}"
-      fi
+      echo "- ${MSG}" >> "${TMPDIR_NOTES}/${prefix}"
       MATCHED=true
       break
     fi
@@ -59,36 +57,34 @@ done < <(git log --format="%s" "$RANGE" 2>/dev/null)
 # Section display names
 section_title() {
   case "$1" in
-    feat)     echo "Features" ;;
-    fix)      echo "Bug Fixes" ;;
-    refactor) echo "Refactoring" ;;
-    perf)     echo "Performance" ;;
-    docs)     echo "Documentation" ;;
-    test)     echo "Tests" ;;
-    chore)    echo "Chores" ;;
+    feat)     echo "## New" ;;
+    fix)      echo "## Fixes" ;;
+    refactor) echo "## Improvements" ;;
+    perf)     echo "## Performance" ;;
   esac
 }
 
-# Build output
-echo "# KCC ${TAG}"
-echo ""
+# Build output — only user-facing sections
+HAS_CONTENT=false
 
-for prefix in feat fix refactor perf docs test chore; do
+for prefix in feat fix refactor perf; do
   if [ -s "${TMPDIR_NOTES}/${prefix}" ]; then
-    echo "## $(section_title "$prefix")"
+    section_title "$prefix"
     echo ""
     cat "${TMPDIR_NOTES}/${prefix}"
     echo ""
+    HAS_CONTENT=true
   fi
 done
 
 if [ -s "${TMPDIR_NOTES}/other" ]; then
-  echo "## Other Changes"
+  echo "## Other"
   echo ""
   cat "${TMPDIR_NOTES}/other"
   echo ""
+  HAS_CONTENT=true
 fi
 
-echo "---"
-echo ""
-echo "${COMPARE_TEXT}"
+if [ "$HAS_CONTENT" = false ]; then
+  echo "Bug fixes and improvements."
+fi
