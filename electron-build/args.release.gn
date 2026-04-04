@@ -1,8 +1,0 @@
-import("//electron/build/args/release.gn")
-
-# Full optimization (LTO, minimal symbols, etc.)
-is_official_build = true
-
-# Not using Google's remote build infrastructure
-use_remoteexec = false
-use_reclient = false
