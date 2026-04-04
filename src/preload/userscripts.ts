@@ -122,7 +122,21 @@ function executeScript(
   };
 
   try {
-    const fn = new Function(instance.content);
+    // Wrap script so DOMContentLoaded listeners fire immediately if the
+    // document is already loaded (scripts run after did-finish-load IPC).
+    const wrapped = `
+      if (document.readyState !== 'loading') {
+        const _origAdd = EventTarget.prototype.addEventListener;
+        EventTarget.prototype.addEventListener = function(type, fn, opts) {
+          if ((this === window || this === document) && type === 'DOMContentLoaded') {
+            Promise.resolve().then(() => fn.call(this, new Event('DOMContentLoaded')));
+            return;
+          }
+          return _origAdd.call(this, type, fn, opts);
+        };
+        try { ${instance.content}\n } finally { EventTarget.prototype.addEventListener = _origAdd; }
+      } else { ${instance.content}\n }`;
+    const fn = new Function(wrapped);
     const result = fn.apply(context);
 
     // Script returned `this` — capture settings and unload
