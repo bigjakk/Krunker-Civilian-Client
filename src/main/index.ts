@@ -15,6 +15,7 @@ import { showUpdateWindow } from './update-window';
 import { DiscordRPC } from './discord-rpc';
 import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS } from './css-themes';
 import { TabManager } from './tab-manager';
+import { openRankedQueue } from './ranked-queue';
 
 // ── App version for API calls ──
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -649,6 +650,11 @@ async function launchApp(): Promise<void> {
       electronLog.error('[KCC] Ping regions error:', err);
       return pingCache;
     }
+  });
+
+  // ── Ranked queue IPC handler ──
+  ipcMain.on('open-ranked-queue', (_e, token: string, region: string, allRegions: boolean) => {
+    openRankedQueue(token, region, allRegions);
   });
 
   // ── Discord Rich Presence IPC handler ──

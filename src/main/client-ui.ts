@@ -706,6 +706,23 @@ export const RANK_TRACKER_CSS = `
 .kpc-rank-grid-item img { width: 28px; height: 28px; }
 .kpc-rank-name { font-size: 13px; font-weight: 600; }
 .kpc-rank-elo { font-size: 11px; color: #888; }
+
+/* Ranked queue button in ranked menu footer */
+#kpc-ranked-queue-btn {
+  background-color: #5ce05a;
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+#kpc-ranked-queue-btn:hover { background-color: #4bc94a; }
 `;
 
 /** Pre-concatenated CSS for single-call injection (excludes HIDE_ADS_CSS which is separate) */

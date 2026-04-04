@@ -1,4 +1,5 @@
-// ── Competitive features: Hardpoint enemy counter + Rank progress tracker ──
+// ── Competitive features: Hardpoint enemy counter + Rank progress tracker + Ranked queue ──
+import { ipcRenderer } from 'electron';
 
 let hpObserver: MutationObserver | null = null;
 let hpCounterEl: HTMLElement | null = null;
@@ -187,6 +188,38 @@ function checkRankedMenu(): void {
     }
 }
 
+// ── Ranked Queue Button ──
+
+function injectQueueButton(): void {
+    const footer = document.querySelector('.footer-controls');
+    if (!footer || footer.querySelector('#kpc-ranked-queue-btn')) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'kpc-ranked-queue-btn';
+    btn.className = 'kpc-ranked-queue-btn';
+    btn.innerHTML = '<span class="material-icons" style="font-size:20px;vertical-align:middle;">open_in_new</span>';
+    btn.title = 'Open External Queue';
+    btn.addEventListener('click', () => {
+        let token = localStorage.getItem('__FRVR_auth_access_token') || '';
+        token = token.replace(/"/g, '').replace(/\//g, '');
+        const regionEl = document.querySelector('.region-indicator');
+        let region = 'na';
+        if (regionEl) {
+            const text = regionEl.textContent || '';
+            const parts = text.split(': ');
+            const regionName = parts[1] || parts[0];
+            if (regionName.includes('Europe')) region = 'eu';
+            else if (regionName.includes('Asia')) region = 'as';
+        }
+        const allRegions = localStorage.getItem('s_rankedAllRegions') === 'true';
+        ipcRenderer.send('open-ranked-queue', token, region, allRegions);
+    });
+
+    const lastChild = footer.lastElementChild;
+    if (lastChild) footer.insertBefore(btn, lastChild);
+    else footer.appendChild(btn);
+}
+
 export function initRankProgress(): void {
     // Poll for window.openRankedMenu — Krunker defines it async after DOM load
     let attempts = 0;
@@ -207,6 +240,7 @@ export function initRankProgress(): void {
                 rankObserver = new MutationObserver(checkRankedMenu);
                 rankObserver.observe(modal, { childList: true, subtree: true });
                 checkRankedMenu();
+                injectQueueButton();
 
                 cleanupInterval = setInterval(() => {
                     if (!document.querySelector('.rankedMenuModal')) {
