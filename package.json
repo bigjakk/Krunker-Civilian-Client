@@ -1,9 +1,9 @@
 {
   "name": "krunker-civilian-client",
-  "version": "0.5.6",
+  "version": "0.6.0",
   "description": "Cross-platform Krunker game client",
   "main": "dist/main/index.js",
-  "homepage": "https://gitea.crjlab.net/bigjakk/krunker-civilian-client",
+  "homepage": "https://github.com/bigjakk/Krunker-Civilian-Client",
   "author": "Krunker Civilian Client <krunker@crjlab.net>",
   "license": "MIT",
   "scripts": {

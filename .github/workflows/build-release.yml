@@ -1,0 +1,104 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check if version already released
+        id: version-check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(grep '"version"' package.json | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+          TAG="v$VERSION"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "TAG=$TAG" >> "$GITHUB_OUTPUT"
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, skipping build"
+            echo "SKIP=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No release for $TAG, proceeding with build"
+            echo "SKIP=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node.js
+        if: steps.version-check.outputs.SKIP == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install system dependencies
+        if: steps.version-check.outputs.SKIP == 'false'
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            wine wine32 wine64 \
+            libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2t64 \
+            libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
+            libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 \
+            libcairo2 libasound2t64 libgtk-3-0
+          WINEDEBUG=-all wine wineboot --init || true
+
+      - name: Install dependencies
+        if: steps.version-check.outputs.SKIP == 'false'
+        run: npm ci --legacy-peer-deps
+
+      - name: Build source
+        if: steps.version-check.outputs.SKIP == 'false'
+        run: npm run build
+
+      - name: Build Windows distributables
+        if: steps.version-check.outputs.SKIP == 'false'
+        env:
+          WINEDEBUG: "-all"
+        run: npx electron-builder --win -c.electronDist=node_modules/electron/dist-win --publish never
+
+      - name: Build Linux distributables
+        if: steps.version-check.outputs.SKIP == 'false'
+        run: npx electron-builder --linux -c.electronDist=node_modules/electron/dist-linux --publish never
+
+      - name: Report build sizes
+        if: steps.version-check.outputs.SKIP == 'false'
+        run: |
+          echo "=== Build output sizes ==="
+          ls -lh out/*.exe out/*.AppImage out/*.deb 2>/dev/null || true
+
+      - name: Create GitHub release and upload assets
+        if: steps.version-check.outputs.SKIP == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Collect built artifacts
+          ASSETS=()
+          for file in out/*.exe out/*.AppImage out/*.deb; do
+            [ -f "$file" ] || continue
+            ASSETS+=("$file")
+          done
+
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "ERROR: No build artifacts found in out/"
+            ls -la out/ 2>/dev/null || echo "out/ directory does not exist"
+            exit 1
+          fi
+
+          echo "Uploading ${#ASSETS[@]} assets:"
+          printf '  %s\n' "${ASSETS[@]}"
+
+          gh release create "${{ steps.version-check.outputs.TAG }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "${{ steps.version-check.outputs.TAG }}" \
+            --notes "Automated build for ${{ steps.version-check.outputs.TAG }}" \
+            "${ASSETS[@]}"

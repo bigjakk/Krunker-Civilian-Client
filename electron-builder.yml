@@ -67,5 +67,5 @@ linux:
 
 publish:
   provider: github
-  owner: krunker-civilian
-  repo: krunker-civilian-client
+  owner: bigjakk
+  repo: Krunker-Civilian-Client

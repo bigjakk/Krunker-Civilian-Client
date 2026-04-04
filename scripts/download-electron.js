@@ -1,13 +1,15 @@
 'use strict';
 
 /**
- * Downloads the patched Electron build and extracts it into node_modules/electron/dist/.
+ * Downloads patched Electron builds for Windows (v42) and Linux (v43).
  *
  * The patched Electron fixes input starvation ("aim freeze") when --disable-frame-rate-limit
  * is active on modern Chromium. Without this, uncapped FPS causes 50-300ms input delays.
  *
- * The zip is hosted as a release asset on the same Gitea repo. The script checks the
- * local version file to skip re-downloading if already present.
+ * Platform behavior:
+ *   Windows:        patched Win   → dist/       (replaces stock)
+ *   Linux (local):  patched Linux → dist/       (replaces stock), Win → dist-win/
+ *   CI (Linux):     Win → dist-win/, Linux → dist-linux/  (stock stays in dist/)
  *
  * Usage:
  *   node scripts/download-electron.js            # download if needed
@@ -21,26 +23,18 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 // ── Configuration ──────────────────────────────────────────────────────────
-const ELECTRON_VERSION = '42.0.0-nightly.20260227';
-const ASSET_NAME = 'electron-v42.0.0-nightly-patched-win32-x64.zip';
-const GITEA_BASE = 'https://gitea.crjlab.net';
-const REPO = 'bigjakk/Krunker-Civilian-Client';
-// The release tag that holds the patched Electron zip.
-// Upload the zip as an asset to this release on Gitea.
-const RELEASE_TAG = 'electron-patched';
+const GITHUB_BASE = 'https://github.com';
+const REPO = 'bigjakk/Electron-Websocket-Fix';
+const RELEASE_TAG = 'v1.0.0';
 
-// On Windows, overwrite the npm-installed Electron with our patched build.
-// On Linux/macOS (CI cross-compilation), extract to a separate dist-win/ directory
-// so the npm-installed platform-native Electron stays in dist/ for bytenode compilation.
+const PLATFORMS = {
+    win32: { asset: 'electron-v42.0.0-nightly-release-patched-win32-x64.zip' },
+    linux: { asset: 'electron-v43.0.0-nightly-release-patched-linux-x64.zip' },
+};
+
 const IS_WIN = process.platform === 'win32';
-const ELECTRON_DIST = IS_WIN
-    ? path.resolve(__dirname, '..', 'node_modules', 'electron', 'dist')
-    : path.resolve(__dirname, '..', 'node_modules', 'electron', 'dist-win');
-const VERSION_FILE = path.join(ELECTRON_DIST, 'version');
-// Separate marker file to distinguish patched from stock electron-nightly.
-// Both have the same version string, so VERSION_FILE alone is not sufficient.
-const PATCHED_MARKER = path.join(ELECTRON_DIST, '.patched');
-const TEMP_ZIP = path.join(ELECTRON_DIST, '..', '_electron-patched.zip');
+const IS_CI = !!process.env.CI;
+const ELECTRON_BASE = path.resolve(__dirname, '..', 'node_modules', 'electron');
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -96,31 +90,6 @@ function downloadToFile(url, dest) {
     });
 }
 
-async function getAssetUrl() {
-    const apiUrl = `${GITEA_BASE}/api/v1/repos/${REPO}/releases/tags/${RELEASE_TAG}`;
-    const res = await get(apiUrl);
-    const body = await new Promise((resolve, reject) => {
-        let data = '';
-        res.on('data', (chunk) => { data += chunk; });
-        res.on('end', () => resolve(data));
-        res.on('error', reject);
-    });
-
-    const release = JSON.parse(body);
-    const asset = release.assets.find((a) => a.name === ASSET_NAME);
-    if (!asset) {
-        const names = release.assets.map((a) => a.name).join(', ');
-        throw new Error(
-            `Asset "${ASSET_NAME}" not found in release "${RELEASE_TAG}".\n` +
-            `  Available assets: ${names || '(none)'}\n` +
-            `  Upload the patched Electron zip to: ${GITEA_BASE}/${REPO}/releases/tag/${RELEASE_TAG}`
-        );
-    }
-
-    // Gitea API returns browser_download_url for direct download
-    return asset.browser_download_url;
-}
-
 function extractZip(zipPath, destDir) {
     // Use PowerShell on Windows, unzip on Linux/macOS
     if (process.platform === 'win32') {
@@ -133,76 +102,93 @@ function extractZip(zipPath, destDir) {
     }
 }
 
+// ── Per-directory install ──────────────────────────────────────────────────
+
+async function installTo(distDir, platform) {
+    const force = process.argv.includes('--force');
+    const patchedMarker = path.join(distDir, '.patched');
+    const tempZip = path.join(ELECTRON_BASE, `_electron-patched-${platform.asset}`);
+    const label = path.relative(path.resolve(__dirname, '..'), distDir);
+
+    // Check if this exact asset is already installed.
+    // The marker stores the asset filename to handle version changes.
+    if (!force && fs.existsSync(patchedMarker)) {
+        const installed = fs.readFileSync(patchedMarker, 'utf8').trim();
+        if (installed === platform.asset) {
+            console.log(`  [${label}] ${platform.asset} already installed, skipping`);
+            return;
+        }
+        console.log(`  [${label}] Installed: ${installed}, need: ${platform.asset}`);
+    }
+
+    // Direct download from GitHub release
+    const url = `${GITHUB_BASE}/${REPO}/releases/download/${RELEASE_TAG}/${platform.asset}`;
+    console.log(`  [${label}] Asset URL: ${url}`);
+
+    // Download
+    await downloadToFile(url, tempZip);
+    const zipSize = (fs.statSync(tempZip).size / 1048576).toFixed(1);
+    console.log(`  [${label}] Downloaded: ${zipSize} MB`);
+
+    // Clear existing target dir and extract
+    console.log(`  [${label}] Extracting...`);
+    if (fs.existsSync(distDir)) {
+        fs.rmSync(distDir, { recursive: true, force: true });
+    }
+    fs.mkdirSync(distDir, { recursive: true });
+    extractZip(tempZip, distDir);
+
+    // Clean up temp zip
+    fs.unlinkSync(tempZip);
+
+    // Write marker with asset name for future skip-check
+    fs.writeFileSync(patchedMarker, platform.asset);
+    const versionFile = path.join(distDir, 'version');
+    if (fs.existsSync(versionFile)) {
+        const ver = fs.readFileSync(versionFile, 'utf8').trim();
+        console.log(`  [${label}] Installed patched Electron ${ver}`);
+    } else {
+        console.log(`  [${label}] Installed ${platform.asset} (no version file)`);
+    }
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
-    const force = process.argv.includes('--force');
-
-    // Check if patched version is already installed.
-    // The .patched marker distinguishes our build from stock electron-nightly
-    // (both share the same version string).
-    if (!force && fs.existsSync(PATCHED_MARKER)) {
-        const installed = fs.readFileSync(PATCHED_MARKER, 'utf8').trim();
-        if (installed === ELECTRON_VERSION) {
-            console.log(`  Patched Electron ${ELECTRON_VERSION} already installed, skipping`);
-            console.log('  (use --force to re-download)');
-            return;
-        }
-        console.log(`  Installed: ${installed}, need: ${ELECTRON_VERSION}`);
+    if (IS_WIN) {
+        // Windows local dev: patched Win → dist/ (replaces stock)
+        await installTo(path.join(ELECTRON_BASE, 'dist'), PLATFORMS.win32);
+    } else if (IS_CI) {
+        // CI (Linux): keep stock in dist/ untouched,
+        // patched Win → dist-win/, patched Linux → dist-linux/
+        await installTo(path.join(ELECTRON_BASE, 'dist-win'), PLATFORMS.win32);
+        await installTo(path.join(ELECTRON_BASE, 'dist-linux'), PLATFORMS.linux);
+    } else {
+        // Linux local dev: patched Linux → dist/ (for npm run dev),
+        // patched Win → dist-win/ (for cross-compilation)
+        await installTo(path.join(ELECTRON_BASE, 'dist'), PLATFORMS.linux);
+        await installTo(path.join(ELECTRON_BASE, 'dist-win'), PLATFORMS.win32);
     }
-
-    // Resolve download URL from Gitea release
-    console.log(`  Fetching release info for "${RELEASE_TAG}"...`);
-    const url = await getAssetUrl();
-    console.log(`  Asset URL: ${url}`);
-
-    // Download
-    await downloadToFile(url, TEMP_ZIP);
-    const zipSize = (fs.statSync(TEMP_ZIP).size / 1048576).toFixed(1);
-    console.log(`  Downloaded: ${zipSize} MB`);
-
-    // Clear existing target dir and extract
-    console.log(`  Extracting to ${path.relative(path.resolve(__dirname, '..'), ELECTRON_DIST)}/...`);
-    if (fs.existsSync(ELECTRON_DIST)) {
-        fs.rmSync(ELECTRON_DIST, { recursive: true, force: true });
-    }
-    fs.mkdirSync(ELECTRON_DIST, { recursive: true });
-    extractZip(TEMP_ZIP, ELECTRON_DIST);
-
-    // Clean up temp zip
-    fs.unlinkSync(TEMP_ZIP);
 
     // Write path.txt so the electron package's lazy downloader (index.js)
     // considers the binary already installed and doesn't re-download stock.
-    // On non-Windows (CI cross-compilation), skip this so electron-nightly still
-    // downloads the native Linux binary into dist/ for the Linux build target.
-    if (IS_WIN) {
-        fs.writeFileSync(path.join(ELECTRON_DIST, '..', 'path.txt'), 'electron.exe');
-    }
-
-    // Write marker and verify
-    if (fs.existsSync(VERSION_FILE)) {
-        const ver = fs.readFileSync(VERSION_FILE, 'utf8').trim();
-        fs.writeFileSync(PATCHED_MARKER, ver);
-        console.log(`  Installed patched Electron ${ver}`);
-    } else {
-        console.log('  Warning: version file not found after extraction');
-    }
+    const platformExe = IS_WIN ? 'electron.exe' : 'electron';
+    fs.writeFileSync(path.join(ELECTRON_BASE, 'path.txt'), platformExe);
 }
 
 console.log('[KCC] Setting up patched Electron...');
 main().then(() => {
     console.log('[KCC] Patched Electron ready.');
+    if (!IS_WIN) {
+        console.log('  (use --force to re-download)');
+    }
 }).catch((err) => {
     console.error('[KCC] Electron download failed:', err.message);
     console.error('');
-    console.error('  If this is your first time building, you need the patched Electron zip');
-    console.error(`  uploaded as a release asset on ${GITEA_BASE}/${REPO}`);
+    console.error('  Download the patched Electron manually from:');
+    console.error(`  ${GITHUB_BASE}/${REPO}/releases/tag/${RELEASE_TAG}`);
     console.error('');
-    console.error('  1. Go to: ' + GITEA_BASE + '/' + REPO + '/releases/new');
-    console.error(`  2. Create a release with tag: ${RELEASE_TAG}`);
-    console.error(`  3. Upload: ${ASSET_NAME}`);
-    console.error('');
-    console.error('  See electron-build/BUILD.md for how to build Electron from source.');
+    console.error(`  Win asset:   ${PLATFORMS.win32.asset}`);
+    console.error(`  Linux asset: ${PLATFORMS.linux.asset}`);
     process.exit(1);
 });

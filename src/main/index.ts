@@ -683,7 +683,7 @@ async function launchApp(): Promise<void> {
     const tag = version.startsWith('v') ? version : `v${version}`;
     try {
       const data = await new Promise<string>((resolve, reject) => {
-        httpsGet(`https://gitea.crjlab.net/api/v1/repos/bigjakk/Krunker-Civilian-Client/releases/tags/${tag}`, (res) => {
+        httpsGet(`https://api.github.com/repos/bigjakk/Krunker-Civilian-Client/releases/tags/${tag}`, { headers: { 'User-Agent': 'KCC' } }, (res) => {
           let body = '';
           res.on('data', (chunk: string) => { body += chunk; });
           res.on('end', () => resolve(body));

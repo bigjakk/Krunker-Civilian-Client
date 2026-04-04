@@ -3,10 +3,10 @@
 > a high-performance krunker client with unlimited FPS, built on a custom-patched Electron
 
 **Download:**
-[Windows (x64)](https://gitea.crjlab.net/bigjakk/Krunker-Civilian-Client/releases/latest) -
-[Linux (AppImage)](https://gitea.crjlab.net/bigjakk/Krunker-Civilian-Client/releases/latest)
+[Windows (x64)](https://github.com/bigjakk/Krunker-Civilian-Client/releases/latest) -
+[Linux (AppImage)](https://github.com/bigjakk/Krunker-Civilian-Client/releases/latest)
 
-## features
+## Features
 
 - unlimited FPS with no aim freeze (custom Electron build, see [below](#custom-electron-build))
 - unobtrusive — all features can be disabled, no watermarks
@@ -37,7 +37,7 @@
 - auto-updater
 - maintained & open source
 
-## hotkeys
+## Hotkeys
 
 All hotkeys are rebindable in settings.
 
@@ -58,30 +58,31 @@ All hotkeys are rebindable in settings.
 | `Ctrl+Shift+T` | Reopen closed tab |
 | `Ctrl+1-9` | Jump to tab |
 
-## userscripts
+## Userscripts
 
 Any `.js` file in the scripts folder will be loaded as a userscript if enabled in settings. Scripts support Tampermonkey-style metadata blocks (`@name`, `@author`, `@version`, `@desc`) and can define custom settings (boolean, number, select, color, keybind).
 
 > **Use userscripts at your own risk.** Do not write or use any userscripts which would give you a competitive advantage.
 
-## custom Electron build
+## Custom Electron Build
 
 This client uses a custom-patched Electron 42 build to overcome the aim freezing issue present in modern Electron versions. The patched binary is downloaded automatically during `npm install`.
 
 For details on the patch and build instructions, see [Electron-Websocket-Fix](https://github.com/bigjakk/Electron-Websocket-Fix).
 
-## building from source
+## Building From Source
 
 1. Install [git](https://git-scm.com/downloads), [Node.js](https://nodejs.org/), and npm
 2. Clone and install:
    ```bash
-   git clone https://gitea.crjlab.net/bigjakk/Krunker-Civilian-Client.git
+   git clone https://github.com/bigjakk/Krunker-Civilian-Client.git
    cd Krunker-Civilian-Client
    npm install
    ```
 3. Run: `npm start` or `npm run dev` (dev mode with sourcemaps)
 4. Package: `npm run dist:win` or `npm run dist:linux`
 
-## credits
+## Credits
 
 - Built on ideas from [Crankshaft](https://github.com/KraXen72/crankshaft) by KraXen72
+- Inspired by [Glorp](https://github.com/slavcp/glorp) by slav

@@ -13,11 +13,9 @@ export interface UpdateInfo {
 export type ProgressCallback = (percent: number) => void;
 
 const UPDATE_CONFIG = {
-  // Gitea provider
-  checkUrl: 'https://gitea.crjlab.net/api/v1/repos/bigjakk/Krunker-Civilian-Client/releases/latest',
+  checkUrl: 'https://api.github.com/repos/bigjakk/Krunker-Civilian-Client/releases/latest',
   assetPattern: /Setup\.exe$/i,
-  // Allowed hosts for update check and download (including redirects)
-  allowedHosts: ['gitea.crjlab.net'],
+  allowedHosts: ['github.com', 'api.github.com', 'objects.githubusercontent.com'],
 };
 
 const CHECK_TIMEOUT_MS = 10000;
