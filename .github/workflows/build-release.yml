@@ -110,4 +110,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --title "${{ steps.version-check.outputs.TAG }}" \
             --notes-file /tmp/release-notes.md \
+            --latest \
             "${ASSETS[@]}"
