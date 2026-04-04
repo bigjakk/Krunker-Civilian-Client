@@ -4,7 +4,7 @@ import type { MatchmakerConfig } from './matchmaker';
 import { initUserscripts, getInstances, setScriptEnabled } from './userscripts';
 import type { UserscriptInstance } from './userscripts';
 import { initTranslator, updateTranslatorConfig } from './translator';
-import { setDeathAnimBlock, setCleanerMenu, escapeHtml } from './utils';
+import { setDeathAnimBlock, setCleanerMenu, setMenuTimer, escapeHtml } from './utils';
 import { initChat, setBetterChat, setChatHistorySize } from './chat';
 import { initHPCounter, destroyHPCounter } from './competitive';
 import { checkChangelog } from './changelog';
@@ -616,6 +616,13 @@ function buildGeneralSection(
   }));
 
   body.appendChild(createToggleRow({
+    label: 'Menu Timer',
+    desc: 'Show the game/spectate timer on the menu screen',
+    checked: ui.menuTimer ?? true, instant: true,
+    onChange: (v) => { ui.menuTimer = v; saveUI(); setMenuTimer(v); },
+  }));
+
+  body.appendChild(createToggleRow({
     label: 'Double Ping Display',
     desc: 'Show the real ping value (Krunker displays half the actual latency)',
     checked: ui.doublePing ?? true, refreshOnly: true,
@@ -656,6 +663,7 @@ function buildGeneralSection(
   }));
 
   if (ui.deathscreenAnimation) setDeathAnimBlock(true);
+  if (ui.menuTimer ?? true) setMenuTimer(true);
   if (ui.hideMenuPopups) startHidePopups();
 
   body.appendChild(createKeybindRow('Toggle Fullscreen', 'Fullscreen the game window (default F11)', bag.binds.fullscreenToggle, (b) => {
@@ -1635,6 +1643,7 @@ ipcRenderer.on('main_did-finish-load', () => {
     if (uiConf?.deathscreenAnimation) setDeathAnimBlock(true);
     if (uiConf?.hideMenuPopups) startHidePopups();
     if (uiConf?.cleanerMenu) setCleanerMenu(true);
+    if (uiConf?.menuTimer ?? true) setMenuTimer(true);
 
     // ── Double ping display ──
     if (isGamePage && (uiConf?.doublePing ?? true)) {
@@ -1687,6 +1696,58 @@ ipcRenderer.on('main_did-finish-load', () => {
     // ── Changelog popup ──
     if (isGamePage && (uiConf?.showChangelog ?? true)) {
       checkChangelog(currentVersion, uiConf?.lastSeenVersion || '');
+    }
+
+    // ── Battle Pass Claim All (game page only) ──
+    // Poll for .bpBotH element — injects button when BP window is visible
+    if (isGamePage) {
+      const getClaimable = () => Array.from(document.querySelectorAll('.bpClaimB')).filter(
+        (el: any) => el.offsetParent !== null && el.textContent?.trim() === 'Claim'
+      );
+      setInterval(() => {
+        const bar = document.querySelector('.bpBotH') as HTMLElement | null;
+        if (!bar || bar.offsetParent === null) return;
+        const existing = document.getElementById('claimAllBtn');
+        if (existing) {
+          // Update state on re-check (rewards may have become claimable)
+          const claimable = getClaimable();
+          if (claimable.length > 0) {
+            existing.textContent = 'Claim All';
+            existing.classList.remove('disabled');
+          } else {
+            existing.textContent = 'Nothing to Claim';
+            existing.classList.add('disabled');
+          }
+          return;
+        }
+        const claimable = getClaimable();
+        const btn = document.createElement('div');
+        btn.className = 'bpBtn skip';
+        btn.id = 'claimAllBtn';
+        btn.style.cssText = 'margin-left: 8px; cursor: pointer; background: #4CAF50;';
+        if (claimable.length > 0) {
+          btn.textContent = 'Claim All';
+        } else {
+          btn.textContent = 'Nothing to Claim';
+          btn.classList.add('disabled');
+        }
+        btn.addEventListener('click', async () => {
+          if (btn.classList.contains('disabled')) return;
+          (window as any).playSelect?.(0.1);
+          const items = getClaimable();
+          if (items.length === 0) return;
+          btn.textContent = 'Claiming...';
+          btn.classList.add('disabled');
+          for (const item of items) {
+            (item as HTMLElement).click();
+            await new Promise(r => setTimeout(r, 200));
+          }
+          const remaining = getClaimable();
+          btn.textContent = remaining.length > 0 ? 'Claim All' : 'Nothing to Claim';
+          btn.classList.toggle('disabled', remaining.length === 0);
+        });
+        bar.appendChild(btn);
+      }, 500);
     }
 
     // ── Initialize userscripts ──

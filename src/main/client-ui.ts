@@ -679,5 +679,10 @@ export const HP_COUNTER_CSS = `
 }
 `;
 
+// ── Battle Pass Claim All CSS ──
+export const BP_CLAIM_ALL_CSS = `
+#claimAllBtn.disabled { opacity: 0.4; pointer-events: none; }
+`;
+
 /** Pre-concatenated CSS for single-call injection (excludes HIDE_ADS_CSS which is separate) */
-export const ALL_CLIENT_CSS = `${CLIENT_SETTINGS_CSS}\n${MATCHMAKER_SETTINGS_CSS}\n${TRANSLATOR_CSS}\n${ALT_MANAGER_CSS}\n${HP_COUNTER_CSS}`;
+export const ALL_CLIENT_CSS = `${CLIENT_SETTINGS_CSS}\n${MATCHMAKER_SETTINGS_CSS}\n${TRANSLATOR_CSS}\n${ALT_MANAGER_CSS}\n${HP_COUNTER_CSS}\n${BP_CLAIM_ALL_CSS}`;
