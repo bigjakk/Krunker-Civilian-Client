@@ -1,5 +1,6 @@
 import { get as httpsGet } from 'https';
-import { createWriteStream, renameSync, unlinkSync, existsSync } from 'fs';
+import { createReadStream, createWriteStream, renameSync, unlinkSync, existsSync } from 'fs';
+import { createHash } from 'crypto';
 import { spawn } from 'child_process';
 import { app } from 'electron';
 import { electronLog } from './logger';
@@ -8,6 +9,7 @@ export interface UpdateInfo {
   version: string;
   downloadUrl: string;
   fileSize: number;
+  sha256: string;
 }
 
 export type ProgressCallback = (percent: number) => void;
@@ -104,7 +106,7 @@ export function checkForUpdate(currentVersion: string): Promise<UpdateInfo | nul
             return;
           }
 
-          const assets: Array<{ name: string; browser_download_url: string; size: number }> = release.assets || [];
+          const assets: Array<{ name: string; browser_download_url: string; size: number; digest: string }> = release.assets || [];
           const setupAsset = assets.find((a) => UPDATE_CONFIG.assetPattern.test(a.name));
           if (!setupAsset) {
             electronLog.error('[KCC-Update] No Setup.exe asset found in release', remoteVersion);
@@ -119,11 +121,20 @@ export function checkForUpdate(currentVersion: string): Promise<UpdateInfo | nul
             return;
           }
 
-          electronLog.log('[KCC-Update] Update available:', remoteVersion, '| Download:', setupAsset.browser_download_url, '| Size:', setupAsset.size);
+          // Extract SHA-256 digest from GitHub API (format: "sha256:<hex>")
+          const sha256 = (setupAsset.digest || '').replace(/^sha256:/i, '');
+          if (!sha256) {
+            electronLog.error('[KCC-Update] No SHA-256 digest found for asset');
+            resolve(null);
+            return;
+          }
+
+          electronLog.log('[KCC-Update] Update available:', remoteVersion, '| SHA-256:', sha256.substring(0, 16) + '...');
           resolve({
             version: remoteVersion,
             downloadUrl: setupAsset.browser_download_url,
             fileSize: setupAsset.size,
+            sha256,
           });
         } catch (err) {
           electronLog.error('[KCC-Update] Failed to parse release data:', err);
@@ -149,7 +160,22 @@ export function checkForUpdate(currentVersion: string): Promise<UpdateInfo | nul
   });
 }
 
-export function downloadUpdate(url: string, destPath: string, onProgress: ProgressCallback): Promise<void> {
+function verifyChecksum(filePath: string, expectedSha256: string): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256');
+    const stream = createReadStream(filePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('end', () => {
+      const actual = hash.digest('hex');
+      electronLog.log('[KCC-Update] SHA-256 expected:', expectedSha256);
+      electronLog.log('[KCC-Update] SHA-256 actual:  ', actual);
+      resolve(actual === expectedSha256);
+    });
+    stream.on('error', reject);
+  });
+}
+
+export function downloadUpdate(url: string, destPath: string, onProgress: ProgressCallback, expectedSha256?: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const tmpPath = destPath + '.tmp';
 
@@ -194,8 +220,18 @@ export function downloadUpdate(url: string, destPath: string, onProgress: Progre
         res.pipe(file);
 
         file.on('finish', () => {
-          file.close(() => {
+          file.close(async () => {
             try {
+              if (expectedSha256) {
+                const valid = await verifyChecksum(tmpPath, expectedSha256);
+                if (!valid) {
+                  electronLog.error('[KCC-Update] Checksum mismatch — file may be corrupted or tampered');
+                  try { unlinkSync(tmpPath); } catch { /* ignore */ }
+                  reject(new Error('SHA-256 checksum mismatch'));
+                  return;
+                }
+                electronLog.log('[KCC-Update] Checksum verified');
+              }
               if (existsSync(destPath)) unlinkSync(destPath);
               renameSync(tmpPath, destPath);
               resolve();

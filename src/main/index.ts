@@ -192,7 +192,7 @@ app.whenReady().then(async () => {
           if (!cancelled && !updateWin.isDestroyed()) {
             sendProgress(`Downloading update... ${pct}%`, pct);
           }
-        });
+        }, update.sha256);
 
         if (!cancelled) {
           sendProgress('Installing update...', 100);
