@@ -6,7 +6,7 @@ import type { UserscriptInstance } from './userscripts';
 import { initTranslator, updateTranslatorConfig } from './translator';
 import { setDeathAnimBlock, setCleanerMenu, setMenuTimer, escapeHtml } from './utils';
 import { initChat, setBetterChat, setChatHistorySize } from './chat';
-import { initHPCounter, destroyHPCounter } from './competitive';
+import { initHPCounter, destroyHPCounter, initRankProgress } from './competitive';
 import { checkChangelog } from './changelog';
 import type { Keybind } from '../main/config';
 
@@ -1675,9 +1675,12 @@ ipcRenderer.on('main_did-finish-load', () => {
       }, _console);
     }
 
-    // ── Hardpoint enemy counter ──
+    // ── Competitive features ──
     if (isGamePage && (gameConf?.hpEnemyCounter ?? true)) {
       initHPCounter();
+    }
+    if (isGamePage) {
+      initRankProgress();
     }
 
     // ── CPU throttle state notifications ──

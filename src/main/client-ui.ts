@@ -684,5 +684,29 @@ export const BP_CLAIM_ALL_CSS = `
 #claimAllBtn.disabled { opacity: 0.4; pointer-events: none; }
 `;
 
+// ── Rank progress tracker CSS ──
+export const RANK_TRACKER_CSS = `
+#kpc-elo-tracker { width: 100%; margin: 8px 0; }
+.kpc-elo-info-row { display: flex; align-items: center; gap: 8px; }
+.kpc-rank-container { display: flex; align-items: center; gap: 4px; white-space: nowrap; font-size: 12px; color: #ccc; }
+.kpc-elo-rank-img { width: 20px; height: 20px; }
+.kpc-elo-bar-bg { flex: 1; height: 14px; background: rgba(255,255,255,0.1); border-radius: 7px; position: relative; overflow: hidden; }
+.kpc-elo-bar-fill { height: 100%; background: linear-gradient(90deg, #388E3C, #4CAF50); border-radius: 7px; transition: width 0.3s; }
+.kpc-elo-bar-text { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+#kpc-rank-list-btn { position: absolute; bottom: 8px; right: 8px; cursor: pointer; padding: 6px 14px; border-radius: 6px; font-size: 12px; background: rgba(76,175,80,0.3); color: #4CAF50; border: 1px solid rgba(76,175,80,0.4); z-index: 1; }
+#kpc-rank-list-btn:hover { background: rgba(76,175,80,0.5); color: #fff; }
+#kpc-rank-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.75); z-index: 9998; display: flex; justify-content: center; align-items: center; }
+.kpc-rank-popup { background: #1a1a2e; border-radius: 12px; padding: 20px; min-width: 340px; max-width: 500px; box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
+.kpc-rank-popup-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.kpc-rank-popup-header h2 { margin: 0; color: #fff; font-size: 16px; }
+.kpc-rank-popup-close { cursor: pointer; color: #888; font-size: 18px; padding: 4px 8px; }
+.kpc-rank-popup-close:hover { color: #fff; }
+.kpc-rank-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.kpc-rank-grid-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(255,255,255,0.05); border-radius: 6px; }
+.kpc-rank-grid-item img { width: 28px; height: 28px; }
+.kpc-rank-name { font-size: 13px; font-weight: 600; }
+.kpc-rank-elo { font-size: 11px; color: #888; }
+`;
+
 /** Pre-concatenated CSS for single-call injection (excludes HIDE_ADS_CSS which is separate) */
-export const ALL_CLIENT_CSS = `${CLIENT_SETTINGS_CSS}\n${MATCHMAKER_SETTINGS_CSS}\n${TRANSLATOR_CSS}\n${ALT_MANAGER_CSS}\n${HP_COUNTER_CSS}\n${BP_CLAIM_ALL_CSS}`;
+export const ALL_CLIENT_CSS = `${CLIENT_SETTINGS_CSS}\n${MATCHMAKER_SETTINGS_CSS}\n${TRANSLATOR_CSS}\n${ALT_MANAGER_CSS}\n${HP_COUNTER_CSS}\n${BP_CLAIM_ALL_CSS}\n${RANK_TRACKER_CSS}`;
