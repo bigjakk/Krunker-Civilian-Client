@@ -9,33 +9,35 @@
 ## Features
 
 - unlimited FPS with no aim freeze (custom Electron build, see [below](#custom-electron-build))
-- unobtrusive — all features can be disabled, no watermarks
+- unobtrusive — nearly all features can be disabled, no watermarks
 - hides ads by default
 - resource swapper (textures, sounds, models)
-- CSS theme system (drop `.css` files in `swap/themes/`)
+- CSS theme system with `@import` support (drop `.css` files in `swap/themes/`)
 - custom loading screen backgrounds (`swap/backgrounds/`)
 - customisable matchmaker with lobby scan animation
   - filter by region, gamemode, map, player count, remaining time
   - auto-join with server capacity verification
+- external ranked queue (works even when the game is closed)
+- rank progress tracker with ELO bar and rank distribution popup
 - tabbed hub/social pages with drag-and-drop reorder
 - better chat — merged team/all chat with `[T]`/`[M]` prefixes
 - chat history preservation (Krunker prunes old messages, this prevents it)
 - real-time chat translator (Google Translate, 15+ languages)
 - userscript support (Tampermonkey-style metadata, per-script settings)
+- battle pass claim all button
 - alt account manager with encrypted credential storage
 - Discord RPC (gamemode, map, class, spectator status)
 - raw input / unadjusted movement (Windows)
 - show numeric ping in player list
 - double ping display (Krunker shows half the real value)
 - hardpoint enemy counter HUD
-- cleaner menu mode (hides clutter)
 - changelog popup on update
 - configurable keybinds with visual rebinding dialog
 - configurable ANGLE backend (D3D11, OpenGL, Vulkan, D3D9, D3D11on12)
 - advanced Chromium flag settings (GPU rasterization, low latency, QUIC, and more)
 - CPU throttling (game vs menu) and process priority control
 - auto-updater
-- maintained & open source
+- maintained & open source (GPL-3.0)
 
 ## Hotkeys
 
@@ -84,5 +86,5 @@ For details on the patch and build instructions, see [Electron-Websocket-Fix](ht
 
 ## Credits
 
-- Built on ideas from [Crankshaft](https://github.com/KraXen72/crankshaft) by KraXen72
-- Inspired by [Glorp](https://github.com/slavcp/glorp) by slav
+- [Crankshaft](https://github.com/KraXen72/crankshaft) by KraXen72 - Original inspiration. Settings Layout
+- [Glorp](https://github.com/slavcp/glorp) by slav - Numerous features for the newer chromium verisions. External Ranked Queue
