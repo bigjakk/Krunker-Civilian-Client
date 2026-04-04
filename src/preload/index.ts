@@ -707,7 +707,7 @@ function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfRaw: any
 
   // ── CSS Theme selector (populated from swap/themes/) ──
   const themeRow = document.createElement('div');
-  themeRow.className = 'setting settName safety-0 sel';
+  themeRow.className = 'setting settName safety-0 sel has-button';
   themeRow.innerHTML =
     '<span class="setting-title">CSS Theme</span>' +
     '<div class="setting-desc-new">Load a custom CSS theme from swap/themes/</div>';
@@ -715,6 +715,12 @@ function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfRaw: any
   themeSelect.className = 's-update inputGrey2';
   themeSelect.innerHTML = '<option value="disabled">Loading...</option>';
   themeRow.appendChild(themeSelect);
+  const themeFolderBtn = document.createElement('div');
+  themeFolderBtn.className = 'settingsBtn';
+  themeFolderBtn.title = 'Open Themes Folder';
+  themeFolderBtn.innerHTML = '<span class="material-icons">folder</span>';
+  themeFolderBtn.addEventListener('click', () => ipcRenderer.invoke('open-themes-folder'));
+  themeRow.appendChild(themeFolderBtn);
   body.appendChild(themeRow);
 
   ipcRenderer.invoke('list-themes').then((themes: Array<{ id: string; label: string }>) => {
@@ -736,7 +742,7 @@ function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfRaw: any
 
   // ── Loading Screen Background ──
   const bgRow = document.createElement('div');
-  bgRow.className = 'setting settName safety-0 sel';
+  bgRow.className = 'setting settName safety-0 sel has-button';
   bgRow.innerHTML =
     '<span class="setting-title">Loading Background</span>' +
     '<div class="setting-desc-new">Custom background image for the loading screen (swap/backgrounds/)</div>';
@@ -744,6 +750,12 @@ function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfRaw: any
   bgSelect.className = 's-update inputGrey2';
   bgSelect.innerHTML = '<option value="disabled">Loading...</option>';
   bgRow.appendChild(bgSelect);
+  const bgFolderBtn = document.createElement('div');
+  bgFolderBtn.className = 'settingsBtn';
+  bgFolderBtn.title = 'Open Backgrounds Folder';
+  bgFolderBtn.innerHTML = '<span class="material-icons">folder</span>';
+  bgFolderBtn.addEventListener('click', () => ipcRenderer.invoke('open-backgrounds-folder'));
+  bgRow.appendChild(bgFolderBtn);
   body.appendChild(bgRow);
 
   ipcRenderer.invoke('list-loading-themes').then((themes: Array<{ id: string; label: string }>) => {

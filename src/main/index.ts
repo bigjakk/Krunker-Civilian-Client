@@ -229,6 +229,12 @@ async function launchApp(): Promise<void> {
   // ── Resource swapper ──
   const swapperConfig = config.get('swapper');
   const swapDir = swapperConfig.path || join(app.getPath('userData'), 'Krunker Civilian Client', 'swapper');
+  // Ensure swap subdirectories exist (themes/, backgrounds/)
+  for (const sub of ['themes', 'backgrounds']) {
+    const dir = join(swapDir, sub);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  }
+
   const swapper = swapperConfig.enabled ? new ResourceSwapper(swapDir) : null;
   electronLog.log(`[KCC] Resource swapper: ${swapper ? 'enabled' : 'disabled'} (${swapDir})`);
 
@@ -510,10 +516,20 @@ async function launchApp(): Promise<void> {
       win.webContents.insertCSS(ALL_CLIENT_CSS),
     ];
 
-    // Inject user CSS theme
+    // Inject user CSS theme via <style> tag so @import rules work
     const uiConf = config.get('ui');
-    const themeCSS = getThemeCSS(uiConf?.cssTheme || 'disabled', swapDir);
-    if (themeCSS) cssInjections.push(win.webContents.insertCSS(themeCSS));
+    const themeId = uiConf?.cssTheme || 'disabled';
+    const themeCSS = getThemeCSS(themeId, swapDir);
+    electronLog.log(`[KCC] CSS theme: id=${themeId}, css=${themeCSS ? themeCSS.length + ' chars' : 'none'}`);
+    if (themeCSS) {
+      const escaped = themeCSS.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+      win.webContents.executeJavaScript(`(() => {
+        const s = document.createElement('style');
+        s.id = 'kcc-user-theme';
+        s.textContent = \`${escaped}\`;
+        document.head.appendChild(s);
+      })()`).catch((err) => electronLog.warn('[KCC] Theme inject failed:', err));
+    }
 
     // Inject loading screen background
     const loadingCSS = getLoadingScreenCSS(uiConf?.loadingTheme || 'disabled', uiConf?.backgroundUrl || '', swapDir);
@@ -607,6 +623,8 @@ async function launchApp(): Promise<void> {
   });
   ipcMain.handle('get-swap-dir', () => swapDir);
   ipcMain.handle('open-swap-folder', () => shell.openPath(swapDir));
+  ipcMain.handle('open-themes-folder', () => shell.openPath(join(swapDir, 'themes')));
+  ipcMain.handle('open-backgrounds-folder', () => shell.openPath(join(swapDir, 'backgrounds')));
 
   // ── Ping regions IPC handler (TCP connect timing, cached 60s) ──
   ipcMain.handle('ping-regions', async () => {
