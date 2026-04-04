@@ -15,7 +15,7 @@ export type ProgressCallback = (percent: number) => void;
 const UPDATE_CONFIG = {
   checkUrl: 'https://api.github.com/repos/bigjakk/Krunker-Civilian-Client/releases/latest',
   assetPattern: /Setup\.exe$/i,
-  allowedHosts: ['github.com', 'api.github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com'],
+  allowedHosts: ['github.com', 'githubusercontent.com'],
 };
 
 const CHECK_TIMEOUT_MS = 10000;
