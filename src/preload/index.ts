@@ -1,5 +1,5 @@
 import { ipcRenderer } from 'electron';
-import { fetchGame, MATCHMAKER_GAMEMODES, MATCHMAKER_REGIONS, MATCHMAKER_REGION_NAMES, MAP_ICON_INDICES, MATCHMAKER_MAP_NAMES } from './matchmaker';
+import { fetchGame, MATCHMAKER_GAMEMODE_FILTER, MATCHMAKER_REGIONS, MATCHMAKER_REGION_NAMES, MATCHMAKER_MAP_FILTER, MATCHMAKER_MAP_NAMES } from './matchmaker';
 import type { MatchmakerConfig } from './matchmaker';
 import { initUserscripts, getInstances, setScriptEnabled } from './userscripts';
 import type { UserscriptInstance } from './userscripts';
@@ -844,7 +844,7 @@ function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag
 
   body.appendChild(createCheckboxGrid({
     header: 'Gamemodes (none selected = all)',
-    items: MATCHMAKER_GAMEMODES.map(gm => ({ value: gm, label: gm })),
+    items: MATCHMAKER_GAMEMODE_FILTER.map(gm => ({ value: gm, label: gm })),
     selected: mm.gamemodes,
     onChange: () => saveMM(),
   }));
@@ -852,7 +852,7 @@ function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag
   if (!mm.maps) mm.maps = [];
   body.appendChild(createCheckboxGrid({
     header: 'Maps (none selected = all)',
-    items: MAP_ICON_INDICES.map(m => ({ value: m, label: MATCHMAKER_MAP_NAMES[m] || m })),
+    items: MATCHMAKER_MAP_FILTER.map(m => ({ value: m, label: MATCHMAKER_MAP_NAMES[m] || m })),
     selected: mm.maps,
     onChange: () => saveMM(),
   }));
