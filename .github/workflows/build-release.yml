@@ -110,5 +110,17 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --title "${{ steps.version-check.outputs.TAG }}" \
             --notes-file /tmp/release-notes.md \
+            --draft=false \
             --latest \
             "${ASSETS[@]}"
+
+      # Gitea mirror force-pushes tags which can reset releases to draft.
+      # Re-publish any drafts on every run to counteract this.
+      - name: Publish any draft releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release list --repo "$GITHUB_REPOSITORY" --json tagName,isDraft --jq '.[] | select(.isDraft) | .tagName' | while read -r tag; do
+            echo "Publishing draft release: $tag"
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+          done
