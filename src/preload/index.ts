@@ -1427,7 +1427,7 @@ function renderUserscriptsSection(body: HTMLElement): void {
 function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement): void {
   if (!inst.settings) return;
 
-  for (const [key, setting] of Object.entries(inst.settings)) {
+  for (const [, setting] of Object.entries(inst.settings)) {
     const typeClass = setting.type === 'bool' ? 'bool' : setting.type === 'sel' ? 'sel' : setting.type === 'num' ? 'num' : setting.type === 'keybind' ? 'keybind' : '';
     const row = document.createElement('div');
     row.className = 'setting settName safety-0' + (typeClass ? ' ' + typeClass : '');
@@ -1447,7 +1447,7 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
         input.addEventListener('change', () => {
           setting.value = input.checked;
           if (typeof setting.changed === 'function') setting.changed(setting.value);
-          saveScriptSetting(inst, key);
+          saveScriptSetting(inst);
         });
         break;
       }
@@ -1463,7 +1463,7 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
         input.addEventListener('change', () => {
           setting.value = parseFloat(input.value) || 0;
           if (typeof setting.changed === 'function') setting.changed(setting.value);
-          saveScriptSetting(inst, key);
+          saveScriptSetting(inst);
         });
         break;
       }
@@ -1483,7 +1483,7 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
         select.addEventListener('change', () => {
           setting.value = select.value;
           if (typeof setting.changed === 'function') setting.changed(setting.value);
-          saveScriptSetting(inst, key);
+          saveScriptSetting(inst);
         });
         break;
       }
@@ -1496,7 +1496,7 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
         input.addEventListener('input', () => {
           setting.value = input.value;
           if (typeof setting.changed === 'function') setting.changed(setting.value);
-          saveScriptSetting(inst, key);
+          saveScriptSetting(inst);
         });
         break;
       }
@@ -1510,7 +1510,7 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
             setting.value = newBind;
             keyEl.textContent = keybindDisplayString(newBind);
             if (typeof setting.changed === 'function') setting.changed(setting.value);
-            saveScriptSetting(inst, key);
+            saveScriptSetting(inst);
           });
         });
         row.appendChild(keyEl);
@@ -1522,7 +1522,7 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
   }
 }
 
-function saveScriptSetting(inst: UserscriptInstance, _key: string): void {
+function saveScriptSetting(inst: UserscriptInstance): void {
   if (!inst.settings) return;
   const prefs: Record<string, unknown> = {};
   for (const [k, s] of Object.entries(inst.settings)) {

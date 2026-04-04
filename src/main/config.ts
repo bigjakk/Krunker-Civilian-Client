@@ -1,5 +1,4 @@
 import Store from 'electron-store';
-import { detectPlatform } from './platform';
 
 export interface Keybind {
   key: string;
@@ -112,10 +111,6 @@ export interface AppConfig {
     y: number | undefined;
     maximized: boolean;
   };
-  platform: {
-    detectedOS: string;
-    gpuBackend: string;
-  };
 }
 
 export const DEFAULT_KEYBINDS: AppConfig['keybinds'] = {
@@ -131,7 +126,6 @@ export const DEFAULT_KEYBINDS: AppConfig['keybinds'] = {
   fullscreenToggle:  { key: 'F11',    ctrl: false, shift: false, alt: false },
 };
 
-const platformInfo = detectPlatform();
 
 export const config = new Store<AppConfig>({
   name: 'krunker-civilian-config',
@@ -221,10 +215,6 @@ export const config = new Store<AppConfig>({
       x: undefined,
       y: undefined,
       maximized: true,
-    },
-    platform: {
-      detectedOS: platformInfo.os,
-      gpuBackend: platformInfo.gpuBackend,
     },
   },
 });

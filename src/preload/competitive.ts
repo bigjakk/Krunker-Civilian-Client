@@ -61,21 +61,16 @@ function startHPCounter(): void {
 }
 
 function stopHPCounter(): void {
-    if (hpCheckInterval) { clearInterval(hpCheckInterval); hpCheckInterval = null; }
-    if (hpObserver) { hpObserver.disconnect(); hpObserver = null; }
-    if (hpCounterEl) { hpCounterEl.remove(); hpCounterEl = null; }
-    if (hpTimeout) { clearTimeout(hpTimeout); hpTimeout = null; }
+    clearInterval(hpCheckInterval!); hpCheckInterval = null;
+    hpObserver?.disconnect(); hpObserver = null;
+    hpCounterEl?.remove(); hpCounterEl = null;
+    clearTimeout(hpTimeout!); hpTimeout = null;
     hpPointCounter = null;
     hpEnemyOBJ = 0;
 }
 
 export function initHPCounter(): void { startHPCounter(); }
 export function destroyHPCounter(): void { stopHPCounter(); }
-
-export function setHPCounterEnabled(enabled: boolean): void {
-    stopHPCounter();
-    if (enabled) startHPCounter();
-}
 
 // ── Rank Progress Tracker ──
 

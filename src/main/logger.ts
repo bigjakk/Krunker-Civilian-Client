@@ -67,7 +67,7 @@ function makeLogger(getStream: () => WriteStream) {
 
 export const electronLog = makeLogger(() => electronStream);
 
-export function getLogPath(_type: 'electron'): string {
+export function getLogPath(): string {
   init();
   return electronPath;
 }

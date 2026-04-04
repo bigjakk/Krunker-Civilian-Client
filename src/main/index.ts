@@ -551,7 +551,7 @@ async function launchApp(): Promise<void> {
   const ALLOWED_CONFIG_KEYS = new Set<string>([
     'window', 'performance', 'game', 'swapper', 'matchmaker',
     'keybinds', 'userscripts', 'ui', 'discord', 'translator',
-    'advanced', 'accounts', 'tabWindow', 'platform',
+    'advanced', 'accounts', 'tabWindow',
   ]);
 
   ipcMain.handle('get-version', () => appVersion);
@@ -745,7 +745,7 @@ async function launchApp(): Promise<void> {
 
   // ── Action button IPC handlers ──
   ipcMain.handle('open-electron-log', () => {
-    shell.openPath(getLogPath('electron'));
+    shell.openPath(getLogPath());
   });
   ipcMain.handle('reset-swapper', async () => {
     try {

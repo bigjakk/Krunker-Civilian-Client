@@ -19,37 +19,10 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, c => HTML_ESCAPE_MAP[c]);
 }
 
-// ── Chat message injection ──
-// Creates messages in #chatHolder inside a persistent #kpcMessageHolder div.
-// timeout=0 means the message is persistent (not auto-removed).
-
-export function genChatMsg(text: string, timeout = 2.25): HTMLElement | null {
-  const chatHolder = document.getElementById('chatHolder');
-  if (!chatHolder) return null;
-  if (!document.getElementById('kpcMessageHolder')) {
-    chatHolder.insertAdjacentHTML('afterbegin', '<div id="kpcMessageHolder"></div>');
-  }
-  const holder = document.getElementById('kpcMessageHolder')!;
-  holder.insertAdjacentHTML('beforeend',
-    '<div class="chatHolder_kpc"><div class="chatItem_kpc"><span class="chatMsg_kpc">' +
-    escapeHtml(text) + '</span></div></div>');
-  const elem = holder.lastElementChild as HTMLElement;
-  if (timeout !== 0) {
-    setTimeout(() => { elem.remove(); }, timeout * 1000);
-  }
-  return elem;
-}
-
-// ── Filename sanitisation ──
-
-export function sanitizeFilename(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_-]/g, '_');
-}
-
 // ── Shared CSS constants ──
 
-export const DEATH_ANIM_BLOCK_ID = 'kpc-animationBlock';
-export const DEATH_ANIM_BLOCK_CSS =
+const DEATH_ANIM_BLOCK_ID = 'kpc-animationBlock';
+const DEATH_ANIM_BLOCK_CSS =
   '.death-ui-bottom, .death-ui-bottom-empty { animation: none !important; transition: none !important; }';
 
 /** Inject or remove the death screen animation block style element. */
