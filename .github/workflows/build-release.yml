@@ -76,6 +76,15 @@ jobs:
           echo "=== Build output sizes ==="
           ls -lh out/*.exe out/*.AppImage out/*.deb 2>/dev/null || true
 
+      - name: Generate release notes
+        if: steps.version-check.outputs.SKIP == 'false'
+        run: |
+          git fetch --unshallow 2>/dev/null || true
+          chmod +x scripts/generate-release-notes.sh
+          scripts/generate-release-notes.sh "${{ steps.version-check.outputs.TAG }}" > /tmp/release-notes.md
+          echo "--- Generated release notes ---"
+          cat /tmp/release-notes.md
+
       - name: Create GitHub release and upload assets
         if: steps.version-check.outputs.SKIP == 'false'
         env:
@@ -100,5 +109,5 @@ jobs:
           gh release create "${{ steps.version-check.outputs.TAG }}" \
             --repo "$GITHUB_REPOSITORY" \
             --title "${{ steps.version-check.outputs.TAG }}" \
-            --notes "Automated build for ${{ steps.version-check.outputs.TAG }}" \
+            --notes-file /tmp/release-notes.md \
             "${ASSETS[@]}"
