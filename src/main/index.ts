@@ -49,7 +49,6 @@ const advancedDefaults = {
   removeUselessFeatures: true,
   gpuRasterizing: false,
   helpfulFlags: true,
-  disableAccelerated2D: false,
   increaseLimits: false,
   lowLatency: false,
   experimentalFlags: false,

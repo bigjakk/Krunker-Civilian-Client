@@ -106,11 +106,6 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('enable-features', 'V8VmFuture,WebAssemblyBaseline,WebAssemblyTiering,WebAssemblyLazyCompilation');
   }
 
-  // ── Disable accelerated 2D canvas ──
-  if (advanced.disableAccelerated2D) {
-    app.commandLine.appendSwitch('disable-accelerated-2d-canvas');
-  }
-
   // ── Increase limits ──
   if (advanced.increaseLimits) {
     app.commandLine.appendSwitch('renderer-process-limit', '100');

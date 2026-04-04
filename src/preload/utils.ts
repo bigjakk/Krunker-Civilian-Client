@@ -40,40 +40,6 @@ export function setDeathAnimBlock(enabled: boolean): void {
   }
 }
 
-// ── Cleaner Menu ──
-// Hides clutter from the main menu for a streamlined look.
-
-const CLEANER_MENU_ID = 'kpc-cleanerMenu';
-const CLEANER_MENU_CSS = `
-*::-webkit-scrollbar { display: none !important; }
-.settingsBtn[style*="width:auto;background-color:#994cd1"] { display: none !important; }
-.setSugBox2 { display: none !important; }
-.advancedSwitch { display: none !important; }
-.menuSocialB { display: none !important; }
-.serverHostOpH { display: none !important; }
-.signup-rewards-container { display: none !important; }
-#tlInfHold { display: none !important; }
-#gameNameHolder { display: none !important; }
-#termsInfo { display: none !important; }
-#bubbleContainer { display: none !important; }
-#instructions:only-child { display: none !important; }
-#mapInfoHld { display: none !important; }
-#krDiscountAd { display: none !important; }
-#classPreviewCanvas { display: none !important; }
-#menuClassSubtext { display: none !important; }
-#settingsPreset { display: none !important; }
-#menuClassName { display: none !important; }
-#menuBtnQuickMatch { display: none !important; }
-#menuClassIcn { display: none !important; }
-#streamContainerNew { display: none !important; }
-#editorBtnM { display: none !important; }
-.verticalSeparator { visibility: hidden !important; }
-#mLevelCont { background-color: transparent; }
-#uiBase.onMenu #spectButton { top: 94% !important; }
-.headerBarL, .headerBar, .menuBtnHL { background-color: transparent; }
-.headerBarR { right: -23px !important; }
-`;
-
 // ── Menu Timer ──
 // Shows the native spectate/game timer prominently on the menu screen.
 // CSS approach from crankshaft/glorp.
@@ -125,16 +91,3 @@ export function setMenuTimer(enabled: boolean): void {
     }
 }
 
-export function setCleanerMenu(enabled: boolean): void {
-    let el = document.getElementById(CLEANER_MENU_ID);
-    if (enabled) {
-        if (!el) {
-            el = document.createElement('style');
-            el.id = CLEANER_MENU_ID;
-            el.textContent = CLEANER_MENU_CSS;
-            document.head.appendChild(el);
-        }
-    } else if (el) {
-        el.remove();
-    }
-}

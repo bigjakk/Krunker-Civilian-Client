@@ -4,7 +4,7 @@ import type { MatchmakerConfig } from './matchmaker';
 import { initUserscripts, getInstances, setScriptEnabled } from './userscripts';
 import type { UserscriptInstance } from './userscripts';
 import { initTranslator, updateTranslatorConfig } from './translator';
-import { setDeathAnimBlock, setCleanerMenu, setMenuTimer, escapeHtml } from './utils';
+import { setDeathAnimBlock, setMenuTimer, escapeHtml } from './utils';
 import { initChat, setBetterChat, setChatHistorySize } from './chat';
 import { initHPCounter, destroyHPCounter, initRankProgress } from './competitive';
 import { checkChangelog } from './changelog';
@@ -609,13 +609,6 @@ function buildGeneralSection(
   }));
 
   body.appendChild(createToggleRow({
-    label: 'Cleaner Menu',
-    desc: 'Hide clutter from the main menu (scrollbars, social buttons, class preview, etc.)',
-    checked: ui.cleanerMenu ?? false, instant: true,
-    onChange: (v) => { ui.cleanerMenu = v; saveUI(); setCleanerMenu(v); },
-  }));
-
-  body.appendChild(createToggleRow({
     label: 'Menu Timer',
     desc: 'Show the game/spectate timer on the menu screen',
     checked: ui.menuTimer ?? true, instant: true,
@@ -1089,7 +1082,6 @@ function buildAdvancedSection(
     removeUselessFeatures: true,
     gpuRasterizing: false,
     helpfulFlags: true,
-    disableAccelerated2D: false,
     increaseLimits: false,
     lowLatency: false,
     experimentalFlags: false,
@@ -1134,9 +1126,8 @@ function buildAdvancedSection(
     { key: 'removeUselessFeatures', label: 'Remove Useless Features', desc: 'Disables crash reporting, metrics, print preview, and other unused Chromium features', safety: 1 },
     { key: 'gpuRasterizing', label: 'GPU Rasterization', desc: 'Force GPU rasterization and out-of-process rasterization', safety: 2 },
     { key: 'helpfulFlags', label: 'Useful Flags', desc: 'Enables WebGL, JS harmony, V8 features, background throttle prevention, and autoplay bypass', safety: 3 },
-    { key: 'disableAccelerated2D', label: 'Disable Accelerated 2D Canvas', desc: 'Disables hardware-accelerated 2D canvas rendering', safety: 3 },
     { key: 'increaseLimits', label: 'Increase Limits', desc: 'Raises renderer process, WebGL context, and WebRTC CPU limits; ignores GPU blocklist', safety: 4 },
-    { key: 'lowLatency', label: 'Low Latency Flags', desc: 'Enables high-resolution timer, QUIC protocol, and accelerated 2D canvas', safety: 4 },
+    { key: 'lowLatency', label: 'Low Latency Flags', desc: 'Enables high-resolution timer, QUIC protocol, and high-performance GPU', safety: 4 },
     { key: 'experimentalFlags', label: 'Experimental Flags', desc: 'Enables accelerated video decode, native GPU memory buffers, high DPI support, and disables pings/proxy', safety: 4 },
   ];
 
@@ -1654,7 +1645,6 @@ ipcRenderer.on('main_did-finish-load', () => {
 
     if (uiConf?.deathscreenAnimation) setDeathAnimBlock(true);
     if (uiConf?.hideMenuPopups) startHidePopups();
-    if (uiConf?.cleanerMenu) setCleanerMenu(true);
     if (uiConf?.menuTimer ?? true) setMenuTimer(true);
 
     // ── Double ping display ──

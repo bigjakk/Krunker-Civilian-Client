@@ -75,7 +75,6 @@ export interface AppConfig {
     showExitButton: boolean;
     deathscreenAnimation: boolean;
     hideMenuPopups: boolean;
-    cleanerMenu: boolean;
     menuTimer: boolean;
     doublePing: boolean;
     cssTheme: string;
@@ -96,7 +95,6 @@ export interface AppConfig {
     removeUselessFeatures: boolean;
     gpuRasterizing: boolean;
     helpfulFlags: boolean;
-    disableAccelerated2D: boolean;
     increaseLimits: boolean;
     lowLatency: boolean;
     experimentalFlags: boolean;
@@ -180,7 +178,6 @@ export const config = new Store<AppConfig>({
       showExitButton: true,
       deathscreenAnimation: true,
       hideMenuPopups: false,
-      cleanerMenu: false,
       menuTimer: true,
       doublePing: true,
       cssTheme: 'disabled',
@@ -201,7 +198,6 @@ export const config = new Store<AppConfig>({
       removeUselessFeatures: true,
       gpuRasterizing: false,
       helpfulFlags: true,
-      disableAccelerated2D: false,
       increaseLimits: false,
       lowLatency: false,
       experimentalFlags: false,
