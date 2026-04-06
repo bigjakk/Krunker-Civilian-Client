@@ -1,5 +1,10 @@
 # Krunker Civilian Client
 
+[![GitHub Downloads](https://img.shields.io/github/downloads/bigjakk/Krunker-Civilian-Client/total?style=flat&logo=github&label=Downloads)](https://github.com/bigjakk/Krunker-Civilian-Client/releases)
+[![GitHub Stars](https://img.shields.io/github/stars/bigjakk/Krunker-Civilian-Client?style=flat&logo=github&label=Stars)](https://github.com/bigjakk/Krunker-Civilian-Client/stargazers)
+[![Latest Release](https://img.shields.io/github/v/release/bigjakk/Krunker-Civilian-Client?style=flat&label=Latest)](https://github.com/bigjakk/Krunker-Civilian-Client/releases/latest)
+[![License](https://img.shields.io/github/license/bigjakk/Krunker-Civilian-Client?style=flat&label=License)](https://github.com/bigjakk/Krunker-Civilian-Client/blob/main/LICENSE)
+
 > a high-performance krunker client with unlimited FPS, built on a custom-patched Electron
 
 **Download:**
@@ -86,5 +91,5 @@ For details on the patch and build instructions, see [Electron-Websocket-Fix](ht
 
 ## Credits
 
-- [Crankshaft](https://github.com/KraXen72/crankshaft) by KraXen72 - Original inspiration. Settings Layout
+- [Crankshaft](https://github.com/KraXen72/crankshaft) by KraXen72 - Original inspiration. Settings Layout, Matchmaker
 - [Glorp](https://github.com/slavcp/glorp) by slav - Numerous features for the newer chromium verisions. External Ranked Queue
