@@ -1,6 +1,6 @@
 {
   "name": "krunker-civilian-client",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Cross-platform Krunker game client",
   "main": "dist/main/index.js",
   "homepage": "https://github.com/bigjakk/Krunker-Civilian-Client",
