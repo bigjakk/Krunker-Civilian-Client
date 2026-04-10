@@ -5,7 +5,7 @@
 
 import { ipcRenderer } from 'electron';
 import type { Keybind } from '../main/config';
-import type { SavedConsole } from './utils';
+import { escapeHtml, type SavedConsole } from './utils';
 
 // Full array — indices must match the server's gamemode IDs (game[4].g)
 export const MATCHMAKER_GAMEMODES = ['Free for All', 'Team Deathmatch', 'Hardpoint', 'Capture the Flag', 'Parkour', 'Hide & Seek', 'Infected', 'Race', 'Last Man Standing', 'Simon Says', 'Gun Game', 'Prop Hunt', 'Boss Hunt', 'Classic FFA', 'Deposit', 'Stalker', 'King of the Hill', 'One in the Chamber', 'Trade', 'Kill Confirmed', 'Defuse', 'Sharp Shooter', 'Traitor', 'Raid', 'Blitz', 'Domination', 'Squad Deathmatch', 'Kranked FFA', 'Team Defender', 'Deposit FFA', 'Chaos Snipers', 'Bighead FFA'];
@@ -242,7 +242,7 @@ function showResultPopup(game: MatchmakerGame): void {
     } else {
         popupTitle.innerText = 'Game Found!';
         const regionName = MATCHMAKER_REGION_NAMES[game.region] ?? 'Unknown Region';
-        popupDescription.innerHTML = `${game.gamemode} on ${game.map} (${regionName})<br/>${game.playerCount}/${game.playerLimit} Players, ${secondsToTimestring(game.remainingTime)} Left`;
+        popupDescription.innerHTML = `${escapeHtml(game.gamemode)} on ${escapeHtml(game.map)} (${escapeHtml(regionName)})<br/>${game.playerCount}/${game.playerLimit} Players, ${secondsToTimestring(game.remainingTime)} Left`;
         popupConfirmBtn.style.display = 'block';
     }
 
@@ -438,8 +438,8 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
             found.className = 'mm-feed-entry mm-pass';
             found.style.cssText = 'font-size:1.1em;justify-content:center;';
             found.innerHTML =
-                `<span class="mm-feed-region">${best.region}</span>` +
-                `<span class="mm-feed-map">${best.map}</span>` +
+                `<span class="mm-feed-region">${escapeHtml(best.region)}</span>` +
+                `<span class="mm-feed-map">${escapeHtml(best.map)}</span>` +
                 `<span class="mm-feed-players">${best.playerCount}/${best.playerLimit}</span>`;
             searchFeed.appendChild(found);
             searchCounter.textContent = `${best.gamemode} \u00B7 ${regionName} \u00B7 ${pings[best.region] ?? '?'}ms`;

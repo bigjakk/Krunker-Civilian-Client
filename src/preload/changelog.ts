@@ -2,6 +2,7 @@
 // Shows release notes in a Shadow DOM modal when the client version changes.
 
 import { ipcRenderer } from 'electron';
+import { escapeHtml } from './utils';
 
 function versionLessThan(a: string, b: string): boolean {
     const pa = a.split('.').map(Number);
@@ -16,14 +17,25 @@ function versionLessThan(a: string, b: string): boolean {
     return false;
 }
 
+function sanitizeUrl(url: string): string {
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return escapeHtml(url);
+    } catch { /* invalid URL */ }
+    return '#';
+}
+
 function renderMarkdown(md: string): string {
-    const html = md
+    // Escape all HTML first, then apply markdown formatting to the safe text
+    const escaped = escapeHtml(md);
+    const html = escaped
         .replace(/### (.+)/g, '<h3>$1</h3>')
         .replace(/## (.+)/g, '<h2>$1</h2>')
         .replace(/# (.+)/g, '<h1>$1</h1>')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, text, url) =>
+            `<a href="${sanitizeUrl(url)}" target="_blank">${text}</a>`);
 
     // Convert list items
     const lines = html.split('\n');
@@ -94,7 +106,7 @@ function showChangelogPopup(version: string, body: string): void {
 
     const header = document.createElement('div');
     header.className = 'header';
-    header.innerHTML = `<h2>What's New in v${version}</h2>`;
+    header.innerHTML = `<h2>What's New in v${escapeHtml(version)}</h2>`;
     const closeBtn = document.createElement('button');
     closeBtn.className = 'close-btn';
     closeBtn.textContent = '\u2715';
