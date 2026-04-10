@@ -64,7 +64,6 @@ export interface AppConfig {
     matchmaker: Keybind;
     matchmakerAccept: Keybind;
     matchmakerCancel: Keybind;
-    pauseChat: Keybind;
     fullscreenToggle: Keybind;
   };
   userscripts: {
@@ -120,7 +119,6 @@ export const DEFAULT_KEYBINDS: AppConfig['keybinds'] = {
   matchmaker:        { key: 'F6',     ctrl: false, shift: false, alt: false },
   matchmakerAccept:  { key: 'Enter',  ctrl: false, shift: false, alt: false },
   matchmakerCancel:  { key: 'Escape', ctrl: false, shift: false, alt: false },
-  pauseChat:         { key: 'F10',    ctrl: false, shift: false, alt: false },
   fullscreenToggle:  { key: 'F11',    ctrl: false, shift: false, alt: false },
 };
 

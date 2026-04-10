@@ -16,7 +16,10 @@ let observer: MutationObserver | null = null;
 let historyMax = 0;
 let betterChatEnabled = false;
 let reInsertGuard = false;
+let scrollPaused = false;
 let _con: SavedConsole | null = null;
+
+const SCROLL_BOTTOM_THRESHOLD = 30; // px from bottom to consider "at bottom"
 
 function isChatMessage(node: Node): node is HTMLElement {
     return node.nodeType === 1 && (node as HTMLElement).id?.startsWith('chatMsg_');
@@ -83,9 +86,25 @@ function handleMutations(mutations: MutationRecord[]): void {
         }
     }
 
-    // Auto-scroll unless paused
-    if (chatList && !chatList.classList.contains('kpc-chat-paused')) {
+    // Auto-scroll to bottom unless the user has scrolled up
+    if (chatList && !scrollPaused) {
         chatList.scrollTop = chatList.scrollHeight;
+    }
+}
+
+function isNearBottom(el: HTMLElement): boolean {
+    return el.scrollHeight - el.scrollTop - el.clientHeight <= SCROLL_BOTTOM_THRESHOLD;
+}
+
+function updatePauseState(): void {
+    if (!chatList) return;
+    const atBottom = isNearBottom(chatList);
+    if (scrollPaused && atBottom) {
+        scrollPaused = false;
+        chatList.classList.remove('kpc-chat-paused');
+    } else if (!scrollPaused && !atBottom) {
+        scrollPaused = true;
+        chatList.classList.add('kpc-chat-paused');
     }
 }
 
@@ -95,6 +114,9 @@ function tryAttach(): boolean {
 
     observer = new MutationObserver(handleMutations);
     observer.observe(chatList, { childList: true });
+
+    chatList.addEventListener('scroll', updatePauseState, { passive: true });
+
     _con?.log('[KCC-Chat] Observer attached to #chatList');
     return true;
 }
