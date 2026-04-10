@@ -232,9 +232,9 @@ function createKeybindRow(label: string, desc: string, currentBind: Keybind, onB
   row.className = 'setting settName safety-' + s + ' keybind';
   row.innerHTML =
     settingIcon(s, instant) +
-    '<span class="setting-title">' + label + '</span>' +
-    '<span class="keyIcon kpc-keyIcon">' + keybindDisplayString(currentBind) + '</span>' +
-    '<div class="setting-desc-new">' + desc + '</div>';
+    '<span class="setting-title">' + escapeHtml(label) + '</span>' +
+    '<span class="keyIcon kpc-keyIcon">' + escapeHtml(keybindDisplayString(currentBind)) + '</span>' +
+    '<div class="setting-desc-new">' + escapeHtml(desc) + '</div>';
   const keyEl = row.querySelector('.kpc-keyIcon') as HTMLElement;
   keyEl.addEventListener('click', () => {
     openKeybindDialog(label).then((newBind) => {
@@ -261,12 +261,12 @@ function createToggleRow(opts: {
   row.className = 'setting settName safety-' + s + ' bool';
   row.innerHTML =
     settingIcon(s, opts.instant, opts.refreshOnly, opts.restart) +
-    '<span class="setting-title">' + opts.label + '</span>' +
+    '<span class="setting-title">' + escapeHtml(opts.label) + '</span>' +
     '<label class="switch">' +
       '<input type="checkbox" class="s-update"' + (opts.checked ? ' checked' : '') + (opts.disabled ? ' disabled' : '') + '>' +
       '<div class="slider round"></div>' +
     '</label>' +
-    '<div class="setting-desc-new">' + opts.desc + '</div>';
+    '<div class="setting-desc-new">' + escapeHtml(opts.desc) + '</div>';
   if (!opts.disabled) {
     const cb = row.querySelector('input[type="checkbox"]') as HTMLInputElement;
     cb.addEventListener('change', () => {
@@ -294,8 +294,8 @@ function createSelectRow(opts: {
   row.className = 'setting settName safety-' + s + ' sel';
   row.innerHTML =
     settingIcon(s, opts.instant, opts.refreshOnly, opts.restart) +
-    '<span class="setting-title">' + opts.label + '</span>' +
-    '<div class="setting-desc-new">' + opts.desc + '</div>';
+    '<span class="setting-title">' + escapeHtml(opts.label) + '</span>' +
+    '<div class="setting-desc-new">' + escapeHtml(opts.desc) + '</div>';
   const select = document.createElement('select');
   select.className = 's-update inputGrey2';
   for (const o of opts.options) {
@@ -331,12 +331,12 @@ function createNumberRow(opts: {
   row.className = 'setting settName safety-' + s + ' num';
   row.innerHTML =
     settingIcon(s, opts.instant, opts.refreshOnly, opts.restart) +
-    '<span class="setting-title">' + opts.label + '</span>' +
+    '<span class="setting-title">' + escapeHtml(opts.label) + '</span>' +
     '<span class="setting-input-wrapper">' +
       '<div class="slidecontainer"><input type="range" class="sliderM s-update-secondary" min="' + opts.min + '" max="' + opts.max + '" value="' + opts.value + '"></div>' +
       '<input type="number" class="rb-input s-update sliderVal" min="' + opts.min + '" max="' + opts.max + '" value="' + opts.value + '">' +
     '</span>' +
-    '<div class="setting-desc-new">' + opts.desc + '</div>';
+    '<div class="setting-desc-new">' + escapeHtml(opts.desc) + '</div>';
   const rangeInput = row.querySelector('input[type="range"]') as HTMLInputElement;
   const numInput = row.querySelector('input[type="number"]') as HTMLInputElement;
   rangeInput.addEventListener('input', () => {
@@ -369,7 +369,7 @@ function createCheckboxGrid(opts: {
 }): HTMLElement {
   const row = document.createElement('div');
   row.className = 'setting settName safety-0 multisel';
-  row.innerHTML = '<span class="setting-title">' + opts.header + '</span>';
+  row.innerHTML = '<span class="setting-title">' + escapeHtml(opts.header) + '</span>';
   const grid = document.createElement('div');
   grid.className = 'kpc-multisel-parent';
   for (const item of opts.items) {
@@ -992,7 +992,7 @@ function buildAccountsSection(body: HTMLElement, accountsArr: any[]): void {
   });
 }
 
-function buildChatSection(body: HTMLElement, gameConf: any, translatorConf: any, bag: SettingsBag): void {
+function buildChatSection(body: HTMLElement, gameConf: any, translatorConf: any): void {
   const game = { betterChat: true, chatHistorySize: 200, ...gameConf };
 
   function saveGame(): void {
@@ -1011,11 +1011,6 @@ function buildChatSection(body: HTMLElement, gameConf: any, translatorConf: any,
     min: 0, max: 1000, value: game.chatHistorySize, instant: true,
     onChange: (v) => { game.chatHistorySize = v; saveGame(); setChatHistorySize(v); },
   }));
-
-  body.appendChild(createKeybindRow('Pause Chat', 'Freeze chat auto-scroll to read history (default F10)', bag.binds.pauseChat, (b) => {
-    bag.binds.pauseChat = b;
-    bag.saveBinds();
-  }, undefined, true));
 
   // Translator settings inline
   const tl = { enabled: true, targetLanguage: 'en', showLanguageTag: true, ...translatorConf };
@@ -1307,7 +1302,6 @@ function renderSettings(searchQuery?: string): void {
       matchmaker:       { key: 'F6',     ctrl: false, shift: false, alt: false },
       matchmakerAccept: { key: 'Enter',  ctrl: false, shift: false, alt: false },
       matchmakerCancel: { key: 'Escape', ctrl: false, shift: false, alt: false },
-      pauseChat:        { key: 'F10',    ctrl: false, shift: false, alt: false },
       fullscreenToggle: { key: 'F11',    ctrl: false, shift: false, alt: false },
     };
     const binds = { ...defaultBinds, ...keybindsConf };
@@ -1323,7 +1317,7 @@ function renderSettings(searchQuery?: string): void {
     buildGeneralSection(genSec.body, gameConf, uiConfRaw, allConf.performance, bag);
     buildSwapperSection(swapSec.body, swapperConf, uiConfRaw);
     buildMatchmakerSection(mmSec.body, mmConf, bag);
-    buildChatSection(chatSec.body, gameConf, translatorConf, bag);
+    buildChatSection(chatSec.body, gameConf, translatorConf);
     buildDiscordSection(discordSec.body, discordConf);
     buildAccountsSection(accSec.body, allConf.accounts);
     buildAdvancedSection(advSec.body, advConf, allConf.performance, isWindows);
@@ -1570,38 +1564,6 @@ ipcRenderer.on('matchmaker-find', (_e, mmConfig: MatchmakerConfig) => {
   fetchGame(mmConfig, _console).catch((err) => _console.error('[KCC] Matchmaker error:', err));
 });
 
-// ── Chat pause ──
-let chatPaused = false;
-let chatSavedScrollTop = 0;
-
-function onChatWheel(e: WheelEvent): void {
-  const chatList = document.getElementById('chatList');
-  if (!chatList) return;
-  chatSavedScrollTop = Math.max(0, Math.min(
-    chatSavedScrollTop + e.deltaY,
-    chatList.scrollHeight - chatList.clientHeight,
-  ));
-  chatList.scrollTop = chatSavedScrollTop;
-}
-
-ipcRenderer.on('toggle-chat-pause', () => {
-  const chatList = document.getElementById('chatList');
-  if (!chatList) return;
-
-  chatPaused = !chatPaused;
-
-  if (chatPaused) {
-    chatSavedScrollTop = chatList.scrollTop;
-    chatList.classList.add('kpc-chat-paused');
-    chatList.style.overflow = 'hidden';
-    chatList.addEventListener('wheel', onChatWheel, { passive: true });
-  } else {
-    chatList.classList.remove('kpc-chat-paused');
-    chatList.style.overflow = '';
-    chatList.removeEventListener('wheel', onChatWheel);
-    chatList.scrollTop = chatList.scrollHeight;
-  }
-});
 
 // ── Wait for main process to signal page load, then poll for settings window ──
 ipcRenderer.on('main_did-finish-load', () => {
