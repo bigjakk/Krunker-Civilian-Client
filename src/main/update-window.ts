@@ -51,17 +51,6 @@ const UPDATE_HTML = `<!DOCTYPE html>
   <div class="progress-container">
     <div class="progress-bar" id="progressBar"></div>
   </div>
-  <script>
-    const { ipcRenderer } = require('electron');
-    const statusEl = document.getElementById('status');
-    const progressBar = document.getElementById('progressBar');
-    ipcRenderer.on('update-progress', function(event, message, percent) {
-      statusEl.textContent = message;
-      if (typeof percent === 'number') {
-        progressBar.style.width = percent + '%';
-      }
-    });
-  </script>
 </body>
 </html>`;
 
@@ -77,9 +66,9 @@ export function showUpdateWindow(): { window: BrowserWindow; sendProgress: (mess
     autoHideMenuBar: true,
     title: 'Krunker Civilian Client - Update',
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      sandbox: false,
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
     },
   });
   win.removeMenu();
@@ -88,7 +77,12 @@ export function showUpdateWindow(): { window: BrowserWindow; sendProgress: (mess
 
   function sendProgress(message: string, percent?: number): void {
     if (!win.isDestroyed()) {
-      win.webContents.send('update-progress', message, percent);
+      win.webContents.executeJavaScript(`(() => {
+        const s = document.getElementById('status');
+        const p = document.getElementById('progressBar');
+        if (s) s.textContent = ${JSON.stringify(message)};
+        if (p && typeof ${JSON.stringify(percent)} === 'number') p.style.width = ${JSON.stringify(percent)} + '%';
+      })()`).catch(() => {});
     }
   }
 

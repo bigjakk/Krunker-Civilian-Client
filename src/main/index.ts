@@ -418,9 +418,6 @@ async function launchApp(): Promise<void> {
         win.loadURL('https://krunker.io');
       }
       event.preventDefault();
-    } else if (matchesKeybind(input, binds.pauseChat)) {
-      win.webContents.send('toggle-chat-pause');
-      event.preventDefault();
     } else if (matchesKeybind(input, binds.fullscreenToggle)) {
       win.setFullScreen(!win.isFullScreen());
       event.preventDefault();
@@ -470,6 +467,13 @@ async function launchApp(): Promise<void> {
 
   // Intercept in-page navigation (e.g. window.location = '/social.html')
   win.webContents.on('will-navigate', (event, url) => {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        event.preventDefault();
+        return;
+      }
+    } catch { event.preventDefault(); return; }
     if (url.includes('krunker.io') && !isGameURL(url)) {
       event.preventDefault();
       tabManager.openTab(url);
@@ -521,11 +525,13 @@ async function launchApp(): Promise<void> {
     const themeCSS = getThemeCSS(themeId, swapDir);
     electronLog.log(`[KCC] CSS theme: id=${themeId}, css=${themeCSS ? themeCSS.length + ' chars' : 'none'}`);
     if (themeCSS) {
-      const escaped = themeCSS.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+      // Use <style> tag via executeJavaScript so @import rules work (insertCSS doesn't support them).
+      // Encode as base64 to avoid any escaping issues with template literals.
+      const b64 = Buffer.from(themeCSS).toString('base64');
       win.webContents.executeJavaScript(`(() => {
         const s = document.createElement('style');
         s.id = 'kcc-user-theme';
-        s.textContent = \`${escaped}\`;
+        s.textContent = atob('${b64}');
         document.head.appendChild(s);
       })()`).catch((err) => electronLog.warn('[KCC] Theme inject failed:', err));
     }
