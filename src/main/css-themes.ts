@@ -32,7 +32,8 @@ export function getThemeCSS(themeId: string, swapDir: string): string {
     if (themeId === 'disabled' || !themeId) return '';
     const prefix = 'user:';
     if (!themeId.startsWith(prefix)) return '';
-    const filename = themeId.slice(prefix.length);
+    const filename = basename(themeId.slice(prefix.length));
+    if (!filename) return '';
     try {
         return readFileSync(join(swapDir, 'themes', filename), 'utf-8');
     } catch { return ''; }
@@ -106,7 +107,8 @@ export function getLoadingScreenCSS(loadingTheme: string, backgroundUrl: string,
                 } catch { /* read failed */ }
             }
         } else if (loadingTheme.startsWith('swap:')) {
-            const filename = loadingTheme.slice(5);
+            const filename = basename(loadingTheme.slice(5));
+            if (!filename) return '';
             try {
                 imageUrl = `url(${fileToDataUri(join(bgDir, filename))})`;
             } catch { /* read failed */ }
