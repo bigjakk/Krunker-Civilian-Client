@@ -463,6 +463,9 @@ async function launchApp(): Promise<void> {
     win, ses, preloadPath, tabMode, isGameURL,
     () => config.get('tabWindow'),
     (state) => config.set('tabWindow', state),
+    () => config.get('savedTabs'),
+    (urls) => config.set('savedTabs', urls),
+    () => config.get('game.rememberTabs') ?? false,
   );
 
   // Intercept in-page navigation (e.g. window.location = '/social.html')

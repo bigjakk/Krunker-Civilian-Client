@@ -42,7 +42,11 @@ export class TabManager {
     private recentlyClosed: { url: string; title: string }[] = [];
     private getTabWindowState: () => TabWindowState;
     private saveTabWindowState: (state: TabWindowState) => void;
+    private getSavedTabs: () => string[];
+    private saveTabs: (urls: string[]) => void;
+    private isRememberEnabled: () => boolean;
     private tabSaveTimer: ReturnType<typeof setTimeout> | null = null;
+    private restoredTabs = false;
 
     constructor(
         win: BrowserWindow,
@@ -52,6 +56,9 @@ export class TabManager {
         isGameURL: (url: string) => boolean,
         getTabWindowState: () => TabWindowState,
         saveTabWindowState: (state: TabWindowState) => void,
+        getSavedTabs: () => string[],
+        saveTabs: (urls: string[]) => void,
+        isRememberEnabled: () => boolean,
     ) {
         this.mainWin = win;
         this.ses = ses;
@@ -60,6 +67,9 @@ export class TabManager {
         this.isGameURL = isGameURL;
         this.getTabWindowState = getTabWindowState;
         this.saveTabWindowState = saveTabWindowState;
+        this.getSavedTabs = getSavedTabs;
+        this.saveTabs = saveTabs;
+        this.isRememberEnabled = isRememberEnabled;
 
         // ── Tab bar view (shared between both modes) ──
         this.tabBarView = new WebContentsView({
@@ -185,8 +195,30 @@ export class TabManager {
         });
     }
 
-    // ── Open a new tab ──
+    // ── Restore saved tabs on first open, then open the requested tab ──
     openTab(url: string): number {
+        if (!this.restoredTabs) {
+            this.restoredTabs = true;
+            const saved = this.isRememberEnabled() ? this.getSavedTabs() : [];
+            this.saveTabs([]);
+            if (saved.length > 0) {
+                for (const savedUrl of saved) {
+                    this.openSingleTab(savedUrl);
+                }
+                // If the requested URL is already among the restored tabs, just activate it
+                const existing = this.tabs.find(t => t.url === url);
+                if (existing) {
+                    this.switchToTab(existing.id);
+                    this.showTabs();
+                    return existing.id;
+                }
+            }
+        }
+        return this.openSingleTab(url);
+    }
+
+    // ── Open a single new tab ──
+    private openSingleTab(url: string): number {
         if (this.tabs.length >= MAX_TABS) {
             const existing = this.tabs.find(t => t.url === url);
             if (existing) {
@@ -489,6 +521,12 @@ export class TabManager {
     }
 
     private destroyAllTabs(): void {
+        // Persist tab URLs so they can be restored later
+        if (this.tabs.length > 0 && this.isRememberEnabled()) {
+            this.saveTabs(this.tabs.map(t => t.url));
+            this.restoredTabs = false;
+        }
+
         for (const tab of this.tabs) {
             this.stopTitleWatcher(tab.id);
             if (this.activeTabId === tab.id) {

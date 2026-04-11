@@ -555,7 +555,7 @@ function buildGeneralSection(
     onChange: (v) => { perf.fpsUnlocked = v; ipcRenderer.invoke('set-config', 'performance', perf); },
   }));
 
-  const gameDefaults = { lastServer: '', socialTabBehaviour: 'New Window' };
+  const gameDefaults = { lastServer: '', socialTabBehaviour: 'New Window', rememberTabs: false };
   const game = { ...gameDefaults, ...gameConf };
 
   body.appendChild(createSelectRow({
@@ -564,6 +564,13 @@ function buildGeneralSection(
     options: [{ value: 'New Window', label: 'Tabs (Separate Window)' }, { value: 'Same Window', label: 'Tabs (Overlay Game)' }],
     value: game.socialTabBehaviour, instant: true,
     onChange: (v) => { game.socialTabBehaviour = v; ipcRenderer.invoke('set-config', 'game', game); },
+  }));
+
+  body.appendChild(createToggleRow({
+    label: 'Remember Tabs',
+    desc: 'Restore your open tabs when you reopen the social/hub window',
+    checked: game.rememberTabs, instant: true,
+    onChange: (v) => { game.rememberTabs = v; ipcRenderer.invoke('set-config', 'game', game); },
   }));
 
   const uiDefaults = { showExitButton: true, deathscreenAnimation: false, hideMenuPopups: false };

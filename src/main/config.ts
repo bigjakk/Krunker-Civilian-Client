@@ -33,6 +33,7 @@ export interface AppConfig {
   game: {
     lastServer: string;
     socialTabBehaviour: 'New Window' | 'Same Window';
+    rememberTabs: boolean;
     joinAsSpectator: boolean;
     rawInput: boolean;
     betterChat: boolean;
@@ -108,6 +109,7 @@ export interface AppConfig {
     y: number | undefined;
     maximized: boolean;
   };
+  savedTabs: string[];
 }
 
 export const DEFAULT_KEYBINDS: AppConfig['keybinds'] = {
@@ -145,6 +147,7 @@ export const config = new Store<AppConfig>({
     game: {
       lastServer: '',
       socialTabBehaviour: 'New Window',
+      rememberTabs: false,
       joinAsSpectator: false,
       rawInput: true,
       betterChat: true,
@@ -210,5 +213,6 @@ export const config = new Store<AppConfig>({
       y: undefined,
       maximized: true,
     },
+    savedTabs: [],
   },
 });
