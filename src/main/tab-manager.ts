@@ -253,7 +253,7 @@ export class TabManager {
                 session: this.ses,
                 contextIsolation: false,
                 nodeIntegration: false,
-                sandbox: false,
+                sandbox: true,
                 spellcheck: false,
             },
         });

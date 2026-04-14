@@ -307,7 +307,7 @@ async function launchApp(): Promise<void> {
       session: ses,
       contextIsolation: false,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       spellcheck: false,
       backgroundThrottling: false,
     },
