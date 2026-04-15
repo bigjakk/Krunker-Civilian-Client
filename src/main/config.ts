@@ -177,7 +177,7 @@ export const config = new Store<AppConfig>({
     },
     ui: {
       showExitButton: true,
-      deathscreenAnimation: true,
+      deathscreenAnimation: false,
       hideMenuPopups: false,
       menuTimer: true,
       doublePing: true,
