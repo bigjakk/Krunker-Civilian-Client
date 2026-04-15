@@ -154,7 +154,7 @@ export const config = new Store<AppConfig>({
       hpEnemyCounter: true,
     },
     swapper: {
-      enabled: true,
+      enabled: false,
       path: '',
     },
     matchmaker: {
@@ -170,12 +170,12 @@ export const config = new Store<AppConfig>({
     },
     keybinds: DEFAULT_KEYBINDS,
     userscripts: {
-      enabled: true,
+      enabled: false,
       path: '',
     },
     ui: {
       showExitButton: true,
-      deathscreenAnimation: false,
+      deathscreenAnimation: true,
       hideMenuPopups: false,
       menuTimer: true,
       doublePing: true,
@@ -186,7 +186,7 @@ export const config = new Store<AppConfig>({
       lastSeenVersion: '',
     },
     discord: {
-      enabled: false,
+      enabled: true,
     },
     translator: {
       enabled: true,
