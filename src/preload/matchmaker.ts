@@ -17,8 +17,8 @@ export const MATCHMAKER_GAMEMODE_FILTER = [
     'Domination', 'Kranked FFA', 'Team Defender', 'Deposit FFA', 'Chaos Snipers',
     'Bighead FFA',
 ];
-export const MATCHMAKER_REGIONS = ['MBI', 'NY', 'FRA', 'SIN', 'DAL', 'SYD', 'MIA', 'BHN', 'TOK', 'BRZ', 'AFR', 'LON', 'CHI', 'SV', 'STL', 'MX'];
-export const MATCHMAKER_REGION_NAMES: Record<string, string> = { MBI: 'Mumbai', NY: 'New York', FRA: 'Frankfurt', SIN: 'Singapore', DAL: 'Dallas', SYD: 'Sydney', MIA: 'Miami', BHN: 'Middle East', TOK: 'Tokyo', BRZ: 'Brazil', AFR: 'South Africa', LON: 'London', CHI: 'China', SV: 'Silicon Valley', STL: 'Seattle', MX: 'Mexico' };
+export const MATCHMAKER_REGIONS = ['SV', 'TOK', 'FRA', 'MBI', 'SYD', 'SIN', 'DAL', 'BHN', 'BRZ', 'NY'];
+export const MATCHMAKER_REGION_NAMES: Record<string, string> = { SV: 'Silicon Valley', TOK: 'Tokyo', FRA: 'Frankfurt', MBI: 'Mumbai', SYD: 'Sydney', SIN: 'Singapore', DAL: 'Dallas', BHN: 'Bahrain', BRZ: 'Brazil', NY: 'New York' };
 export const MAP_ICON_INDICES = ['Burg', 'Littletown', 'Sandstorm', 'Subzero', 'Undergrowth', 'Shipment', 'Freight', 'Lostworld', 'Citadel', 'Oasis', 'Kanji', 'Industry', 'Lumber', 'Evacuation', 'Site', 'SkyTemple', 'Lagoon', 'Bureau', 'Tortuga', 'Tropicano', 'Krunk_Plaza', 'Arena', 'Habitat', 'Atomic', 'Old_Burg', 'Throwback', 'Stockade', 'Facility', 'Clockwork', 'Laboratory', 'Shipyard', 'Soul Sanctum', 'Bazaar', 'Erupt', 'HQ', 'Khepri', 'Lush', 'Vivo', 'Slide Moonlight', 'Eterno Sim'];
 export const MATCHMAKER_MAP_NAMES: Record<string, string> = {
     SkyTemple: 'Sky Temple', Krunk_Plaza: 'Krunk Plaza', Old_Burg: 'Old Burg',
