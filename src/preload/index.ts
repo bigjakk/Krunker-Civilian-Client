@@ -321,20 +321,23 @@ function createNumberRow(opts: {
   max: number;
   value: number;
   onChange: (value: number) => void;
+  step?: number;
   safety?: number;
   restart?: boolean;
   instant?: boolean;
   refreshOnly?: boolean;
 }): HTMLElement {
   const s = opts.safety || 0;
+  const step = opts.step || 1;
+  const parse = step < 1 ? parseFloat : parseInt;
   const row = document.createElement('div');
   row.className = 'setting settName safety-' + s + ' num';
   row.innerHTML =
     settingIcon(s, opts.instant, opts.refreshOnly, opts.restart) +
     '<span class="setting-title">' + escapeHtml(opts.label) + '</span>' +
     '<span class="setting-input-wrapper">' +
-      '<div class="slidecontainer"><input type="range" class="sliderM s-update-secondary" min="' + opts.min + '" max="' + opts.max + '" value="' + opts.value + '"></div>' +
-      '<input type="number" class="rb-input s-update sliderVal" min="' + opts.min + '" max="' + opts.max + '" value="' + opts.value + '">' +
+      '<div class="slidecontainer"><input type="range" class="sliderM s-update-secondary" min="' + opts.min + '" max="' + opts.max + '" step="' + step + '" value="' + opts.value + '"></div>' +
+      '<input type="number" class="rb-input s-update sliderVal" min="' + opts.min + '" max="' + opts.max + '" step="' + step + '" value="' + opts.value + '">' +
     '</span>' +
     '<div class="setting-desc-new">' + escapeHtml(opts.desc) + '</div>';
   const rangeInput = row.querySelector('input[type="range"]') as HTMLInputElement;
@@ -343,7 +346,7 @@ function createNumberRow(opts: {
     numInput.value = rangeInput.value;
   });
   rangeInput.addEventListener('change', () => {
-    const v = Math.max(opts.min, Math.min(opts.max, parseInt(rangeInput.value) || 0));
+    const v = Math.max(opts.min, Math.min(opts.max, parse(rangeInput.value) || 0));
     rangeInput.value = String(v);
     numInput.value = String(v);
     opts.onChange(v);
@@ -351,7 +354,7 @@ function createNumberRow(opts: {
     else if (opts.refreshOnly) onSettingChanged('refresh');
   });
   numInput.addEventListener('change', () => {
-    const v = Math.max(opts.min, Math.min(opts.max, parseInt(numInput.value) || 0));
+    const v = Math.max(opts.min, Math.min(opts.max, parse(numInput.value) || 0));
     numInput.value = String(v);
     rangeInput.value = String(v);
     opts.onChange(v);
@@ -1144,13 +1147,13 @@ function buildAdvancedSection(
 
   body.appendChild(createNumberRow({
     label: 'CPU Throttle (Game)', desc: 'CPU throttle rate during gameplay (1 = no throttle, 3 = heavy throttle)',
-    min: 1, max: 3, value: perf.cpuThrottleGame, instant: true, safety: 2,
+    min: 1, max: 3, step: 0.01, value: perf.cpuThrottleGame, instant: true, safety: 2,
     onChange: (v) => { perf.cpuThrottleGame = v; savePerf(); },
   }));
 
   body.appendChild(createNumberRow({
     label: 'CPU Throttle (Menu)', desc: 'CPU throttle rate on menu screens (1 = no throttle, 3 = heavy throttle)',
-    min: 1, max: 3, value: perf.cpuThrottleMenu, instant: true, safety: 1,
+    min: 1, max: 3, step: 0.01, value: perf.cpuThrottleMenu, instant: true, safety: 1,
     onChange: (v) => { perf.cpuThrottleMenu = v; savePerf(); },
   }));
 
