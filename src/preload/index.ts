@@ -777,6 +777,27 @@ function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfRaw: any
     saveUI();
     onSettingChanged('refresh');
   });
+
+  // ── Background URL (overrides loading theme selection) ──
+  const urlRow = document.createElement('div');
+  urlRow.className = 'setting settName safety-0';
+  urlRow.innerHTML =
+    refreshIcon('refresh-icon') +
+    '<span class="setting-title">Background URL</span>' +
+    '<div class="setting-desc-new">Direct image URL for loading screen (overrides dropdown above)</div>';
+  const urlInput = document.createElement('input');
+  urlInput.type = 'text';
+  urlInput.className = 'inputGrey2';
+  urlInput.placeholder = 'https://example.com/image.png';
+  urlInput.value = ui.backgroundUrl || '';
+  urlInput.style.width = '300px';
+  urlInput.addEventListener('change', () => {
+    ui.backgroundUrl = urlInput.value.trim();
+    saveUI();
+    onSettingChanged('refresh');
+  });
+  urlRow.appendChild(urlInput);
+  body.appendChild(urlRow);
 }
 
 function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag): void {
