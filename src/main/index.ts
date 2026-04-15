@@ -457,12 +457,13 @@ async function launchApp(): Promise<void> {
   // ── Tab Manager ──
   const preloadPath = join(__dirname, '..', 'preload', 'index.js');
   let tabMode: 'same' | 'new' = getGameConf().socialTabBehaviour === 'Same Window' ? 'same' : 'new';
+  let sessionTabs: string[] = [];
   let tabManager = new TabManager(
     win, ses, preloadPath, tabMode, isGameURL,
     () => config.get('tabWindow'),
     (state) => config.set('tabWindow', state),
-    () => config.get('savedTabs'),
-    (urls) => config.set('savedTabs', urls),
+    () => sessionTabs,
+    (urls) => { sessionTabs = urls; },
     () => config.get('game.rememberTabs') ?? false,
   );
 
