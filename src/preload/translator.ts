@@ -104,7 +104,7 @@ const FALSE_POSITIVE_LANGS = new Set([
 
 // ── Auto-suppression (repeated short phrases) ──
 
-const suppressionCounts = new Map<string, number>();
+let suppressionCounts = new Map<string, number>();
 const SUPPRESS_THRESHOLD = 3;
 const MIN_LATIN_WORDS = 3;
 const SHORT_TEXT_THRESHOLD = 15;
@@ -113,6 +113,7 @@ const SHORT_TEXT_THRESHOLD = 15;
 
 let activeRequests = 0;
 const MAX_CONCURRENT = 3;
+const MAX_QUEUE = 15;
 const pendingQueue: Array<() => void> = [];
 
 function enqueue(fn: () => Promise<void>): void {
@@ -123,7 +124,42 @@ function enqueue(fn: () => Promise<void>): void {
       if (pendingQueue.length > 0) pendingQueue.shift()!();
     });
   } else {
+    // Drop oldest if queue is full — old messages have already scrolled off-screen
+    if (pendingQueue.length >= MAX_QUEUE) pendingQueue.shift();
     pendingQueue.push(() => enqueue(fn));
+  }
+}
+
+// ── Periodic cleanup (prevents unbounded memory growth in long sessions) ──
+
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+function startCleanup(): void {
+  if (cleanupTimer) return;
+  cleanupTimer = setInterval(() => {
+    // Reset suppression counts (re-learned naturally from fresh messages)
+    suppressionCounts = new Map();
+
+    // Prune expired sessionStorage cache entries
+    const now = Date.now();
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (!key?.startsWith(CACHE_KEY_PREFIX)) continue;
+      try {
+        const entry: CacheEntry = JSON.parse(sessionStorage.getItem(key) || '');
+        if (now - entry.ts > CACHE_EXPIRY_MS) keysToRemove.push(key);
+      } catch { keysToRemove.push(key); }
+    }
+    for (const key of keysToRemove) sessionStorage.removeItem(key);
+  }, CLEANUP_INTERVAL_MS);
+}
+
+function stopCleanup(): void {
+  if (cleanupTimer) {
+    clearInterval(cleanupTimer);
+    cleanupTimer = null;
   }
 }
 
@@ -281,8 +317,10 @@ function processMessage(node: HTMLElement): void {
 
   const { message, username } = extracted;
   enqueue(async () => {
+    // Node may have been removed by chat history trimming while queued
+    if (!node.isConnected) return;
     const result = await translateText(message);
-    if (result) appendTranslation(node, username, result.translation, result.srcLang);
+    if (result && node.isConnected) appendTranslation(node, username, result.translation, result.srcLang);
   });
 }
 
@@ -316,6 +354,7 @@ function startObserver(): void {
     });
 
     chatObserver.observe(chatList, { childList: true });
+    startCleanup();
     _con.log('[KCC-TL] Chat observer active');
   }, 500);
 }
@@ -329,6 +368,8 @@ function stopObserver(): void {
     chatObserver.disconnect();
     chatObserver = null;
   }
+  stopCleanup();
+  pendingQueue.length = 0;
 }
 
 // ── Public API ──
