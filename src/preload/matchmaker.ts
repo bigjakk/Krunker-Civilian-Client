@@ -66,6 +66,7 @@ export interface MatchmakerConfig {
     minRemainingTime: number;
     openServerBrowser: boolean;
     autoJoin: boolean;
+    sortByPlayers: boolean;
     acceptKey: Keybind;
     cancelKey: Keybind;
 }
@@ -358,8 +359,12 @@ async function fetchAllGames(mmConfig: MatchmakerConfig): Promise<{ all: RawLobb
     return { all, filtered };
 }
 
-function sortByPingThenPlayers(games: MatchmakerGame[], pings: Record<string, number>): MatchmakerGame[] {
+function sortGames(games: MatchmakerGame[], pings: Record<string, number>, sortByPlayers: boolean): MatchmakerGame[] {
     return games.sort((a, b) => {
+        if (sortByPlayers) {
+            if (a.playerCount !== b.playerCount) return b.playerCount - a.playerCount;
+            return (pings[a.region] ?? 999) - (pings[b.region] ?? 999);
+        }
         const pingA = pings[a.region] ?? 999;
         const pingB = pings[b.region] ?? 999;
         if (pingA !== pingB) return pingA - pingB;
@@ -406,7 +411,7 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
     _con?.log('[KCC-MM]', filtered.length, '/', allLobbies.length, 'games passed filters');
 
     // Sort immediately — result is ready
-    if (filtered.length > 0) sortByPingThenPlayers(filtered, pings);
+    if (filtered.length > 0) sortGames(filtered, pings, mmConfig.sortByPlayers);
     popupCandidates = filtered;
 
     // Fire animation in background (non-blocking eye candy)

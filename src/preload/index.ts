@@ -828,6 +828,13 @@ function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag
     onChange: (v) => { mm.autoJoin = v; saveMM(); },
   }));
 
+  body.appendChild(createToggleRow({
+    label: 'Prioritize Player Count',
+    desc: 'Sort results by most players first, then by ping (default is ping first)',
+    checked: mm.sortByPlayers ?? false, instant: true,
+    onChange: (v) => { mm.sortByPlayers = v; saveMM(); },
+  }));
+
   body.appendChild(createKeybindRow('Matchmaker Hotkey', 'Key to trigger the custom matchmaker', bag.binds.matchmaker, (b) => {
     bag.binds.matchmaker = b;
     bag.saveBinds();

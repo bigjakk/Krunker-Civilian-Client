@@ -55,6 +55,7 @@ export interface AppConfig {
     minRemainingTime: number;
     openServerBrowser: boolean;
     autoJoin: boolean;
+    sortByPlayers: boolean;
   };
   keybinds: {
     reload: Keybind;
@@ -169,6 +170,7 @@ export const config = new Store<AppConfig>({
       minRemainingTime: 120,
       openServerBrowser: true,
       autoJoin: false,
+      sortByPlayers: false,
     },
     keybinds: DEFAULT_KEYBINDS,
     userscripts: {
