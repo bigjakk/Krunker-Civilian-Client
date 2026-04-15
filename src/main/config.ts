@@ -54,7 +54,6 @@ export interface AppConfig {
     maxPlayers: number;
     minRemainingTime: number;
     openServerBrowser: boolean;
-    autoJoin: boolean;
     sortByPlayers: boolean;
   };
   keybinds: {
@@ -64,7 +63,6 @@ export interface AppConfig {
     joinFromClipboard: Keybind;
     devTools: Keybind;
     matchmaker: Keybind;
-    matchmakerAccept: Keybind;
     matchmakerCancel: Keybind;
     fullscreenToggle: Keybind;
   };
@@ -120,7 +118,6 @@ export const DEFAULT_KEYBINDS: AppConfig['keybinds'] = {
   joinFromClipboard: { key: 'j',      ctrl: true,  shift: false, alt: false },
   devTools:          { key: 'F12',    ctrl: false, shift: false, alt: false },
   matchmaker:        { key: 'F6',     ctrl: false, shift: false, alt: false },
-  matchmakerAccept:  { key: 'Enter',  ctrl: false, shift: false, alt: false },
   matchmakerCancel:  { key: 'Escape', ctrl: false, shift: false, alt: false },
   fullscreenToggle:  { key: 'F11',    ctrl: false, shift: false, alt: false },
 };
@@ -169,7 +166,6 @@ export const config = new Store<AppConfig>({
       maxPlayers: 6,
       minRemainingTime: 120,
       openServerBrowser: true,
-      autoJoin: false,
       sortByPlayers: false,
     },
     keybinds: DEFAULT_KEYBINDS,

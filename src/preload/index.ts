@@ -853,7 +853,7 @@ function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void {
 }
 
 function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag): void {
-  const mm = mmConf || { enabled: true, regions: [], gamemodes: [], minPlayers: 1, maxPlayers: 6, minRemainingTime: 120, openServerBrowser: true, autoJoin: false };
+  const mm = mmConf || { enabled: true, regions: [], gamemodes: [], minPlayers: 1, maxPlayers: 6, minRemainingTime: 120, openServerBrowser: true, sortByPlayers: false };
 
   function saveMM(): void {
     ipcRenderer.invoke('set-config', 'matchmaker', mm);
@@ -874,13 +874,6 @@ function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag
   }));
 
   body.appendChild(createToggleRow({
-    label: 'Auto-Join',
-    desc: 'Automatically join the best match without showing the popup',
-    checked: mm.autoJoin ?? false, instant: true,
-    onChange: (v) => { mm.autoJoin = v; saveMM(); },
-  }));
-
-  body.appendChild(createToggleRow({
     label: 'Prioritize Player Count',
     desc: 'Sort results by most players first, then by ping (default is ping first)',
     checked: mm.sortByPlayers ?? false, instant: true,
@@ -889,10 +882,6 @@ function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag
 
   body.appendChild(createKeybindRow('Matchmaker Hotkey', 'Key to trigger the custom matchmaker', bag.binds.matchmaker, (b) => {
     bag.binds.matchmaker = b;
-    bag.saveBinds();
-  }, undefined, true));
-  body.appendChild(createKeybindRow('Matchmaker Accept', 'Key to accept a found game', bag.binds.matchmakerAccept, (b) => {
-    bag.binds.matchmakerAccept = b;
     bag.saveBinds();
   }, undefined, true));
   body.appendChild(createKeybindRow('Matchmaker Cancel', 'Key to dismiss the matchmaker popup', bag.binds.matchmakerCancel, (b) => {
@@ -1363,7 +1352,6 @@ function renderSettings(searchQuery?: string): void {
     const translatorConf = allConf.translator;
     const defaultBinds = {
       matchmaker:       { key: 'F6',     ctrl: false, shift: false, alt: false },
-      matchmakerAccept: { key: 'Enter',  ctrl: false, shift: false, alt: false },
       matchmakerCancel: { key: 'Escape', ctrl: false, shift: false, alt: false },
       fullscreenToggle: { key: 'F11',    ctrl: false, shift: false, alt: false },
     };

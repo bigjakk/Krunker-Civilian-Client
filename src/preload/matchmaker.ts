@@ -65,17 +65,8 @@ export interface MatchmakerConfig {
     maxPlayers: number;
     minRemainingTime: number;
     openServerBrowser: boolean;
-    autoJoin: boolean;
     sortByPlayers: boolean;
-    acceptKey: Keybind;
     cancelKey: Keybind;
-}
-
-function secondsToTimestring(num: number): string {
-    const minutes = Math.floor(num / 60);
-    const seconds = num % 60;
-    if (minutes < 1) return `${num}s`;
-    return `${minutes}m ${seconds}s`;
 }
 
 function matchesKey(bind: Keybind, event: KeyboardEvent): boolean {
@@ -103,21 +94,17 @@ popupElement.appendChild(popupDescription);
 const popupOptions = document.createElement('div');
 popupOptions.id = 'matchmakerPopupOptions';
 
-const popupConfirmBtn = document.createElement('div');
-popupConfirmBtn.id = 'matchmakerConfirmButton';
-popupConfirmBtn.className = 'matchmakerPopupButton bigShadowT';
-popupConfirmBtn.textContent = 'Join';
-popupConfirmBtn.setAttribute('onmouseenter', 'playTick()');
-popupConfirmBtn.addEventListener('click', () => decideMatchmakerDecision(true));
-
 const popupCancelBtn = document.createElement('div');
 popupCancelBtn.id = 'matchmakerCancelButton';
 popupCancelBtn.className = 'matchmakerPopupButton bigShadowT';
 popupCancelBtn.textContent = 'Cancel';
 popupCancelBtn.setAttribute('onmouseenter', 'playTick()');
-popupCancelBtn.addEventListener('click', () => decideMatchmakerDecision(false));
+popupCancelBtn.addEventListener('click', () => {
+    const w = window as any;
+    if (typeof w.playSelect === 'function') w.playSelect();
+    dismissPopup();
+});
 
-popupOptions.appendChild(popupConfirmBtn);
 popupOptions.appendChild(popupCancelBtn);
 popupElement.appendChild(popupOptions);
 
@@ -147,10 +134,8 @@ searchContainer.appendChild(searchCancelBtn);
 popupElement.appendChild(searchContainer);
 
 // ── State ──
-let popupGameID = '';
 let popupCandidates: MatchmakerGame[] = [];
 let openServerBrowser = true;
-let confirmKey: Keybind = { key: 'Enter', ctrl: false, shift: false, alt: false };
 let cancelKey: Keybind = { key: 'Escape', ctrl: false, shift: false, alt: false };
 let searchAborted = false;
 
@@ -192,23 +177,9 @@ async function verifyAndJoin(gameID: string): Promise<void> {
 
 function dismissPopup(): void {
     document.removeEventListener('keydown', handleSearchBind, true);
-    document.removeEventListener('keydown', handleMatchmakerBind, true);
+
     if (popupElement.parentNode) popupElement.remove();
     popupElement.classList.remove('searching');
-}
-
-function decideMatchmakerDecision(accept: boolean): void {
-    const w = window as any;
-    if (typeof w.playSelect === 'function') w.playSelect();
-
-    if (accept && popupGameID !== 'none') {
-        verifyAndJoin(popupGameID);
-    } else {
-        dismissPopup();
-        if (popupGameID === 'none' && openServerBrowser && typeof w.openServerWindow === 'function') {
-            w.openServerWindow(0);
-        }
-    }
 }
 
 function handleSearchBind(event: KeyboardEvent): void {
@@ -220,42 +191,6 @@ function handleSearchBind(event: KeyboardEvent): void {
     }
 }
 
-function handleMatchmakerBind(event: KeyboardEvent): void {
-    if (document.pointerLockElement) return;
-    const isAccept = matchesKey(confirmKey, event);
-    const isCancel = matchesKey(cancelKey, event);
-    if (isAccept || isCancel) {
-        document.removeEventListener('keydown', handleMatchmakerBind, true);
-        decideMatchmakerDecision(isAccept);
-    }
-}
-
-function showResultPopup(game: MatchmakerGame): void {
-    popupElement.classList.remove('searching');
-    const mapIdx = MAP_ICON_INDICES.indexOf(game.map);
-    popupElement.style.backgroundImage = `url(https://assets.krunker.io/img/maps/map_${mapIdx >= 0 ? mapIdx : 0}.png)`;
-
-    popupGameID = game.gameID;
-    if (game.gameID === 'none') {
-        popupTitle.innerText = 'No Games Found...';
-        popupDescription.innerHTML = 'Check the server browser to see other lobbies.';
-        popupConfirmBtn.style.display = 'none';
-    } else {
-        popupTitle.innerText = 'Game Found!';
-        const regionName = MATCHMAKER_REGION_NAMES[game.region] ?? 'Unknown Region';
-        popupDescription.innerHTML = `${escapeHtml(game.gamemode)} on ${escapeHtml(game.map)} (${escapeHtml(regionName)})<br/>${game.playerCount}/${game.playerLimit} Players, ${secondsToTimestring(game.remainingTime)} Left`;
-        popupConfirmBtn.style.display = 'block';
-    }
-
-    // Re-trigger slide animation
-    popupElement.style.animation = 'none';
-    void popupElement.offsetWidth;
-    popupElement.style.animation = '';
-
-    document.removeEventListener('keydown', handleSearchBind, true);
-    document.addEventListener('keydown', handleMatchmakerBind, true);
-}
-
 function showSearchPopup(): void {
     searchAborted = false;
     popupElement.classList.add('searching');
@@ -264,7 +199,7 @@ function showSearchPopup(): void {
     searchFeed.innerHTML = '';
     searchCounter.textContent = '';
 
-    document.removeEventListener('keydown', handleMatchmakerBind, true);
+
     document.addEventListener('keydown', handleSearchBind, true);
 
     const uiBase = document.getElementById('uiBase');
@@ -374,7 +309,6 @@ function sortGames(games: MatchmakerGame[], pings: Record<string, number>, sortB
 
 export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole): Promise<void> {
     openServerBrowser = mmConfig.openServerBrowser;
-    confirmKey = mmConfig.acceptKey;
     cancelKey = mmConfig.cancelKey;
 
     // Dismiss existing popup if active (also aborts in-flight search)
@@ -434,45 +368,27 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
         const best = pool[Math.floor(Math.random() * pool.length)];
         _con?.log('[KCC-MM] Best match:', best.gameID, best.region, best.map, `(${pings[best.region] ?? '?'}ms, pool: ${pool.length})`);
 
-        if (mmConfig.autoJoin) {
-            // Brief "Lobby Found!" flash before joining
-            const regionName = MATCHMAKER_REGION_NAMES[best.region] ?? best.region;
-            searchStatus.textContent = 'Lobby Found!';
-            searchFeed.innerHTML = '';
-            const found = document.createElement('div');
-            found.className = 'mm-feed-entry mm-pass';
-            found.style.cssText = 'font-size:1.1em;justify-content:center;';
-            found.innerHTML =
-                `<span class="mm-feed-region">${escapeHtml(best.region)}</span>` +
-                `<span class="mm-feed-map">${escapeHtml(best.map)}</span>` +
-                `<span class="mm-feed-players">${best.playerCount}/${best.playerLimit}</span>`;
-            searchFeed.appendChild(found);
-            searchCounter.textContent = `${best.gamemode} \u00B7 ${regionName} \u00B7 ${pings[best.region] ?? '?'}ms`;
-            await new Promise(r => setTimeout(r, 1200));
-            await verifyAndJoin(best.gameID);
-            return;
-        }
-
-        showResultPopup(best);
+        // Brief "Lobby Found!" flash before auto-joining
+        const regionName = MATCHMAKER_REGION_NAMES[best.region] ?? best.region;
+        searchStatus.textContent = 'Lobby Found!';
+        searchFeed.innerHTML = '';
+        const found = document.createElement('div');
+        found.className = 'mm-feed-entry mm-pass';
+        found.style.cssText = 'font-size:1.1em;justify-content:center;';
+        found.innerHTML =
+            `<span class="mm-feed-region">${escapeHtml(best.region)}</span>` +
+            `<span class="mm-feed-map">${escapeHtml(best.map)}</span>` +
+            `<span class="mm-feed-players">${best.playerCount}/${best.playerLimit}</span>`;
+        searchFeed.appendChild(found);
+        searchCounter.textContent = `${best.gamemode} \u00B7 ${regionName} \u00B7 ${pings[best.region] ?? '?'}ms`;
+        await new Promise(r => setTimeout(r, 1200));
+        await verifyAndJoin(best.gameID);
     } else {
         _con?.log('[KCC-MM] No matching games found');
 
-        if (mmConfig.autoJoin) {
-            dismissPopup();
-            if (openServerBrowser && typeof (window as any).openServerWindow === 'function') {
-                (window as any).openServerWindow(0);
-            }
-            return;
+        dismissPopup();
+        if (openServerBrowser && typeof (window as any).openServerWindow === 'function') {
+            (window as any).openServerWindow(0);
         }
-
-        showResultPopup({
-            gameID: 'none',
-            region: 'none',
-            playerCount: 0,
-            playerLimit: 0,
-            map: MAP_ICON_INDICES[0],
-            gamemode: MATCHMAKER_GAMEMODES[0],
-            remainingTime: 0,
-        });
     }
 }

@@ -389,7 +389,6 @@ async function launchApp(): Promise<void> {
       if (mm.enabled) {
         win.webContents.send('matchmaker-find', {
           ...mm,
-          acceptKey: binds.matchmakerAccept,
           cancelKey: binds.matchmakerCancel,
         });
       } else {
@@ -411,7 +410,6 @@ async function launchApp(): Promise<void> {
       if (mm.enabled) {
         win.webContents.send('matchmaker-find', {
           ...mm,
-          acceptKey: binds.matchmakerAccept,
           cancelKey: binds.matchmakerCancel,
         });
       } else {
