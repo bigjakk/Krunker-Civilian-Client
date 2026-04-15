@@ -546,18 +546,8 @@ interface SettingsBag {
 }
 
 function buildGeneralSection(
-  body: HTMLElement, gameConf: any, uiConfRaw: any, perfConf: any, bag: SettingsBag,
+  body: HTMLElement, gameConf: any, uiConfRaw: any, bag: SettingsBag,
 ): void {
-  const perfDefaults = { fpsUnlocked: true };
-  const perf = { ...perfDefaults, ...perfConf };
-
-  body.appendChild(createToggleRow({
-    label: 'Unlimited FPS',
-    desc: 'Uncap the frame rate (requires restart)',
-    checked: perf.fpsUnlocked, restart: true,
-    onChange: (v) => { perf.fpsUnlocked = v; ipcRenderer.invoke('set-config', 'performance', perf); },
-  }));
-
   const gameDefaults = { lastServer: '', socialTabBehaviour: 'New Window', rememberTabs: false };
   const game = { ...gameDefaults, ...gameConf };
 
@@ -595,6 +585,72 @@ function buildGeneralSection(
   }));
 
   body.appendChild(createToggleRow({
+    label: 'Join as Spectator',
+    desc: 'Automatically enable spectate mode when joining a game',
+    checked: game.joinAsSpectator, instant: true,
+    onChange: (v) => { game.joinAsSpectator = v; ipcRenderer.invoke('set-config', 'game', game); },
+  }));
+
+  body.appendChild(createToggleRow({
+    label: 'Show Changelog',
+    desc: 'Show release notes popup when the client updates',
+    checked: ui.showChangelog ?? true, instant: true,
+    onChange: (v) => { ui.showChangelog = v; saveUI(); },
+  }));
+
+  body.appendChild(createKeybindRow('Toggle Fullscreen', 'Fullscreen the game window (default F11)', bag.binds.fullscreenToggle, (b) => {
+    bag.binds.fullscreenToggle = b;
+    bag.saveBinds();
+  }, undefined, true));
+}
+
+function buildGameSection(
+  body: HTMLElement, gameConf: any, uiConfRaw: any, bag: SettingsBag,
+): void {
+  const game = { rawInput: true, showPing: true, hpEnemyCounter: true, ...gameConf };
+  const ui = { deathscreenAnimation: false, hideMenuPopups: false, menuTimer: true, doublePing: true, ...uiConfRaw };
+
+  function saveGame(): void {
+    ipcRenderer.invoke('set-config', 'game', game);
+  }
+  function saveUI(): void {
+    ipcRenderer.invoke('set-config', 'ui', ui);
+  }
+
+  if (bag.isWindows) {
+    body.appendChild(createToggleRow({
+      label: 'Raw Input',
+      desc: 'Bypass OS mouse acceleration for direct 1:1 sensor input (Windows only)',
+      checked: game.rawInput ?? true, refreshOnly: true,
+      onChange: (v) => { game.rawInput = v; saveGame(); },
+    }));
+  }
+
+  body.appendChild(createToggleRow({
+    label: 'Show Ping in Player List',
+    desc: 'Replace the ping icon with numeric millisecond values in the player list',
+    checked: game.showPing ?? true, refreshOnly: true,
+    onChange: (v) => { game.showPing = v; saveGame(); },
+  }));
+
+  body.appendChild(createToggleRow({
+    label: 'Double Ping Display',
+    desc: 'Show the real ping value (Krunker displays half the actual latency)',
+    checked: ui.doublePing ?? true, refreshOnly: true,
+    onChange: (v) => { ui.doublePing = v; saveUI(); },
+  }));
+
+  body.appendChild(createToggleRow({
+    label: 'Hardpoint Enemy Counter',
+    desc: 'Show enemy capture points in Hardpoint mode',
+    checked: game.hpEnemyCounter ?? true, refreshOnly: true,
+    onChange: (v) => {
+      game.hpEnemyCounter = v; saveGame();
+      if (v) initHPCounter(); else destroyHPCounter();
+    },
+  }));
+
+  body.appendChild(createToggleRow({
     label: 'Block Death Screen Animation',
     desc: 'Disable the slide-in animation on the death screen',
     checked: ui.deathscreenAnimation, instant: true,
@@ -612,76 +668,64 @@ function buildGeneralSection(
   }));
 
   body.appendChild(createToggleRow({
-    label: 'Join as Spectator',
-    desc: 'Automatically enable spectate mode when joining a game',
-    checked: game.joinAsSpectator, instant: true,
-    onChange: (v) => { game.joinAsSpectator = v; ipcRenderer.invoke('set-config', 'game', game); },
-  }));
-
-  body.appendChild(createToggleRow({
     label: 'Menu Timer',
     desc: 'Show the game/spectate timer on the menu screen',
     checked: ui.menuTimer ?? true, instant: true,
     onChange: (v) => { ui.menuTimer = v; saveUI(); setMenuTimer(v); },
   }));
 
-  body.appendChild(createToggleRow({
-    label: 'Double Ping Display',
-    desc: 'Show the real ping value (Krunker displays half the actual latency)',
-    checked: ui.doublePing ?? true, refreshOnly: true,
-    onChange: (v) => { ui.doublePing = v; saveUI(); },
-  }));
-
-  body.appendChild(createToggleRow({
-    label: 'Show Ping in Player List',
-    desc: 'Replace the ping icon with numeric millisecond values in the player list',
-    checked: game.showPing ?? true, refreshOnly: true,
-    onChange: (v) => { game.showPing = v; ipcRenderer.invoke('set-config', 'game', game); },
-  }));
-
-  if (bag.isWindows) {
-    body.appendChild(createToggleRow({
-      label: 'Raw Input',
-      desc: 'Bypass OS mouse acceleration for direct 1:1 sensor input (Windows only)',
-      checked: game.rawInput ?? true, refreshOnly: true,
-      onChange: (v) => { game.rawInput = v; ipcRenderer.invoke('set-config', 'game', game); },
-    }));
-  }
-
-  body.appendChild(createToggleRow({
-    label: 'Hardpoint Enemy Counter',
-    desc: 'Show enemy capture points in Hardpoint mode',
-    checked: game.hpEnemyCounter ?? true, refreshOnly: true,
-    onChange: (v) => {
-      game.hpEnemyCounter = v; ipcRenderer.invoke('set-config', 'game', game);
-      if (v) initHPCounter(); else destroyHPCounter();
-    },
-  }));
-
-  body.appendChild(createToggleRow({
-    label: 'Show Changelog',
-    desc: 'Show release notes popup when the client updates',
-    checked: ui.showChangelog ?? true, instant: true,
-    onChange: (v) => { ui.showChangelog = v; saveUI(); },
-  }));
-
   if (ui.deathscreenAnimation) setDeathAnimBlock(true);
   if (ui.menuTimer ?? true) setMenuTimer(true);
   if (ui.hideMenuPopups) startHidePopups();
-
-  body.appendChild(createKeybindRow('Toggle Fullscreen', 'Fullscreen the game window (default F11)', bag.binds.fullscreenToggle, (b) => {
-    bag.binds.fullscreenToggle = b;
-    bag.saveBinds();
-  }, undefined, true));
 }
 
-function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfRaw: any): void {
-  const swapEnabled = swapperConf ? swapperConf.enabled : true;
-  const ui = { cssTheme: 'disabled', loadingTheme: 'disabled', backgroundUrl: '', ...uiConfRaw };
+function buildPerformanceSection(
+  body: HTMLElement, perfConf: any, isWindows: boolean,
+): void {
+  const perf = { fpsUnlocked: true, cpuThrottleGame: 1, cpuThrottleMenu: 1.5, processPriority: 'Normal', ...perfConf };
 
-  function saveUI(): void {
-    ipcRenderer.invoke('set-config', 'ui', ui);
+  function savePerf(): void {
+    ipcRenderer.invoke('set-config', 'performance', perf);
   }
+
+  body.appendChild(createToggleRow({
+    label: 'Unlimited FPS',
+    desc: 'Uncap the frame rate (requires restart)',
+    checked: perf.fpsUnlocked, restart: true,
+    onChange: (v) => { perf.fpsUnlocked = v; savePerf(); },
+  }));
+
+  body.appendChild(createNumberRow({
+    label: 'CPU Throttle (Game)', desc: 'CPU throttle rate during gameplay (1 = no throttle, 3 = heavy throttle)',
+    min: 1, max: 3, step: 0.01, value: perf.cpuThrottleGame, instant: true, safety: 2,
+    onChange: (v) => { perf.cpuThrottleGame = v; savePerf(); },
+  }));
+
+  body.appendChild(createNumberRow({
+    label: 'CPU Throttle (Menu)', desc: 'CPU throttle rate on menu screens (1 = no throttle, 3 = heavy throttle)',
+    min: 1, max: 3, step: 0.01, value: perf.cpuThrottleMenu, instant: true, safety: 1,
+    onChange: (v) => { perf.cpuThrottleMenu = v; savePerf(); },
+  }));
+
+  if (isWindows) {
+    body.appendChild(createSelectRow({
+      label: 'Process Priority',
+      desc: 'OS-level process priority for the client (Windows only)',
+      options: [
+        { value: 'Normal', label: 'Normal' },
+        { value: 'Above Normal', label: 'Above Normal' },
+        { value: 'High', label: 'High' },
+        { value: 'Below Normal', label: 'Below Normal' },
+        { value: 'Low', label: 'Low' },
+      ],
+      value: perf.processPriority, restart: true, safety: 2,
+      onChange: (v) => { perf.processPriority = v; savePerf(); },
+    }));
+  }
+}
+
+function buildSwapperSection(body: HTMLElement, swapperConf: any): void {
+  const swapEnabled = swapperConf ? swapperConf.enabled : true;
 
   body.appendChild(createToggleRow({
     label: 'Resource Swapper',
@@ -707,6 +751,14 @@ function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfRaw: any
   swapFolderBtn.addEventListener('click', () => ipcRenderer.invoke('open-swap-folder'));
   folderRow.appendChild(swapFolderBtn);
   body.appendChild(folderRow);
+}
+
+function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void {
+  const ui = { cssTheme: 'disabled', loadingTheme: 'disabled', backgroundUrl: '', ...uiConfRaw };
+
+  function saveUI(): void {
+    ipcRenderer.invoke('set-config', 'ui', ui);
+  }
 
   // ── CSS Theme selector (populated from swap/themes/) ──
   const themeRow = document.createElement('div');
@@ -1109,7 +1161,7 @@ function buildChatSection(body: HTMLElement, gameConf: any, translatorConf: any)
 }
 
 function buildAdvancedSection(
-  body: HTMLElement, advConf: any, perfConf: any, isWindows: boolean,
+  body: HTMLElement, advConf: any, isWindows: boolean,
 ): void {
   const advDefaults = {
     removeUselessFeatures: true,
@@ -1122,11 +1174,6 @@ function buildAdvancedSection(
     verboseLogging: false,
   };
   const adv = { ...advDefaults, ...advConf };
-  const perf = { cpuThrottleGame: 1, cpuThrottleMenu: 1.5, processPriority: 'Normal', ...perfConf };
-
-  function savePerf(): void {
-    ipcRenderer.invoke('set-config', 'performance', perf);
-  }
 
   function saveAdv(): void {
     ipcRenderer.invoke('set-config', 'advanced', adv);
@@ -1170,34 +1217,6 @@ function buildAdvancedSection(
       checked: !!adv[t.key], restart: true,
       safety: t.safety,
       onChange: (v) => { adv[t.key] = v; saveAdv(); },
-    }));
-  }
-
-  body.appendChild(createNumberRow({
-    label: 'CPU Throttle (Game)', desc: 'CPU throttle rate during gameplay (1 = no throttle, 3 = heavy throttle)',
-    min: 1, max: 3, step: 0.01, value: perf.cpuThrottleGame, instant: true, safety: 2,
-    onChange: (v) => { perf.cpuThrottleGame = v; savePerf(); },
-  }));
-
-  body.appendChild(createNumberRow({
-    label: 'CPU Throttle (Menu)', desc: 'CPU throttle rate on menu screens (1 = no throttle, 3 = heavy throttle)',
-    min: 1, max: 3, step: 0.01, value: perf.cpuThrottleMenu, instant: true, safety: 1,
-    onChange: (v) => { perf.cpuThrottleMenu = v; savePerf(); },
-  }));
-
-  if (isWindows) {
-    body.appendChild(createSelectRow({
-      label: 'Process Priority',
-      desc: 'OS-level process priority for the client (Windows only)',
-      options: [
-        { value: 'Normal', label: 'Normal' },
-        { value: 'Above Normal', label: 'Above Normal' },
-        { value: 'High', label: 'High' },
-        { value: 'Below Normal', label: 'Below Normal' },
-        { value: 'Low', label: 'Low' },
-      ],
-      value: perf.processPriority, restart: true, safety: 2,
-      onChange: (v) => { perf.processPriority = v; savePerf(); },
     }));
   }
 
@@ -1308,8 +1327,14 @@ function renderSettings(searchQuery?: string): void {
   // ── Create section shells ──
   const genSec = createSection('General');
   container.appendChild(genSec.section);
+  const gameSec = createSection('Game');
+  container.appendChild(gameSec.section);
+  const perfSec = createSection('Performance');
+  container.appendChild(perfSec.section);
   const swapSec = createSection('Swapper');
   container.appendChild(swapSec.section);
+  const appearSec = createSection('Appearance');
+  container.appendChild(appearSec.section);
   const mmSec = createSection('Matchmaker');
   container.appendChild(mmSec.section);
   const chatSec = createSection('Chat');
@@ -1352,13 +1377,16 @@ function renderSettings(searchQuery?: string): void {
     };
 
     // Populate each section
-    buildGeneralSection(genSec.body, gameConf, uiConfRaw, allConf.performance, bag);
-    buildSwapperSection(swapSec.body, swapperConf, uiConfRaw);
+    buildGeneralSection(genSec.body, gameConf, uiConfRaw, bag);
+    buildGameSection(gameSec.body, gameConf, uiConfRaw, bag);
+    buildPerformanceSection(perfSec.body, allConf.performance, isWindows);
+    buildSwapperSection(swapSec.body, swapperConf);
+    buildAppearanceSection(appearSec.body, uiConfRaw);
     buildMatchmakerSection(mmSec.body, mmConf, bag);
     buildChatSection(chatSec.body, gameConf, translatorConf);
     buildDiscordSection(discordSec.body, discordConf);
     buildAccountsSection(accSec.body, allConf.accounts);
-    buildAdvancedSection(advSec.body, advConf, allConf.performance, isWindows);
+    buildAdvancedSection(advSec.body, advConf, isWindows);
     renderUserscriptsSection(usSec.body);
 
     if (searchQuery) applySearchFilter(container, holder, searchQuery);
