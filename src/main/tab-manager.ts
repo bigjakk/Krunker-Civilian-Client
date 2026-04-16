@@ -45,6 +45,8 @@ export class TabManager {
     private getSavedTabs: () => string[];
     private saveTabs: (urls: string[]) => void;
     private isRememberEnabled: () => boolean;
+    private applyCpuThrottleFn: (wc: Electron.WebContents, rate: number) => void;
+    private getCpuThrottleMenu: () => number;
     private tabSaveTimer: ReturnType<typeof setTimeout> | null = null;
     private restoredTabs = false;
 
@@ -59,6 +61,8 @@ export class TabManager {
         getSavedTabs: () => string[],
         saveTabs: (urls: string[]) => void,
         isRememberEnabled: () => boolean,
+        applyCpuThrottleFn: (wc: Electron.WebContents, rate: number) => void,
+        getCpuThrottleMenu: () => number,
     ) {
         this.mainWin = win;
         this.ses = ses;
@@ -70,6 +74,8 @@ export class TabManager {
         this.getSavedTabs = getSavedTabs;
         this.saveTabs = saveTabs;
         this.isRememberEnabled = isRememberEnabled;
+        this.applyCpuThrottleFn = applyCpuThrottleFn;
+        this.getCpuThrottleMenu = getCpuThrottleMenu;
 
         // ── Tab bar view (shared between both modes) ──
         this.tabBarView = new WebContentsView({
@@ -80,6 +86,22 @@ export class TabManager {
             },
         });
         this.tabBarView.webContents.loadURL(TAB_BAR_DATA_URL);
+        // Throttle the tab bar UI and recover throttle on crash / DevTools close
+        this.tabBarView.webContents.once('did-finish-load', () => {
+            this.applyCpuThrottleFn(this.tabBarView.webContents, this.getCpuThrottleMenu());
+        });
+        this.tabBarView.webContents.on('render-process-gone', () => {
+            setTimeout(() => {
+                if (!this.tabBarView.webContents.isDestroyed()) {
+                    this.applyCpuThrottleFn(this.tabBarView.webContents, this.getCpuThrottleMenu());
+                }
+            }, 500);
+        });
+        this.tabBarView.webContents.on('devtools-closed', () => {
+            if (!this.tabBarView.webContents.isDestroyed()) {
+                this.applyCpuThrottleFn(this.tabBarView.webContents, this.getCpuThrottleMenu());
+            }
+        });
 
         // ── Container view (holds tab bar + active tab content) ──
         this.containerView = new View();
@@ -263,9 +285,20 @@ export class TabManager {
         wc.on('did-finish-load', () => {
             wc.insertCSS(ALL_CLIENT_CSS).catch(() => {});
             wc.send('main_did-finish-load-tab');
-            ipcMain.emit('throttle-state', { sender: wc } as any, 'menu');
+            // Apply CPU throttle directly to this tab's webContents (always menu rate — tabs are social pages)
+            this.applyCpuThrottleFn(wc, this.getCpuThrottleMenu());
             this.updateTabInfo(tabId, { loading: false });
             this.startTitleWatcher(tabId, wc);
+        });
+
+        // Recover throttle on renderer crash / DevTools close
+        wc.on('render-process-gone', () => {
+            setTimeout(() => {
+                if (!wc.isDestroyed()) this.applyCpuThrottleFn(wc, this.getCpuThrottleMenu());
+            }, 500);
+        });
+        wc.on('devtools-closed', () => {
+            if (!wc.isDestroyed()) this.applyCpuThrottleFn(wc, this.getCpuThrottleMenu());
         });
 
         wc.on('did-start-loading', () => {
@@ -359,17 +392,38 @@ export class TabManager {
         const wc = tab.view.webContents;
         if (wc.isDestroyed()) return;
         this.stopTitleWatcher(tab.id);
-        try { wc.debugger.attach('1.3'); } catch { /* already attached (DevTools open) */ }
-        wc.debugger.sendCommand('Page.setWebLifecycleState', { state: 'frozen' }).catch(() => {});
+        try { if (!wc.debugger.isAttached()) wc.debugger.attach('1.3'); } catch { /* DevTools open */ }
+        if (!wc.debugger.isAttached()) return;
+        wc.debugger.sendCommand('Page.setWebLifecycleState', { state: 'frozen' })
+            .catch(err => electronLog.warn(`[KCC-Tabs] Freeze FAILED id=${tab.id}: ${err?.message || err}`));
     }
 
     private unfreezeTab(tab: TabInfo): void {
         const wc = tab.view.webContents;
         if (wc.isDestroyed()) return;
-        wc.debugger.sendCommand('Page.setWebLifecycleState', { state: 'active' }).catch(() => {}).finally(() => {
-            try { wc.debugger.detach(); } catch { /* not attached */ }
-            if (!wc.isDestroyed()) this.startTitleWatcher(tab.id, wc);
-        });
+        // Keep debugger attached for the tab's lifetime — it's shared with CPU throttle.
+        // First activation: no debugger session yet, no-op and let title watcher restart.
+        if (!wc.debugger.isAttached()) {
+            this.startTitleWatcher(tab.id, wc);
+            return;
+        }
+        wc.debugger.sendCommand('Page.setWebLifecycleState', { state: 'active' })
+            .catch(err => electronLog.warn(`[KCC-Tabs] Unfreeze FAILED id=${tab.id}: ${err?.message || err}`))
+            .finally(() => {
+                if (!wc.isDestroyed()) this.startTitleWatcher(tab.id, wc);
+            });
+    }
+
+    // ── Re-apply CPU throttle to every live tab + the tab bar (called when perf settings change) ──
+    applyCpuThrottleToAll(rate: number): void {
+        for (const tab of this.tabs) {
+            const wc = tab.view.webContents;
+            if (wc.isDestroyed()) continue;
+            this.applyCpuThrottleFn(wc, rate);
+        }
+        if (!this.tabBarView.webContents.isDestroyed()) {
+            this.applyCpuThrottleFn(this.tabBarView.webContents, rate);
+        }
     }
 
     // ── Close a tab ──
@@ -388,6 +442,11 @@ export class TabManager {
         if (this.recentlyClosed.length > 10) this.recentlyClosed.shift();
 
         this.stopTitleWatcher(id);
+        try {
+            if (!tab.view.webContents.isDestroyed() && tab.view.webContents.debugger.isAttached()) {
+                tab.view.webContents.debugger.detach();
+            }
+        } catch { /* ignore */ }
         tab.view.webContents.close();
         this.tabs.splice(idx, 1);
 
@@ -553,6 +612,9 @@ export class TabManager {
                 this.containerView.removeChildView(tab.view);
             }
             if (!tab.view.webContents.isDestroyed()) {
+                try {
+                    if (tab.view.webContents.debugger.isAttached()) tab.view.webContents.debugger.detach();
+                } catch { /* ignore */ }
                 tab.view.webContents.close();
             }
         }

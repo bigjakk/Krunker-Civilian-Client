@@ -487,7 +487,23 @@ function buildQueueHtml(token: string, region: string, allRegions: boolean): str
 </html>`;
 }
 
-export function openRankedQueue(token: string, region: string, allRegions: boolean): void {
+// Re-apply throttle to the open queue window (if any). No-op if not open.
+export function reapplyRankedQueueThrottle(
+    applyCpuThrottle: (wc: Electron.WebContents, rate: number) => void,
+    rate: number,
+): void {
+    if (queueWindow && !queueWindow.isDestroyed()) {
+        applyCpuThrottle(queueWindow.webContents, rate);
+    }
+}
+
+export function openRankedQueue(
+    token: string,
+    region: string,
+    allRegions: boolean,
+    applyCpuThrottle?: (wc: Electron.WebContents, rate: number) => void,
+    getMenuRate?: () => number,
+): void {
     if (queueWindow && !queueWindow.isDestroyed()) {
         queueWindow.focus();
         return;
@@ -513,4 +529,14 @@ export function openRankedQueue(token: string, region: string, allRegions: boole
 
     const html = buildQueueHtml(token, region, allRegions);
     win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+
+    // Throttle the queue UI — user stares at it for minutes while waiting for a match
+    if (applyCpuThrottle && getMenuRate) {
+        const apply = () => {
+            if (!win.isDestroyed()) applyCpuThrottle(win.webContents, getMenuRate());
+        };
+        win.webContents.once('did-finish-load', apply);
+        win.webContents.on('render-process-gone', () => setTimeout(apply, 500));
+        win.webContents.on('devtools-closed', apply);
+    }
 }
