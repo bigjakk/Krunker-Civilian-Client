@@ -696,11 +696,15 @@ export class TabManager {
         let lastUrl = '';
         let lastDom = '';
         const poll = setInterval(() => {
-            if (wc.isDestroyed()) {
+            if (wc.isDestroyed() || wc.isCrashed()) {
                 clearInterval(poll);
                 this.titlePolls.delete(tabId);
                 return;
             }
+            // Guard against "Render frame was disposed" errors during navigation/freeze transitions
+            try {
+                if (!wc.mainFrame) return;
+            } catch { return; }
             wc.executeJavaScript(
                 `(function() {
                     var url = window.location.href;
