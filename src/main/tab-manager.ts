@@ -339,17 +339,37 @@ export class TabManager {
         const tab = this.tabs.find(t => t.id === id);
         if (!tab) return;
 
-        if (this.activeTabId !== null) {
+        if (this.activeTabId !== null && this.activeTabId !== id) {
             const prev = this.tabs.find(t => t.id === this.activeTabId);
             if (prev) {
                 this.containerView.removeChildView(prev.view);
+                this.freezeTab(prev);
             }
         }
 
         this.activeTabId = id;
+        this.unfreezeTab(tab);
         this.containerView.addChildView(tab.view);
         this.updateLayout();
         this.broadcastTabState();
+    }
+
+    // ── Freeze/unfreeze background tabs via CDP Page Lifecycle ──
+    private freezeTab(tab: TabInfo): void {
+        const wc = tab.view.webContents;
+        if (wc.isDestroyed()) return;
+        this.stopTitleWatcher(tab.id);
+        try { wc.debugger.attach('1.3'); } catch { /* already attached (DevTools open) */ }
+        wc.debugger.sendCommand('Page.setWebLifecycleState', { state: 'frozen' }).catch(() => {});
+    }
+
+    private unfreezeTab(tab: TabInfo): void {
+        const wc = tab.view.webContents;
+        if (wc.isDestroyed()) return;
+        wc.debugger.sendCommand('Page.setWebLifecycleState', { state: 'active' }).catch(() => {}).finally(() => {
+            try { wc.debugger.detach(); } catch { /* not attached */ }
+            if (!wc.isDestroyed()) this.startTitleWatcher(tab.id, wc);
+        });
     }
 
     // ── Close a tab ──
