@@ -1,33 +1,69 @@
 // ── Competitive features: Hardpoint enemy counter + Rank progress tracker + Ranked queue ──
 import { ipcRenderer } from 'electron';
 
+// ── Hardpoint Enemy Counter ──
+
 let hpObserver: MutationObserver | null = null;
 let hpCounterEl: HTMLElement | null = null;
 let hpPointCounter: HTMLElement | null = null;
-let hpEnemyOBJ = 0;
+const hpEnemyScores = new Map<string, number>();
+let hpInitialized = false;
 let hpTimeout: ReturnType<typeof setTimeout> | null = null;
 let hpCheckInterval: ReturnType<typeof setInterval> | null = null;
 
-// ── Hardpoint Enemy Counter ──
+// Hardpoint scores 10 pts/sec per enemy on point. Max realistic team size ~8.
+// Anything bigger is a capture bonus, score reset, or stale baseline — ignore.
+const HP_MAX_SANE_DELTA = 80;
+
+function isHardpoint(): boolean {
+    try {
+        const activity = (window as any).getGameActivity?.();
+        if (activity?.mode === 'Hardpoint') return true;
+    } catch { /* ignore */ }
+    return !!document.querySelector('.cmpTmHed');
+}
+
+function resetHPBaseline(): void {
+    hpEnemyScores.clear();
+    hpInitialized = false;
+    if (hpPointCounter) hpPointCounter.textContent = '0';
+    if (hpTimeout) { clearTimeout(hpTimeout); hpTimeout = null; }
+}
 
 function processTeamScores(): void {
     const teams = document.querySelectorAll('#tScoreC1, #tScoreC2');
+    let maxDelta = 0;
     for (const team of teams) {
         if (team.className.includes('you')) continue;
         const scoreEl = team.nextElementSibling;
         if (!scoreEl) continue;
-
         const currentScore = parseInt(scoreEl.textContent || '0', 10);
-        if (currentScore > hpEnemyOBJ && hpPointCounter) {
-            hpPointCounter.textContent = String((currentScore - hpEnemyOBJ) / 10);
+        if (isNaN(currentScore)) continue;
 
-            if (hpTimeout) clearTimeout(hpTimeout);
-            hpTimeout = setTimeout(() => {
-                if (hpPointCounter) hpPointCounter.textContent = '0';
-                hpTimeout = null;
-            }, 1600);
-        }
-        hpEnemyOBJ = currentScore;
+        const teamId = team.id;
+        const prevScore = hpEnemyScores.get(teamId);
+        hpEnemyScores.set(teamId, currentScore);
+
+        // No baseline yet, or score reset (new round) — just record, don't display.
+        if (prevScore === undefined || currentScore < prevScore) continue;
+
+        const delta = currentScore - prevScore;
+        if (delta > maxDelta) maxDelta = delta;
+    }
+
+    // Skip first observation pass — we now have a baseline for next tick.
+    if (!hpInitialized) {
+        hpInitialized = true;
+        return;
+    }
+
+    if (maxDelta > 0 && maxDelta <= HP_MAX_SANE_DELTA && hpPointCounter) {
+        hpPointCounter.textContent = String(maxDelta / 10);
+        if (hpTimeout) clearTimeout(hpTimeout);
+        hpTimeout = setTimeout(() => {
+            if (hpPointCounter) hpPointCounter.textContent = '0';
+            hpTimeout = null;
+        }, 1600);
     }
 }
 
@@ -38,9 +74,9 @@ function setupHPDisplay(): void {
     hpCounterEl = document.createElement('div');
     hpCounterEl.className = 'statIcon kpc-hp-counter';
     hpCounterEl.innerHTML =
-        '<div class="greyInner" style="display:flex">' +
-        '<span style="color:white;font-size:15px;margin-right:4px;">on</span>' +
-        '<span class="pointVal">0</span></div>';
+        '<div class="greyInner" style="display:flex;align-items:center;border:2px solid #ffc107;box-shadow:0 0 6px rgba(255,193,7,0.5);">' +
+        '<span style="color:#ffffff;font-size:15px;margin-right:6px;font-weight:600;text-shadow:1px 1px 2px rgba(0,0,0,0.9);">on</span>' +
+        '<span class="pointVal" style="color:#ffc107;font-size:22px;font-weight:bold;text-shadow:1px 1px 3px rgba(0,0,0,0.9);">0</span></div>';
     hpPointCounter = hpCounterEl.querySelector('.pointVal');
     counters.appendChild(hpCounterEl);
 
@@ -51,22 +87,32 @@ function setupHPDisplay(): void {
     }
 }
 
+function checkHPMode(): void {
+    if (isHardpoint()) {
+        const wasHidden = !hpCounterEl || hpCounterEl.style.display === 'none';
+        setupHPDisplay();
+        if (hpCounterEl) hpCounterEl.style.display = '';
+        if (wasHidden) resetHPBaseline();
+    } else if (hpCounterEl) {
+        hpCounterEl.style.display = 'none';
+        resetHPBaseline();
+    }
+}
+
 function startHPCounter(): void {
-    hpCheckInterval = setInterval(() => {
-        if (document.querySelector('.cmpTmHed')) {
-            if (hpCheckInterval) { clearInterval(hpCheckInterval); hpCheckInterval = null; }
-            setupHPDisplay();
-        }
-    }, 2000);
+    if (hpCheckInterval) return;
+    hpCheckInterval = setInterval(checkHPMode, 2000);
+    checkHPMode();
 }
 
 function stopHPCounter(): void {
-    clearInterval(hpCheckInterval!); hpCheckInterval = null;
-    hpObserver?.disconnect(); hpObserver = null;
-    hpCounterEl?.remove(); hpCounterEl = null;
-    clearTimeout(hpTimeout!); hpTimeout = null;
+    if (hpCheckInterval) { clearInterval(hpCheckInterval); hpCheckInterval = null; }
+    if (hpObserver) { hpObserver.disconnect(); hpObserver = null; }
+    if (hpCounterEl) { hpCounterEl.remove(); hpCounterEl = null; }
+    if (hpTimeout) { clearTimeout(hpTimeout); hpTimeout = null; }
     hpPointCounter = null;
-    hpEnemyOBJ = 0;
+    hpEnemyScores.clear();
+    hpInitialized = false;
 }
 
 export function initHPCounter(): void { startHPCounter(); }
