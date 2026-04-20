@@ -6,12 +6,14 @@ interface TranslatorConfig {
   enabled: boolean;
   targetLanguage: string;
   showLanguageTag: boolean;
+  customSkipWords: string;
 }
 
 const DEFAULTS: TranslatorConfig = {
   enabled: true,
   targetLanguage: 'en',
   showLanguageTag: true,
+  customSkipWords: '',
 };
 
 // ── Module state ──
@@ -93,6 +95,18 @@ const SKIP_TERMS = new Set([
   // Emoticons
   ':)', ':(', ':d', ':p', ':o', '<3',
 ]);
+
+// ── Custom (user-provided) skip words ──
+
+let customSkipWords: Set<string> = new Set();
+
+function parseCustomSkipWords(raw: string): Set<string> {
+  return new Set(
+    raw.split(/[,\s]+/)
+      .map(w => w.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
 
 // ── False-positive source languages ──
 
@@ -185,7 +199,7 @@ function shouldTranslate(text: string): boolean {
   // Tokenize for skip-term checking
   const words = cleaned.replace(/[^a-zA-Z0-9\s]/g, '').toLowerCase().split(/\s+/).filter(w => w.length > 0);
   if (words.length === 0) return false;
-  if (words.every(w => SKIP_TERMS.has(w))) return false;
+  if (words.every(w => SKIP_TERMS.has(w) || customSkipWords.has(w))) return false;
 
   // Auto-suppressed phrases
   const key = cleaned.toLowerCase();
@@ -380,7 +394,9 @@ export function initTranslator(savedConsole: SavedConsole, initCfg: TranslatorCo
     enabled: initCfg.enabled ?? DEFAULTS.enabled,
     targetLanguage: initCfg.targetLanguage ?? DEFAULTS.targetLanguage,
     showLanguageTag: initCfg.showLanguageTag ?? DEFAULTS.showLanguageTag,
+    customSkipWords: initCfg.customSkipWords ?? DEFAULTS.customSkipWords,
   };
+  customSkipWords = parseCustomSkipWords(cfg.customSkipWords);
 
   if (!cfg.enabled) {
     _con.log('[KCC-TL] Translator disabled');
@@ -399,4 +415,8 @@ export function updateTranslatorConfig(update: Partial<TranslatorConfig>): void 
   }
   if (update.targetLanguage !== undefined) cfg.targetLanguage = update.targetLanguage;
   if (update.showLanguageTag !== undefined) cfg.showLanguageTag = update.showLanguageTag;
+  if (update.customSkipWords !== undefined) {
+    cfg.customSkipWords = update.customSkipWords;
+    customSkipWords = parseCustomSkipWords(update.customSkipWords);
+  }
 }

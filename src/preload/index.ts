@@ -1092,7 +1092,7 @@ function buildChatSection(body: HTMLElement, gameConf: any, translatorConf: any)
   }));
 
   // Translator settings inline
-  const tl = { enabled: true, targetLanguage: 'en', showLanguageTag: true, ...translatorConf };
+  const tl = { enabled: true, targetLanguage: 'en', showLanguageTag: true, customSkipWords: '', ...translatorConf };
 
   function saveTL(): void {
     ipcRenderer.invoke('set-config', 'translator', tl);
@@ -1147,6 +1147,26 @@ function buildChatSection(body: HTMLElement, gameConf: any, translatorConf: any)
       updateTranslatorConfig({ showLanguageTag: v });
     },
   }));
+
+  // Custom skip words — messages made entirely of these (plus built-in skip terms) won't be translated.
+  const skipRow = document.createElement('div');
+  skipRow.className = 'setting settName safety-0';
+  skipRow.innerHTML =
+    '<span class="setting-title">Custom Skip Words</span>' +
+    '<div class="setting-desc-new">Comma-separated words to ignore (e.g. your nickname, friends\' names). Applies instantly.</div>';
+  const skipInput = document.createElement('input');
+  skipInput.type = 'text';
+  skipInput.className = 'inputGrey2';
+  skipInput.placeholder = 'jakk, bigj, etc.';
+  skipInput.value = tl.customSkipWords || '';
+  skipInput.style.width = '300px';
+  skipInput.addEventListener('change', () => {
+    tl.customSkipWords = skipInput.value;
+    saveTL();
+    updateTranslatorConfig({ customSkipWords: skipInput.value });
+  });
+  skipRow.appendChild(skipInput);
+  body.appendChild(skipRow);
 }
 
 function buildAdvancedSection(
@@ -1798,7 +1818,7 @@ ipcRenderer.on('main_did-finish-load', () => {
 
     // ── Initialize chat translator (game page only) ──
     if (isGamePage) {
-      const mergedTl = { enabled: true, targetLanguage: 'en', showLanguageTag: true, ...translatorConf };
+      const mergedTl = { enabled: true, targetLanguage: 'en', showLanguageTag: true, customSkipWords: '', ...translatorConf };
       initTranslator(_console, mergedTl);
     }
 

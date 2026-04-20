@@ -89,6 +89,7 @@ export interface AppConfig {
     enabled: boolean;
     targetLanguage: string;
     showLanguageTag: boolean;
+    customSkipWords: string;
   };
   advanced: {
     removeUselessFeatures: boolean;
@@ -192,6 +193,7 @@ export const config = new Store<AppConfig>({
       enabled: true,
       targetLanguage: 'en',
       showLanguageTag: true,
+      customSkipWords: '',
     },
     advanced: {
       removeUselessFeatures: true,
