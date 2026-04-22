@@ -1,6 +1,6 @@
-import { app, BrowserWindow, Menu, clipboard, ipcMain, safeStorage, session, shell } from 'electron';
-import { join } from 'path';
-import { existsSync, mkdirSync, promises as fsp } from 'fs';
+import { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, safeStorage, session, shell } from 'electron';
+import { join, extname } from 'path';
+import { existsSync, mkdirSync, promises as fsp, readFileSync, statSync } from 'fs';
 import { get as httpsGet } from 'https';
 import { execFile } from 'child_process';
 import * as os from 'os';
@@ -15,7 +15,38 @@ import { showUpdateWindow } from './update-window';
 import { DiscordRPC } from './discord-rpc';
 import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS } from './css-themes';
 import { TabManager } from './tab-manager';
-import { openRankedQueue, reapplyRankedQueueThrottle } from './ranked-queue';
+import { openRankedQueue, reapplyRankedQueueThrottle, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
+
+const AUDIO_MIME: Record<string, string> = {
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.oga': 'audio/ogg',
+  '.flac': 'audio/flac',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+};
+const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
+
+function resolveRankedAudioUrl(setting: string): string {
+  const s = (setting || '').trim();
+  if (!s) return DEFAULT_RANKED_AUDIO_URL;
+  if (/^https?:\/\//i.test(s)) return s;
+  try {
+    const stat = statSync(s);
+    if (!stat.isFile()) throw new Error('not a file');
+    if (stat.size > MAX_AUDIO_BYTES) {
+      electronLog.warn(`[KCC] Ranked match sound too large (${stat.size} bytes), using default`);
+      return DEFAULT_RANKED_AUDIO_URL;
+    }
+    const mime = AUDIO_MIME[extname(s).toLowerCase()] || 'audio/mpeg';
+    const b64 = readFileSync(s).toString('base64');
+    return `data:${mime};base64,${b64}`;
+  } catch (err) {
+    electronLog.warn(`[KCC] Ranked match sound invalid (${s}):`, err);
+    return DEFAULT_RANKED_AUDIO_URL;
+  }
+}
 
 // ── App version for API calls ──
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -722,12 +753,29 @@ async function launchApp(): Promise<void> {
 
   // ── Ranked queue IPC handler ──
   ipcMain.on('open-ranked-queue', (_e, token: string, region: string, allRegions: boolean) => {
+    const mm = config.get('matchmaker');
+    const audioUrl = resolveRankedAudioUrl(mm?.rankedMatchSound || '');
     openRankedQueue(
-      token, region, allRegions,
+      token, region, allRegions, audioUrl,
       applyCpuThrottle,
       () => config.get('performance')?.cpuThrottleMenu ?? 1.5,
     );
   });
+
+  ipcMain.handle('pick-audio-file', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Audio File',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'oga', 'flac', 'm4a', 'aac'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
+    if (result.canceled || result.filePaths.length === 0) return '';
+    return result.filePaths[0];
+  });
+
+  ipcMain.handle('resolve-ranked-sound', (_e, setting: string) => resolveRankedAudioUrl(setting));
 
   // ── Discord Rich Presence IPC handler ──
   ipcMain.on('discord-update', (_e, activity: any) => {

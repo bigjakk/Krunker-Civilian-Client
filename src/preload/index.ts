@@ -853,7 +853,8 @@ function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void {
 }
 
 function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag): void {
-  const mm = mmConf || { enabled: true, regions: [], gamemodes: [], minPlayers: 1, maxPlayers: 6, minRemainingTime: 120, openServerBrowser: true, sortByPlayers: false };
+  const mm = mmConf || { enabled: true, regions: [], gamemodes: [], minPlayers: 1, maxPlayers: 6, minRemainingTime: 120, openServerBrowser: true, sortByPlayers: false, rankedMatchSound: '' };
+  if (mm.rankedMatchSound === undefined) mm.rankedMatchSound = '';
 
   function saveMM(): void {
     ipcRenderer.invoke('set-config', 'matchmaker', mm);
@@ -928,6 +929,58 @@ function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag
     selected: mm.maps,
     onChange: () => saveMM(),
   }));
+
+  // ── Ranked Match Sound (URL or local file path; empty = default) ──
+  const soundRow = document.createElement('div');
+  soundRow.className = 'setting settName safety-0 has-button';
+  soundRow.innerHTML =
+    '<span class="setting-title">Ranked Match Sound</span>' +
+    '<div class="setting-desc-new">Custom sound played when a ranked match is found. Accepts a URL or a local file path; leave blank for default.</div>';
+  const soundInput = document.createElement('input');
+  soundInput.type = 'text';
+  soundInput.className = 'inputGrey2';
+  soundInput.placeholder = 'https://example.com/sound.mp3  or  C:\\path\\to\\file.mp3';
+  soundInput.value = mm.rankedMatchSound || '';
+  soundInput.style.width = '300px';
+  soundInput.addEventListener('change', () => {
+    mm.rankedMatchSound = soundInput.value.trim();
+    saveMM();
+  });
+  soundRow.appendChild(soundInput);
+  const soundBtnWrap = document.createElement('div');
+  soundBtnWrap.style.cssText = 'grid-area: button; display: inline-flex; gap: 0.25rem; margin: 0 .5rem;';
+  const soundBrowseBtn = document.createElement('div');
+  soundBrowseBtn.className = 'settingsBtn';
+  soundBrowseBtn.title = 'Browse for Audio File';
+  soundBrowseBtn.style.margin = '0';
+  soundBrowseBtn.innerHTML = '<span class="material-icons">folder_open</span>';
+  soundBrowseBtn.addEventListener('click', async () => {
+    const path: string = await ipcRenderer.invoke('pick-audio-file');
+    if (path) {
+      soundInput.value = path;
+      mm.rankedMatchSound = path;
+      saveMM();
+    }
+  });
+  soundBtnWrap.appendChild(soundBrowseBtn);
+  let previewAudio: HTMLAudioElement | null = null;
+  const soundPlayBtn = document.createElement('div');
+  soundPlayBtn.className = 'settingsBtn';
+  soundPlayBtn.title = 'Preview Sound';
+  soundPlayBtn.style.margin = '0';
+  soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+  soundPlayBtn.addEventListener('click', async () => {
+    if (previewAudio) { previewAudio.pause(); previewAudio = null; soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>'; return; }
+    const url: string = await ipcRenderer.invoke('resolve-ranked-sound', soundInput.value.trim());
+    previewAudio = new Audio(url);
+    soundPlayBtn.innerHTML = '<span class="material-icons">stop</span>';
+    previewAudio.onended = () => { previewAudio = null; soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>'; };
+    previewAudio.onerror = () => { previewAudio = null; soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>'; };
+    previewAudio.play().catch(() => { previewAudio = null; soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>'; });
+  });
+  soundBtnWrap.appendChild(soundPlayBtn);
+  soundRow.appendChild(soundBtnWrap);
+  body.appendChild(soundRow);
 }
 
 function buildDiscordSection(body: HTMLElement, discordConf: any): void {
@@ -1606,19 +1659,21 @@ function startHidePopups(): void {
     style.textContent = HIDE_POPUPS_CSS;
     document.head.appendChild(style);
   }
-  const w = window as any;
   _hidePopupsInterval = setInterval(() => {
     for (const id of HIDE_POPUPS_ELS) {
       const el = document.getElementById(id);
       if (el && el.style.display !== 'none') el.style.display = 'none';
     }
     const bundlePop = document.getElementById('bundlePop');
-    if (bundlePop && bundlePop.children.length > 0 && bundlePop.style.display !== 'none') {
-      if (typeof w.clearPops === 'function') w.clearPops();
+    if (bundlePop && bundlePop.children.length > 0) {
+      while (bundlePop.firstChild) bundlePop.firstChild.remove();
+      bundlePop.style.display = 'none';
     }
     const genericPop = document.getElementById('genericPop');
-    if (genericPop && genericPop.classList.contains('claimPop') && genericPop.style.display !== 'none') {
-      if (typeof w.clearPops === 'function') w.clearPops();
+    if (genericPop && genericPop.classList.contains('claimPop')) {
+      genericPop.classList.remove('claimPop');
+      while (genericPop.firstChild) genericPop.firstChild.remove();
+      genericPop.style.display = 'none';
     }
   }, 1000);
 }

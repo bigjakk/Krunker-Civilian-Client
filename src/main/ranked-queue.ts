@@ -1,6 +1,8 @@
 import { BrowserWindow } from 'electron';
 import { QUEUE_NOTIFICATION_AUDIO } from './ranked-queue-audio';
 
+export const DEFAULT_RANKED_AUDIO_URL = `data:audio/mpeg;base64,${QUEUE_NOTIFICATION_AUDIO}`;
+
 let queueWindow: BrowserWindow | null = null;
 
 const RANKED_QUEUE_WS = 'wss://gamefrontend.svc.krunker.io/v1/matchmaking/queue';
@@ -166,7 +168,7 @@ function buildRegionCheckboxes(): string {
     }).join('\n');
 }
 
-function buildQueueScript(token: string, region: string, allRegions: boolean): string {
+function buildQueueScript(token: string, region: string, allRegions: boolean, audioUrl: string): string {
     return `
 let isQueued = false;
 let queueStartTime = null;
@@ -184,6 +186,8 @@ const WS_URL = ${JSON.stringify(RANKED_QUEUE_WS)};
 const INIT_TOKEN = ${JSON.stringify(token)};
 const INIT_REGION = ${JSON.stringify(region)};
 const INIT_ALL_REGIONS = ${JSON.stringify(allRegions)};
+const AUDIO_URL = ${JSON.stringify(audioUrl)};
+const FALLBACK_AUDIO_URL = ${JSON.stringify(DEFAULT_RANKED_AUDIO_URL)};
 const maps = ${buildMapsJson()};
 const regions = ${buildRegionsJson()};
 
@@ -196,8 +200,6 @@ const countdownTimer = document.getElementById('countDownTimer');
 const foundRegion = document.getElementById('foundRegion');
 const queueButton = document.getElementById('queueButton');
 const closeButton = document.getElementById('closeButton');
-
-const base64String = ${JSON.stringify(QUEUE_NOTIFICATION_AUDIO)};
 
 function saveSettings() {
     const selectedRegions = Array.from(document.querySelectorAll('#regionCheckboxes input:checked')).map(el => el.value);
@@ -220,18 +222,24 @@ function loadSettings() {
     }
 }
 
-const base64ToArrayBuffer = (b64) => {
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return bytes.buffer;
-};
+async function fetchAndDecode(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const buf = await res.arrayBuffer();
+    return await audioContext.decodeAudioData(buf);
+}
 
 async function initializeAudio() {
     audioContext = new AudioContext();
     if (audioContext.state === 'suspended') await audioContext.resume();
-    const arrayBuffer = base64ToArrayBuffer(base64String);
-    notificationBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    try {
+        notificationBuffer = await fetchAndDecode(AUDIO_URL);
+    } catch (e) {
+        console.warn('Custom ranked sound failed, using default:', e);
+        if (AUDIO_URL !== FALLBACK_AUDIO_URL) {
+            try { notificationBuffer = await fetchAndDecode(FALLBACK_AUDIO_URL); } catch {}
+        }
+    }
     audioInitialized = true;
 }
 
@@ -445,7 +453,7 @@ loadSettings();
 `;
 }
 
-function buildQueueHtml(token: string, region: string, allRegions: boolean): string {
+function buildQueueHtml(token: string, region: string, allRegions: boolean, audioUrl: string): string {
     return `<!DOCTYPE html>
 <html lang="en-US">
 <head>
@@ -482,7 +490,7 @@ function buildQueueHtml(token: string, region: string, allRegions: boolean): str
     </div>
   </div>
 </div>
-<script>${buildQueueScript(token, region, allRegions)}</script>
+<script>${buildQueueScript(token, region, allRegions, audioUrl)}</script>
 </body>
 </html>`;
 }
@@ -501,6 +509,7 @@ export function openRankedQueue(
     token: string,
     region: string,
     allRegions: boolean,
+    audioUrl: string,
     applyCpuThrottle?: (wc: Electron.WebContents, rate: number) => void,
     getMenuRate?: () => number,
 ): void {
@@ -527,7 +536,7 @@ export function openRankedQueue(
     queueWindow = win;
     win.on('closed', () => { queueWindow = null; });
 
-    const html = buildQueueHtml(token, region, allRegions);
+    const html = buildQueueHtml(token, region, allRegions, audioUrl);
     win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 
     // Throttle the queue UI — user stares at it for minutes while waiting for a match

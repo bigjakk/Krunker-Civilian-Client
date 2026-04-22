@@ -55,6 +55,7 @@ export interface AppConfig {
     minRemainingTime: number;
     openServerBrowser: boolean;
     sortByPlayers: boolean;
+    rankedMatchSound: string;
   };
   keybinds: {
     reload: Keybind;
@@ -168,6 +169,7 @@ export const config = new Store<AppConfig>({
       minRemainingTime: 120,
       openServerBrowser: true,
       sortByPlayers: false,
+      rankedMatchSound: '',
     },
     keybinds: DEFAULT_KEYBINDS,
     userscripts: {
