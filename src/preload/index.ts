@@ -607,7 +607,7 @@ function buildGeneralSection(
 function buildGameSection(
   body: HTMLElement, gameConf: any, uiConfRaw: any, bag: SettingsBag,
 ): void {
-  const game = { rawInput: true, showPing: true, hpEnemyCounter: true, ...gameConf };
+  const game = { rawInput: true, showPing: true, hpEnemyCounter: true, hideBunnies: false, ...gameConf };
   const ui = { deathscreenAnimation: false, hideMenuPopups: false, menuTimer: true, doublePing: true, ...uiConfRaw };
 
   function saveGame(): void {
@@ -648,6 +648,13 @@ function buildGameSection(
       game.hpEnemyCounter = v; saveGame();
       if (v) initHPCounter(); else destroyHPCounter();
     },
+  }));
+
+  body.appendChild(createToggleRow({
+    label: 'Hide Bunny NPCs',
+    desc: 'Block the bunny NPC models that spawn in public matches',
+    checked: game.hideBunnies ?? false, refreshOnly: true,
+    onChange: (v) => { game.hideBunnies = v; saveGame(); },
   }));
 
   body.appendChild(createToggleRow({

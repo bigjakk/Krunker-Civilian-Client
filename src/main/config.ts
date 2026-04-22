@@ -40,6 +40,7 @@ export interface AppConfig {
     chatHistorySize: number;
     showPing: boolean;
     hpEnemyCounter: boolean;
+    hideBunnies: boolean;
   };
   swapper: {
     enabled: boolean;
@@ -154,6 +155,7 @@ export const config = new Store<AppConfig>({
       chatHistorySize: 200,
       showPing: true,
       hpEnemyCounter: true,
+      hideBunnies: false,
     },
     swapper: {
       enabled: false,

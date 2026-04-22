@@ -111,6 +111,27 @@ const BLOCKED_URL_PATTERNS = [
   '*://imasdk.googleapis.com/*',
 ];
 
+// ── Bunny NPC blocklist (mirrors Glorp) ──
+// Glorp nullifies these URIs via `request.SetUri(null)` — we emulate by redirecting
+// to an empty data URL so Krunker's OBJLoader parses zero geometry (vs cancelling,
+// which triggers fallback behavior in Krunker). 60585 is a whole-folder block (all
+// file types for that asset id); 618xx are model.obj-only.
+const BUNNY_URL_PATTERNS = [
+  '*://user-assets.krunker.io/60585/*',
+  '*://user-assets.krunker.io/61806/model.obj*',
+  '*://user-assets.krunker.io/61814/model.obj*',
+  '*://user-assets.krunker.io/61815/model.obj*',
+  '*://user-assets.krunker.io/61818/model.obj*',
+  '*://user-assets.krunker.io/61820/model.obj*',
+  '*://user-assets.krunker.io/61821/model.obj*',
+  '*://user-assets.krunker.io/61822/model.obj*',
+  '*://user-assets.krunker.io/61823/model.obj*',
+  '*://user-assets.krunker.io/61824/model.obj*',
+];
+const BUNNY_URL_RE = /user-assets\.krunker\.io\/(?:60585\/|(?:61806|61814|61815|61818|61820|61821|61822|61823|61824)\/model\.obj)/;
+const EMPTY_RESPONSE_URL = 'data:,';
+let hideBunnies = false;
+
 // ── CSS to hide ad containers ──
 const HIDE_ADS_CSS = `
 .endAHolder,
@@ -278,12 +299,17 @@ async function launchApp(): Promise<void> {
   // The broad *://*.krunker.io/* pattern lets the swapper intercept any krunker asset.
   // swapper.getRedirect() returns null before its async scan completes, so swapped
   // resources simply pass through until the scan finishes — no re-registration needed.
+  hideBunnies = config.get('game')?.hideBunnies ?? false;
   const requestFilterUrls = swapper
-    ? [...BLOCKED_URL_PATTERNS, '*://*.krunker.io/*']
-    : [...BLOCKED_URL_PATTERNS];
+    ? [...BLOCKED_URL_PATTERNS, ...BUNNY_URL_PATTERNS, '*://*.krunker.io/*']
+    : [...BLOCKED_URL_PATTERNS, ...BUNNY_URL_PATTERNS];
 
   ses.webRequest.onBeforeRequest({ urls: requestFilterUrls }, (details, callback) => {
-    // Check swapper first — redirect matching assets to local files
+    // Bunny NPC block — redirect to empty body (matches Glorp's SetUri(null))
+    if (hideBunnies && BUNNY_URL_RE.test(details.url)) {
+      return callback({ redirectURL: EMPTY_RESPONSE_URL });
+    }
+    // Check swapper next — redirect matching assets to local files
     if (swapper) {
       const redirect = swapper.getRedirect(details.url);
       if (redirect) return callback({ redirectURL: redirect });
@@ -657,8 +683,9 @@ async function launchApp(): Promise<void> {
     // Invalidate caches immediately (not on flush) to prevent stale reads
     if (key === 'game') {
       cachedGameConf = null;
-      // Switch tab mode if socialTabBehaviour changed
       const newGame = value as any;
+      hideBunnies = newGame?.hideBunnies ?? false;
+      // Switch tab mode if socialTabBehaviour changed
       if (newGame?.socialTabBehaviour) {
         const newMode: 'same' | 'new' = newGame.socialTabBehaviour === 'Same Window' ? 'same' : 'new';
         if (newMode !== tabMode) {
