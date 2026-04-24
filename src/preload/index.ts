@@ -7,7 +7,7 @@ import { initTranslator, updateTranslatorConfig } from './translator';
 import { setDeathAnimBlock, setMenuTimer, escapeHtml } from './utils';
 import { initChat, setBetterChat, setChatHistorySize } from './chat';
 import { initHPCounter, destroyHPCounter, initRankProgress } from './competitive';
-import { checkChangelog } from './changelog';
+import { checkChangelog, showChangelogNow } from './changelog';
 import type { Keybind } from '../main/config';
 
 
@@ -597,6 +597,20 @@ function buildGeneralSection(
     checked: ui.showChangelog ?? true, instant: true,
     onChange: (v) => { ui.showChangelog = v; saveUI(); },
   }));
+
+  const changelogBtnRow = document.createElement('div');
+  changelogBtnRow.className = 'setting settName safety-0 has-button';
+  changelogBtnRow.innerHTML =
+    '<span class="setting-title">Changelog</span>' +
+    '<div class="setting-desc-new">View release notes for the current version</div>';
+  const changelogBtn = document.createElement('div');
+  changelogBtn.className = 'settingsBtn';
+  changelogBtn.innerHTML = '<span class="material-icons">article</span> Show';
+  changelogBtn.addEventListener('click', () => {
+    ipcRenderer.invoke('get-version').then((ver: string) => showChangelogNow(ver));
+  });
+  changelogBtnRow.appendChild(changelogBtn);
+  body.appendChild(changelogBtnRow);
 
   body.appendChild(createKeybindRow('Toggle Fullscreen', 'Fullscreen the game window (default F11)', bag.binds.fullscreenToggle, (b) => {
     bag.binds.fullscreenToggle = b;

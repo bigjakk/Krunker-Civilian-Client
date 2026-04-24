@@ -125,6 +125,13 @@ function showChangelogPopup(version: string, body: string): void {
     document.body.appendChild(host);
 }
 
+export async function showChangelogNow(currentVersion: string): Promise<void> {
+    try {
+        const body = await ipcRenderer.invoke('changelog-fetch', currentVersion);
+        if (body) showChangelogPopup(currentVersion, body);
+    } catch { /* fetch failed — skip silently */ }
+}
+
 export async function checkChangelog(currentVersion: string, lastSeenVersion: string): Promise<void> {
     if (lastSeenVersion && !versionLessThan(lastSeenVersion, currentVersion)) return;
 
