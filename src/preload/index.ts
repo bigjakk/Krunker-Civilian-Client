@@ -1667,6 +1667,7 @@ function startHidePopups(): void {
     document.head.appendChild(style);
   }
   _hidePopupsInterval = setInterval(() => {
+    if (document.pointerLockElement) return;
     for (const id of HIDE_POPUPS_ELS) {
       const el = document.getElementById(id);
       if (el && el.style.display !== 'none') el.style.display = 'none';
