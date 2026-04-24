@@ -86,6 +86,10 @@ export interface AppConfig {
   };
   discord: {
     enabled: boolean;
+    showMapMode: boolean;
+    showClass: boolean;
+    showTimer: boolean;
+    showStatus: boolean;
   };
   translator: {
     enabled: boolean;
@@ -192,6 +196,10 @@ export const config = new Store<AppConfig>({
     },
     discord: {
       enabled: true,
+      showMapMode: true,
+      showClass: true,
+      showTimer: true,
+      showStatus: true,
     },
     translator: {
       enabled: true,

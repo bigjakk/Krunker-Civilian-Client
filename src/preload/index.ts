@@ -991,7 +991,14 @@ function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag
 }
 
 function buildDiscordSection(body: HTMLElement, discordConf: any): void {
-  const discord = { enabled: false, ...discordConf };
+  const discord = {
+    enabled: false,
+    showMapMode: true,
+    showClass: true,
+    showTimer: true,
+    showStatus: true,
+    ...discordConf,
+  };
 
   body.appendChild(createToggleRow({
     label: 'Discord Rich Presence',
@@ -1000,6 +1007,50 @@ function buildDiscordSection(body: HTMLElement, discordConf: any): void {
     restart: true,
     onChange: (v) => {
       discord.enabled = v;
+      ipcRenderer.invoke('set-config', 'discord', discord);
+    },
+  }));
+
+  body.appendChild(createToggleRow({
+    label: 'Show Map & Gamemode',
+    desc: 'Display the current map and gamemode',
+    checked: discord.showMapMode,
+    refreshOnly: true,
+    onChange: (v) => {
+      discord.showMapMode = v;
+      ipcRenderer.invoke('set-config', 'discord', discord);
+    },
+  }));
+
+  body.appendChild(createToggleRow({
+    label: 'Show Class',
+    desc: 'Display your current class name',
+    checked: discord.showClass,
+    refreshOnly: true,
+    onChange: (v) => {
+      discord.showClass = v;
+      ipcRenderer.invoke('set-config', 'discord', discord);
+    },
+  }));
+
+  body.appendChild(createToggleRow({
+    label: 'Show Elapsed Time',
+    desc: 'Display how long you\'ve been in the current match',
+    checked: discord.showTimer,
+    refreshOnly: true,
+    onChange: (v) => {
+      discord.showTimer = v;
+      ipcRenderer.invoke('set-config', 'discord', discord);
+    },
+  }));
+
+  body.appendChild(createToggleRow({
+    label: 'Show Menu/Spectating Status',
+    desc: 'Display "In Menus" or "Spectating" when not in a match',
+    checked: discord.showStatus,
+    refreshOnly: true,
+    onChange: (v) => {
+      discord.showStatus = v;
       ipcRenderer.invoke('set-config', 'discord', discord);
     },
   }));
@@ -1887,12 +1938,18 @@ ipcRenderer.on('main_did-finish-load', () => {
 
     // ── Discord Rich Presence game state polling ──
     if (isGamePage && discordConf?.enabled) {
+      const showMapMode = discordConf.showMapMode !== false;
+      const showClass = discordConf.showClass !== false;
+      const showTimer = discordConf.showTimer !== false;
+      const showStatus = discordConf.showStatus !== false;
+
       let lastDetails = '';
       let lastState = '';
+      let firstSend = true;
       let gameStartTimestamp = Math.floor(Date.now() / 1000);
 
       function pollDiscordState(): void {
-        let details: string;
+        let details = '';
         let state = '';
         let startTimestamp: number | undefined = undefined;
 
@@ -1905,42 +1962,47 @@ ipcRenderer.on('main_did-finish-load', () => {
         }
 
         if (spectating) {
-          details = 'Spectating';
-          if (gameActivity?.map) {
+          if (showStatus) details = 'Spectating';
+          if (showMapMode && gameActivity?.map) {
             state = gameActivity.map;
           }
         } else {
           const uiBase = document.getElementById('uiBase');
           if (uiBase && uiBase.className === 'onMenu') {
-            details = 'In Menus';
+            if (showStatus) details = 'In Menus';
           } else {
-            if (gameActivity?.mode && gameActivity?.map) {
-              details = gameActivity.mode + ' on ' + gameActivity.map;
-            } else {
-              const mapInfo = document.getElementById('mapInfo');
-              details = mapInfo?.textContent || 'Playing Krunker';
+            if (showMapMode) {
+              if (gameActivity?.mode && gameActivity?.map) {
+                details = gameActivity.mode + ' on ' + gameActivity.map;
+              } else {
+                const mapInfo = document.getElementById('mapInfo');
+                details = mapInfo?.textContent || 'Playing Krunker';
+              }
             }
 
-            if (gameActivity?.class?.name) {
-              state = gameActivity.class.name;
-            } else {
-              const classElem = document.getElementById('menuClassName');
-              if (classElem?.textContent) state = classElem.textContent;
+            if (showClass) {
+              if (gameActivity?.class?.name) {
+                state = gameActivity.class.name;
+              } else {
+                const classElem = document.getElementById('menuClassName');
+                if (classElem?.textContent) state = classElem.textContent;
+              }
             }
 
-            startTimestamp = gameStartTimestamp;
+            if (showTimer) startTimestamp = gameStartTimestamp;
           }
         }
 
-        if (details !== lastDetails || state !== lastState) {
+        if (firstSend || details !== lastDetails || state !== lastState) {
           if (startTimestamp && lastDetails !== details) {
             gameStartTimestamp = Math.floor(Date.now() / 1000);
             startTimestamp = gameStartTimestamp;
           }
           lastDetails = details;
           lastState = state;
+          firstSend = false;
           ipcRenderer.send('discord-update', {
-            details,
+            details: details || undefined,
             state: state || undefined,
             startTimestamp,
             largeImageKey: 'krunker',
