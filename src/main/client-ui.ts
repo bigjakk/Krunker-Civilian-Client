@@ -612,6 +612,7 @@ export const TRANSLATOR_CSS = `
   font-style: italic;
   margin-left: 8px;
   margin-top: 2px;
+  overflow-wrap: anywhere;
 }
 `;
 
