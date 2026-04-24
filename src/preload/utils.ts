@@ -21,7 +21,7 @@ export function escapeHtml(s: string): string {
 
 // ── Shared CSS constants ──
 
-const DEATH_ANIM_BLOCK_ID = 'kpc-animationBlock';
+const DEATH_ANIM_BLOCK_ID = 'kcc-animationBlock';
 const DEATH_ANIM_BLOCK_CSS =
   '.death-ui-bottom, .death-ui-bottom-empty { animation: none !important; transition: none !important; }';
 
@@ -44,7 +44,7 @@ export function setDeathAnimBlock(enabled: boolean): void {
 // Shows the native spectate/game timer prominently on the menu screen.
 // CSS approach from crankshaft/glorp.
 
-const MENU_TIMER_ID = 'kpc-menuTimer';
+const MENU_TIMER_ID = 'kcc-menuTimer';
 const MENU_TIMER_CSS = `
 #uiBase.onMenu #spectateUI { display: block !important; }
 #uiBase.onCompMenu.onMenu #specTimer,

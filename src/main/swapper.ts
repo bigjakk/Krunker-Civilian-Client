@@ -2,21 +2,21 @@ import { existsSync, mkdirSync, promises as fsp } from 'fs';
 import { join } from 'path';
 import { protocol, net, Session } from 'electron';
 
-const PROTOCOL_NAME = 'kpc-swap';
+const PROTOCOL_NAME = 'kcc-swap';
 const TARGET_DOMAIN = 'krunker.io';
 
 /**
- * Convert a native file path to a proper kpc-swap:// URL.
- * Windows paths like C:\foo\bar become kpc-swap://C/foo/bar
+ * Convert a native file path to a proper kcc-swap:// URL.
+ * Windows paths like C:\foo\bar become kcc-swap://C/foo/bar
  */
 function filePathToSwapURL(filePath: string): string {
   const forwardSlash = filePath.replace(/\\/g, '/');
-  // Windows drive letter: C:/foo → kpc-swap://C/foo
+  // Windows drive letter: C:/foo → kcc-swap://C/foo
   const match = forwardSlash.match(/^([A-Za-z]):\/(.*)/);
   if (match) {
     return `${PROTOCOL_NAME}://${match[1]}/${match[2]}`;
   }
-  // Unix absolute: /home/user/foo → kpc-swap:///home/user/foo
+  // Unix absolute: /home/user/foo → kcc-swap:///home/user/foo
   return `${PROTOCOL_NAME}://${forwardSlash}`;
 }
 
@@ -38,8 +38,8 @@ export function registerSwapperFileProtocol(ses: Session): void {
   ses.protocol.handle(PROTOCOL_NAME, async (request) => {
     const url = new URL(request.url);
     // Reconstruct the file path from the URL
-    // Windows: kpc-swap://C/foo/bar → C:/foo/bar
-    // Unix:    kpc-swap:///home/foo  → /home/foo
+    // Windows: kcc-swap://C/foo/bar → C:/foo/bar
+    // Unix:    kcc-swap:///home/foo  → /home/foo
     let filePath: string;
     if (url.hostname) {
       // Windows drive letter is the hostname

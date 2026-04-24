@@ -12,8 +12,8 @@ export const TAB_BAR_HTML = `<!DOCTYPE html>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--kpc-surface-dialog);
-    color: var(--kpc-text-primary);
+    background: var(--kcc-surface-dialog);
+    color: var(--kcc-text-primary);
     height: 40px;
     overflow: hidden;
     display: flex;
@@ -29,31 +29,31 @@ export const TAB_BAR_HTML = `<!DOCTYPE html>
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    border: 1px solid var(--kpc-toggle-off);
+    border: 1px solid var(--kcc-toggle-off);
     border-radius: 6px;
     padding: 4px 10px;
     cursor: pointer;
     font-size: 12px;
     font-weight: 500;
     transition: background 0.12s, border-color 0.12s;
-    background: var(--kpc-surface-card);
-    color: var(--kpc-text-secondary);
+    background: var(--kcc-surface-card);
+    color: var(--kcc-text-secondary);
   }
   .bar-pill:hover {
-    background: var(--kpc-surface-input);
+    background: var(--kcc-surface-input);
     border-color: rgba(255,255,255,0.2);
   }
 
   /* ── Game button (green accent) ── */
   #gameBtn {
     background: rgba(76, 175, 80, 0.12);
-    color: var(--kpc-green);
+    color: var(--kcc-green);
     border-color: rgba(76, 175, 80, 0.5);
     font-weight: 600;
   }
   #gameBtn:hover {
     background: rgba(76, 175, 80, 0.25);
-    border-color: var(--kpc-green);
+    border-color: var(--kcc-green);
   }
 
   /* ── Tab strip ── */
@@ -88,7 +88,7 @@ export const TAB_BAR_HTML = `<!DOCTYPE html>
     top: 2px;
     bottom: 2px;
     width: 2px;
-    background: var(--kpc-green);
+    background: var(--kcc-green);
     border-radius: 1px;
   }
   .tab.drop-after::after {
@@ -98,17 +98,17 @@ export const TAB_BAR_HTML = `<!DOCTYPE html>
     top: 2px;
     bottom: 2px;
     width: 2px;
-    background: var(--kpc-green);
+    background: var(--kcc-green);
     border-radius: 1px;
   }
   .tab.active {
     background: rgba(76, 175, 80, 0.12);
     border-color: rgba(76, 175, 80, 0.5);
-    color: var(--kpc-text-primary);
+    color: var(--kcc-text-primary);
   }
   .tab.active:hover {
     background: rgba(76, 175, 80, 0.2);
-    border-color: var(--kpc-green);
+    border-color: var(--kcc-green);
   }
 
   .tab-title {
@@ -121,8 +121,8 @@ export const TAB_BAR_HTML = `<!DOCTYPE html>
   .tab-spinner {
     width: 10px;
     height: 10px;
-    border: 1.5px solid var(--kpc-border-medium);
-    border-top-color: var(--kpc-green);
+    border: 1.5px solid var(--kcc-border-medium);
+    border-top-color: var(--kcc-green);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
     flex-shrink: 0;
@@ -139,11 +139,11 @@ export const TAB_BAR_HTML = `<!DOCTYPE html>
     text-align: center;
     border-radius: 3px;
     font-size: 13px;
-    color: var(--kpc-text-dim);
+    color: var(--kcc-text-dim);
     transition: background 0.1s, color 0.1s;
   }
   .tab-close:hover {
-    background: var(--kpc-toggle-off);
+    background: var(--kcc-toggle-off);
     color: #fff;
   }
 
@@ -154,12 +154,12 @@ export const TAB_BAR_HTML = `<!DOCTYPE html>
     justify-content: center;
     font-size: 16px;
     font-weight: 400;
-    color: var(--kpc-text-faint);
+    color: var(--kcc-text-faint);
     padding: 0;
     border-style: dashed;
   }
   #newTabBtn:hover {
-    color: var(--kpc-text-primary);
+    color: var(--kcc-text-primary);
   }
 </style>
 </head>

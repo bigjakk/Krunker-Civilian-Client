@@ -322,8 +322,8 @@ function appendTranslation(chatNode: HTMLElement, username: string, translation:
 // ── Message processing ──
 
 function processMessage(node: HTMLElement): void {
-  if (node.hasAttribute('data-kpc-translated')) return;
-  node.setAttribute('data-kpc-translated', '1');
+  if (node.hasAttribute('data-kcc-translated')) return;
+  node.setAttribute('data-kcc-translated', '1');
 
   const extracted = extractChatText(node);
   if (!extracted) return;

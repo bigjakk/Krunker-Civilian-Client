@@ -80,7 +80,7 @@ function updateRefreshNotification(): void {
     }
     if (refreshPopupEl) { try { refreshPopupEl.remove(); } catch { /* noop */ } }
     refreshPopupEl = document.createElement('div');
-    refreshPopupEl.className = 'kpc-holder-update refresh-popup';
+    refreshPopupEl.className = 'kcc-holder-update refresh-popup';
     if (refreshLevel === RefreshLevel.restart) {
         refreshPopupEl.innerHTML = '<span class="restart-msg">Restart client fully to see changes</span>';
     } else {
@@ -92,8 +92,8 @@ function updateRefreshNotification(): void {
 // ── Tell Krunker this is a client (enables "Client" settings tab) ──
 (window as any).OffCliV = true;
 
-// ── IPC bridge exposed as window.kpc ──
-(window as any).kpc = {
+// ── IPC bridge exposed as window.kcc ──
+(window as any).kcc = {
   platform: {
     getInfo: () => ipcRenderer.invoke('get-platform'),
   },
@@ -132,27 +132,27 @@ function keybindDisplayString(bind: Keybind): string {
 let capturingKeybind: { resolve: (bind: Keybind) => void } | null = null;
 
 const kbOverlay = document.createElement('div');
-kbOverlay.className = 'kpc-keybind-overlay';
+kbOverlay.className = 'kcc-keybind-overlay';
 const kbDialog = document.createElement('div');
-kbDialog.className = 'kpc-keybind-dialog';
+kbDialog.className = 'kcc-keybind-dialog';
 const kbTitle = document.createElement('div');
-kbTitle.className = 'kpc-keybind-dialog-title';
+kbTitle.className = 'kcc-keybind-dialog-title';
 const kbSub = document.createElement('div');
-kbSub.className = 'kpc-keybind-dialog-sub';
+kbSub.className = 'kcc-keybind-dialog-sub';
 kbSub.innerHTML = 'Press any key. Press <code>Shift+Escape</code> to cancel.';
 const kbModifiers = document.createElement('div');
-kbModifiers.className = 'kpc-keybind-dialog-modifiers';
+kbModifiers.className = 'kcc-keybind-dialog-modifiers';
 const kbShift = document.createElement('div');
-kbShift.className = 'kpc-keybind-modifier';
+kbShift.className = 'kcc-keybind-modifier';
 kbShift.textContent = 'Shift';
 const kbCtrl = document.createElement('div');
-kbCtrl.className = 'kpc-keybind-modifier';
+kbCtrl.className = 'kcc-keybind-modifier';
 kbCtrl.textContent = 'Control';
 const kbAlt = document.createElement('div');
-kbAlt.className = 'kpc-keybind-modifier';
+kbAlt.className = 'kcc-keybind-modifier';
 kbAlt.textContent = 'Alt';
 const kbCancel = document.createElement('div');
-kbCancel.className = 'kpc-keybind-dialog-cancel';
+kbCancel.className = 'kcc-keybind-dialog-cancel';
 kbCancel.textContent = 'Cancel';
 kbCancel.addEventListener('click', dismissKeybindDialog);
 
@@ -233,9 +233,9 @@ function createKeybindRow(label: string, desc: string, currentBind: Keybind, onB
   row.innerHTML =
     settingIcon(s, instant) +
     '<span class="setting-title">' + escapeHtml(label) + '</span>' +
-    '<span class="keyIcon kpc-keyIcon">' + escapeHtml(keybindDisplayString(currentBind)) + '</span>' +
+    '<span class="keyIcon kcc-keyIcon">' + escapeHtml(keybindDisplayString(currentBind)) + '</span>' +
     '<div class="setting-desc-new">' + escapeHtml(desc) + '</div>';
-  const keyEl = row.querySelector('.kpc-keyIcon') as HTMLElement;
+  const keyEl = row.querySelector('.kcc-keyIcon') as HTMLElement;
   keyEl.addEventListener('click', () => {
     openKeybindDialog(label).then((newBind) => {
       keyEl.textContent = keybindDisplayString(newBind);
@@ -374,7 +374,7 @@ function createCheckboxGrid(opts: {
   row.className = 'setting settName safety-0 multisel';
   row.innerHTML = '<span class="setting-title">' + escapeHtml(opts.header) + '</span>';
   const grid = document.createElement('div');
-  grid.className = 'kpc-multisel-parent';
+  grid.className = 'kcc-multisel-parent';
   for (const item of opts.items) {
     const label = document.createElement('label');
     label.className = 'hostOpt';
@@ -434,7 +434,7 @@ function initShowPing(): void {
     let attempts = 0;
     const poll = setInterval(() => {
         const origGenList = w.windows?.[22]?.genList;
-        if (origGenList && !origGenList.__kpcPingPatched) {
+        if (origGenList && !origGenList.__kccPingPatched) {
             clearInterval(poll);
             const patched = function (this: any) {
                 const html = origGenList.call(this);
@@ -448,7 +448,7 @@ function initShowPing(): void {
                 }
                 return doc.body.innerHTML;
             };
-            (patched as any).__kpcPingPatched = true;
+            (patched as any).__kccPingPatched = true;
             w.windows[22].genList = patched;
         } else if (++attempts > 75) {
             clearInterval(poll);
@@ -510,7 +510,7 @@ function hookSettings(): void {
     if (query.length > 0) {
       renderSettings(query);
     } else {
-      const existing = document.querySelector('#settHolder .kpc-settings');
+      const existing = document.querySelector('#settHolder .kcc-settings');
       if (existing && !isClientTab()) existing.remove();
       else if (isClientTab()) renderSettings();
     }
@@ -1109,26 +1109,26 @@ function buildAccountsSection(body: HTMLElement, accountsArr: any[]): void {
   addBtn.className = 'setting settName safety-0 has-button';
   addBtn.innerHTML =
     '<span class="setting-title">Add Account</span>' +
-    '<button class="kpc-acc-save" style="margin-left:auto;padding:4px 14px;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-family:inherit;background:var(--kpc-accent);color:#fff;">+ Add</button>' +
+    '<button class="kcc-acc-save" style="margin-left:auto;padding:4px 14px;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-family:inherit;background:var(--kcc-accent);color:#fff;">+ Add</button>' +
     '<div class="setting-desc-new">Save a Krunker account for quick switching</div>';
   body.appendChild(addBtn);
 
   const form = document.createElement('div');
-  form.className = 'kpc-acc-form';
+  form.className = 'kcc-acc-form';
   form.style.display = 'none';
   form.innerHTML =
-    '<input type="text" placeholder="Label (e.g. Main, Alt1)" class="kpc-acc-label">' +
-    '<input type="text" placeholder="Krunker Username" class="kpc-acc-user">' +
-    '<input type="password" placeholder="Krunker Password" class="kpc-acc-pass">' +
-    '<div class="kpc-acc-form-buttons">' +
-      '<button class="kpc-acc-save">Save</button>' +
-      '<button class="kpc-acc-cancel">Cancel</button>' +
+    '<input type="text" placeholder="Label (e.g. Main, Alt1)" class="kcc-acc-label">' +
+    '<input type="text" placeholder="Krunker Username" class="kcc-acc-user">' +
+    '<input type="password" placeholder="Krunker Password" class="kcc-acc-pass">' +
+    '<div class="kcc-acc-form-buttons">' +
+      '<button class="kcc-acc-save">Save</button>' +
+      '<button class="kcc-acc-cancel">Cancel</button>' +
     '</div>';
   body.appendChild(form);
 
-  const labelIn = form.querySelector('.kpc-acc-label') as HTMLInputElement;
-  const userIn = form.querySelector('.kpc-acc-user') as HTMLInputElement;
-  const passIn = form.querySelector('.kpc-acc-pass') as HTMLInputElement;
+  const labelIn = form.querySelector('.kcc-acc-label') as HTMLInputElement;
+  const userIn = form.querySelector('.kcc-acc-user') as HTMLInputElement;
+  const passIn = form.querySelector('.kcc-acc-pass') as HTMLInputElement;
 
   // Stop Krunker's global keydown handler from eating keystrokes in our inputs
   form.querySelectorAll('input').forEach(input => {
@@ -1139,7 +1139,7 @@ function buildAccountsSection(body: HTMLElement, accountsArr: any[]): void {
     form.style.display = form.style.display === 'none' ? '' : 'none';
   });
 
-  form.querySelector('.kpc-acc-cancel')!.addEventListener('click', () => {
+  form.querySelector('.kcc-acc-cancel')!.addEventListener('click', () => {
     form.style.display = 'none';
   });
 
@@ -1149,26 +1149,26 @@ function buildAccountsSection(body: HTMLElement, accountsArr: any[]): void {
   function renderList(): void {
     listEl.innerHTML = '';
     if (accounts.length === 0) {
-      listEl.innerHTML = '<div class="kpc-acc-empty">No saved accounts</div>';
+      listEl.innerHTML = '<div class="kcc-acc-empty">No saved accounts</div>';
       return;
     }
     accounts.forEach((acc, i) => {
       const row = document.createElement('div');
-      row.className = 'kpc-acc-item';
+      row.className = 'kcc-acc-item';
       row.innerHTML =
-        '<div class="kpc-acc-item-info">' +
-          '<span class="kpc-acc-item-label">' + escapeHtml(acc.label) + '</span>' +
+        '<div class="kcc-acc-item-info">' +
+          '<span class="kcc-acc-item-label">' + escapeHtml(acc.label) + '</span>' +
         '</div>' +
-        '<div class="kpc-acc-item-actions">' +
-          '<button class="kpc-acc-switch">Switch</button>' +
-          '<button class="kpc-acc-delete">Delete</button>' +
+        '<div class="kcc-acc-item-actions">' +
+          '<button class="kcc-acc-switch">Switch</button>' +
+          '<button class="kcc-acc-delete">Delete</button>' +
         '</div>';
-      row.querySelector('.kpc-acc-switch')!.addEventListener('click', () => {
+      row.querySelector('.kcc-acc-switch')!.addEventListener('click', () => {
         ipcRenderer.invoke('alt-get-credentials', i).then((creds: { username: string; password: string } | null) => {
           if (creds) switchToAccount(creds);
         });
       });
-      row.querySelector('.kpc-acc-delete')!.addEventListener('click', () => {
+      row.querySelector('.kcc-acc-delete')!.addEventListener('click', () => {
         ipcRenderer.invoke('alt-remove', i).then(() => {
           accounts.splice(i, 1);
           renderList();
@@ -1179,7 +1179,7 @@ function buildAccountsSection(body: HTMLElement, accountsArr: any[]): void {
   }
   renderList();
 
-  form.querySelector('.kpc-acc-save')!.addEventListener('click', () => {
+  form.querySelector('.kcc-acc-save')!.addEventListener('click', () => {
     const label = labelIn.value.trim();
     const user = userIn.value.trim();
     const pass = passIn.value;
@@ -1415,34 +1415,34 @@ function renderSettings(searchQuery?: string): void {
   if (refreshPopupEl) { refreshPopupEl.remove(); refreshPopupEl = null; }
 
   if (searchQuery) {
-    const existing = holder.querySelector('.kpc-settings');
+    const existing = holder.querySelector('.kcc-settings');
     if (existing) existing.remove();
   } else {
     while (holder.firstChild) holder.removeChild(holder.firstChild);
   }
 
   const container = document.createElement('div');
-  container.className = 'kpc-settings';
+  container.className = 'kcc-settings';
 
   // ── Action button grid ──
   const actionGrid = document.createElement('div');
-  actionGrid.className = 'kpc-action-grid';
+  actionGrid.className = 'kcc-action-grid';
 
   const actionButtons: Array<{ label: string; color: string; full?: boolean; action: () => void }> = [
-    { label: 'Open Resource Swapper', color: 'kpc-ab-pink', action: () => ipcRenderer.invoke('open-swap-folder') },
-    { label: 'Reset Resource Swapper', color: 'kpc-ab-pink', action: () => {
+    { label: 'Open Resource Swapper', color: 'kcc-ab-pink', action: () => ipcRenderer.invoke('open-swap-folder') },
+    { label: 'Reset Resource Swapper', color: 'kcc-ab-pink', action: () => {
       if (confirm('Reset resource swapper? This will delete all files in the swapper folder.')) {
         ipcRenderer.invoke('reset-swapper');
       }
     }},
-    { label: 'Open Electron Logs', color: 'kpc-ab-red', action: () => ipcRenderer.invoke('open-electron-log') },
-    { label: 'Restart Client', color: 'kpc-ab-orange', full: true, action: () => ipcRenderer.invoke('restart-client') },
-    { label: 'Reset Options', color: 'kpc-ab-red', action: () => {
+    { label: 'Open Electron Logs', color: 'kcc-ab-red', action: () => ipcRenderer.invoke('open-electron-log') },
+    { label: 'Restart Client', color: 'kcc-ab-orange', full: true, action: () => ipcRenderer.invoke('restart-client') },
+    { label: 'Reset Options', color: 'kcc-ab-red', action: () => {
       if (confirm('Reset all settings to defaults? The client will restart.')) {
         ipcRenderer.invoke('reset-options');
       }
     }},
-    { label: 'Delete All Data', color: 'kpc-ab-red', action: () => {
+    { label: 'Delete All Data', color: 'kcc-ab-red', action: () => {
       if (confirm('Delete all data (config, logs)? Scripts are preserved. The client will restart.')) {
         ipcRenderer.invoke('delete-all-data');
       }
@@ -1451,7 +1451,7 @@ function renderSettings(searchQuery?: string): void {
 
   for (const ab of actionButtons) {
     const btn = document.createElement('button');
-    btn.className = 'kpc-action-btn ' + ab.color + (ab.full ? ' full' : '');
+    btn.className = 'kcc-action-btn ' + ab.color + (ab.full ? ' full' : '');
     btn.textContent = ab.label;
     btn.addEventListener('click', ab.action);
     actionGrid.appendChild(btn);
@@ -1573,7 +1573,7 @@ function renderUserscriptsSection(body: HTMLElement): void {
       const metaParts: string[] = [];
       if (inst.meta.author) metaParts.push('by ' + escapeHtml(inst.meta.author));
       if (inst.meta.version) metaParts.push('v' + escapeHtml(inst.meta.version));
-      const metaLine = metaParts.length > 0 ? '<span class="kpc-us-meta">' + metaParts.join(' &middot; ') + '</span>' : '';
+      const metaLine = metaParts.length > 0 ? '<span class="kcc-us-meta">' + metaParts.join(' &middot; ') + '</span>' : '';
       const descText = escapeHtml(inst.meta.desc || '');
 
       scriptRow.innerHTML =
@@ -1587,7 +1587,7 @@ function renderUserscriptsSection(body: HTMLElement): void {
 
       const cb = scriptRow.querySelector('input[type="checkbox"]') as HTMLInputElement;
       const settingsContainer = document.createElement('div');
-      settingsContainer.className = 'kpc-us-settings';
+      settingsContainer.className = 'kcc-us-settings';
       body.appendChild(settingsContainer);
 
       if (inst.enabled && inst.settings) {
@@ -1674,7 +1674,7 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
       case 'color': {
         const input = document.createElement('input');
         input.type = 'color';
-        input.className = 'kpc-color-input';
+        input.className = 'kcc-color-input';
         input.value = String(setting.value) || '#ffffff';
         row.appendChild(input);
         input.addEventListener('input', () => {
@@ -1687,7 +1687,7 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
       case 'keybind': {
         const bind = setting.value as Keybind;
         const keyEl = document.createElement('span');
-        keyEl.className = 'keyIcon kpc-keyIcon';
+        keyEl.className = 'keyIcon kcc-keyIcon';
         keyEl.textContent = keybindDisplayString(bind);
         keyEl.addEventListener('click', () => {
           openKeybindDialog(setting.title).then((newBind) => {
@@ -1725,9 +1725,9 @@ const HIDE_POPUPS_ELS = ['homeStoreAd', 'streamContainerNew'];
 
 function startHidePopups(): void {
   if (_hidePopupsInterval) return;
-  if (!document.getElementById('kpc-hideMenuPopups')) {
+  if (!document.getElementById('kcc-hideMenuPopups')) {
     const style = document.createElement('style');
-    style.id = 'kpc-hideMenuPopups';
+    style.id = 'kcc-hideMenuPopups';
     style.textContent = HIDE_POPUPS_CSS;
     document.head.appendChild(style);
   }
@@ -1753,7 +1753,7 @@ function startHidePopups(): void {
 
 function stopHidePopups(): void {
   if (_hidePopupsInterval) { clearInterval(_hidePopupsInterval); _hidePopupsInterval = null; }
-  const style = document.getElementById('kpc-hideMenuPopups');
+  const style = document.getElementById('kcc-hideMenuPopups');
   if (style) style.remove();
   for (const id of HIDE_POPUPS_ELS) {
     const el = document.getElementById(id);
@@ -2033,7 +2033,7 @@ ipcRenderer.on('main_did-finish-load', () => {
     if (isGamePage) {
       ipcRenderer.invoke('alt-list').then(() => {
         const altBtn = document.createElement('div');
-        altBtn.id = 'kpcAltBtn';
+        altBtn.id = 'kccAltBtn';
         altBtn.className = 'menuItem';
         altBtn.setAttribute('onmouseenter', 'playTick()');
         altBtn.innerHTML =
@@ -2062,7 +2062,7 @@ ipcRenderer.on('main_did-finish-load', () => {
               let html =
                 '<div style="font-size:30px;text-align:center;margin:3px;font-weight:700;color:#fff;">Alt Manager</div>' +
                 '<hr style="color:rgba(28,28,28,.5);">' +
-                '<div class="button buttonPI lgn" id="kpcAltAddBtn" style="text-align:center;width:98%;margin:3px;padding-top:5px;padding-bottom:13px;">Add Account</div>' +
+                '<div class="button buttonPI lgn" id="kccAltAddBtn" style="text-align:center;width:98%;margin:3px;padding-top:5px;padding-bottom:13px;">Add Account</div>' +
                 '<div class="amHolder" style="display:flex;flex-direction:column;justify-content:center;">';
 
               if (!accs || accs.length === 0) {
@@ -2072,11 +2072,11 @@ ipcRenderer.on('main_did-finish-load', () => {
                   html +=
                     '<div class="amAccName" style="display:flex;justify-content:flex-end;align-items:center;padding:4px 0;">' +
                       '<span style="margin-right:auto;color:#fff;font-size:18px;">' + escapeHtml(acc.label) + '</span>' +
-                      '<div class="button buttonG lgn kpc-alt-login" data-idx="' + i + '" style="width:70px;margin-right:0;padding-top:3px;padding-bottom:15px;transform:scale(0.75);">' +
+                      '<div class="button buttonG lgn kcc-alt-login" data-idx="' + i + '" style="width:70px;margin-right:0;padding-top:3px;padding-bottom:15px;transform:scale(0.75);">' +
                         '<span class="material-icons" style="vertical-align:bottom;color:#fff;font-size:30px;margin-bottom:-1px;">login</span>' +
                       '</div>' +
                       '<div class="verticalSeparator" style="height:35px;background:rgba(28,28,28,.3);"></div>' +
-                      '<div class="button buttonR lgn kpc-alt-del" data-idx="' + i + '" style="width:70px;margin-right:0;padding-top:3px;padding-bottom:15px;transform:scale(0.75);">' +
+                      '<div class="button buttonR lgn kcc-alt-del" data-idx="' + i + '" style="width:70px;margin-right:0;padding-top:3px;padding-bottom:15px;transform:scale(0.75);">' +
                         '<span class="material-icons" style="vertical-align:bottom;color:#fff;font-size:30px;margin-bottom:-1px;">delete</span>' +
                       '</div>' +
                     '</div>';
@@ -2085,10 +2085,10 @@ ipcRenderer.on('main_did-finish-load', () => {
               html += '</div>';
               menuWindow.innerHTML = html;
 
-              const addBtn = document.getElementById('kpcAltAddBtn');
+              const addBtn = document.getElementById('kccAltAddBtn');
               if (addBtn) addBtn.addEventListener('click', showAddForm);
 
-              menuWindow.querySelectorAll('.kpc-alt-login').forEach((el) => {
+              menuWindow.querySelectorAll('.kcc-alt-login').forEach((el) => {
                 el.addEventListener('click', () => {
                   const idx = parseInt((el as HTMLElement).dataset.idx || '0', 10);
                   if (accs[idx]) {
@@ -2100,7 +2100,7 @@ ipcRenderer.on('main_did-finish-load', () => {
                 });
               });
 
-              menuWindow.querySelectorAll('.kpc-alt-del').forEach((el) => {
+              menuWindow.querySelectorAll('.kcc-alt-del').forEach((el) => {
                 el.addEventListener('click', () => {
                   const idx = parseInt((el as HTMLElement).dataset.idx || '0', 10);
                   if (confirm('Delete account "' + (accs[idx]?.label || '') + '"?')) {
@@ -2115,12 +2115,12 @@ ipcRenderer.on('main_did-finish-load', () => {
             menuWindow.innerHTML =
               '<div class="setBodH" style="padding:20px;">' +
                 '<div style="font-size:25px;text-align:center;margin-bottom:15px;color:#fff;">Add Account</div>' +
-                '<input class="accountInput" id="kpcAltLabel" type="text" placeholder="Label (e.g. Main, Alt1)" style="width:100%;margin-bottom:8px;">' +
-                '<input class="accountInput" id="kpcAltUser" type="text" placeholder="Krunker Username" style="width:100%;margin-bottom:8px;">' +
-                '<input class="accountInput" id="kpcAltPass" type="password" placeholder="Krunker Password" style="width:100%;margin-bottom:15px;">' +
+                '<input class="accountInput" id="kccAltLabel" type="text" placeholder="Label (e.g. Main, Alt1)" style="width:100%;margin-bottom:8px;">' +
+                '<input class="accountInput" id="kccAltUser" type="text" placeholder="Krunker Username" style="width:100%;margin-bottom:8px;">' +
+                '<input class="accountInput" id="kccAltPass" type="password" placeholder="Krunker Password" style="width:100%;margin-bottom:15px;">' +
                 '<div style="display:flex;gap:8px;">' +
-                  '<div class="button buttonG lgn" id="kpcAltSaveBtn" style="flex:1;text-align:center;padding-top:5px;padding-bottom:13px;">Add Account</div>' +
-                  '<div class="button buttonR lgn" id="kpcAltBackBtn" style="width:120px;text-align:center;padding-top:5px;padding-bottom:13px;">Back</div>' +
+                  '<div class="button buttonG lgn" id="kccAltSaveBtn" style="flex:1;text-align:center;padding-top:5px;padding-bottom:13px;">Add Account</div>' +
+                  '<div class="button buttonR lgn" id="kccAltBackBtn" style="width:120px;text-align:center;padding-top:5px;padding-bottom:13px;">Back</div>' +
                 '</div>' +
               '</div>';
 
@@ -2129,11 +2129,11 @@ ipcRenderer.on('main_did-finish-load', () => {
               input.addEventListener('keydown', (e) => e.stopPropagation());
             });
 
-            document.getElementById('kpcAltBackBtn')!.addEventListener('click', renderAccountList);
-            document.getElementById('kpcAltSaveBtn')!.addEventListener('click', () => {
-              const label = (document.getElementById('kpcAltLabel') as HTMLInputElement).value.trim();
-              const user = (document.getElementById('kpcAltUser') as HTMLInputElement).value.trim();
-              const pass = (document.getElementById('kpcAltPass') as HTMLInputElement).value;
+            document.getElementById('kccAltBackBtn')!.addEventListener('click', renderAccountList);
+            document.getElementById('kccAltSaveBtn')!.addEventListener('click', () => {
+              const label = (document.getElementById('kccAltLabel') as HTMLInputElement).value.trim();
+              const user = (document.getElementById('kccAltUser') as HTMLInputElement).value.trim();
+              const pass = (document.getElementById('kccAltPass') as HTMLInputElement).value;
               if (!label || !user || !pass) return;
               ipcRenderer.invoke('alt-save', {
                 label,
@@ -2153,7 +2153,7 @@ ipcRenderer.on('main_did-finish-load', () => {
         });
 
         function injectAltBtn(): boolean {
-          if (document.getElementById('kpcAltBtn')) return true;
+          if (document.getElementById('kccAltBtn')) return true;
           const menuContainer = document.getElementById('menuItemContainer');
           if (!menuContainer) return false;
           const exitBtn = document.getElementById('clientExit');

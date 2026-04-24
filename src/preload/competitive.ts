@@ -72,7 +72,7 @@ function setupHPDisplay(): void {
     if (!counters || hpCounterEl) return;
 
     hpCounterEl = document.createElement('div');
-    hpCounterEl.className = 'statIcon kpc-hp-counter';
+    hpCounterEl.className = 'statIcon kcc-hp-counter';
     hpCounterEl.innerHTML =
         '<div class="greyInner" style="display:flex;align-items:center;border:2px solid #ffc107;box-shadow:0 0 6px rgba(255,193,7,0.5);">' +
         '<span style="color:#ffffff;font-size:15px;margin-right:6px;font-weight:600;text-shadow:1px 1px 2px rgba(0,0,0,0.9);">on</span>' +
@@ -164,29 +164,29 @@ function getRankData(currentElo: number): { current: RankInfo; next: RankInfo; p
 }
 
 function openRankPopup(): void {
-    if (document.getElementById('kpc-rank-overlay')) return;
+    if (document.getElementById('kcc-rank-overlay')) return;
     const overlay = document.createElement('div');
-    overlay.id = 'kpc-rank-overlay';
+    overlay.id = 'kcc-rank-overlay';
     overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) overlay.remove(); });
 
     let grid = '';
     for (const r of RANKS) {
-        grid += `<div class="kpc-rank-grid-item">
+        grid += `<div class="kcc-rank-grid-item">
             <img src="${RANK_IMG_BASE}${r.image}" loading="lazy">
-            <div><div class="kpc-rank-name" style="color:${r.color}">${r.rank}</div>
-            <div class="kpc-rank-elo">${r.elo !== null ? r.elo + '+' : 'Placement'}</div></div></div>`;
+            <div><div class="kcc-rank-name" style="color:${r.color}">${r.rank}</div>
+            <div class="kcc-rank-elo">${r.elo !== null ? r.elo + '+' : 'Placement'}</div></div></div>`;
     }
 
-    overlay.innerHTML = `<div class="kpc-rank-popup">
-        <div class="kpc-rank-popup-header"><h2>Rank Distribution</h2>
-        <div class="kpc-rank-popup-close" id="kpc-rank-close">\u2715</div></div>
-        <div class="kpc-rank-grid">${grid}</div></div>`;
+    overlay.innerHTML = `<div class="kcc-rank-popup">
+        <div class="kcc-rank-popup-header"><h2>Rank Distribution</h2>
+        <div class="kcc-rank-popup-close" id="kcc-rank-close">\u2715</div></div>
+        <div class="kcc-rank-grid">${grid}</div></div>`;
     document.body.appendChild(overlay);
-    document.getElementById('kpc-rank-close')?.addEventListener('click', () => overlay.remove());
+    document.getElementById('kcc-rank-close')?.addEventListener('click', () => overlay.remove());
 }
 
 function injectRankBar(container: Element): void {
-    if (container.querySelector('#kpc-elo-tracker')) return;
+    if (container.querySelector('#kcc-elo-tracker')) return;
     const statValues = container.querySelectorAll('.quick-stat-value');
     if (!statValues.length) return;
     const currentElo = Number(statValues[0].textContent);
@@ -194,16 +194,16 @@ function injectRankBar(container: Element): void {
 
     const data = getRankData(currentElo);
     const wrapper = document.createElement('div');
-    wrapper.id = 'kpc-elo-tracker';
+    wrapper.id = 'kcc-elo-tracker';
 
     const nextHtml = data.isMax ? '' :
-        `<div class="kpc-rank-container"><img src="${RANK_IMG_BASE}${data.next.image}" class="kpc-elo-rank-img"><span>${data.next.rank}</span></div>`;
+        `<div class="kcc-rank-container"><img src="${RANK_IMG_BASE}${data.next.image}" class="kcc-elo-rank-img"><span>${data.next.rank}</span></div>`;
     const barText = data.isMax ? `${currentElo}` : `${currentElo} / ${data.next.elo}`;
 
-    wrapper.innerHTML = `<div class="kpc-elo-info-row">
-        <div class="kpc-rank-container"><img src="${RANK_IMG_BASE}${data.current.image}" class="kpc-elo-rank-img"><span>${data.current.rank}</span></div>
-        <div class="kpc-elo-bar-bg"><div class="kpc-elo-bar-fill" style="width:${data.progress}%"></div>
-        <div class="kpc-elo-bar-text">${barText}</div></div>${nextHtml}</div>`;
+    wrapper.innerHTML = `<div class="kcc-elo-info-row">
+        <div class="kcc-rank-container"><img src="${RANK_IMG_BASE}${data.current.image}" class="kcc-elo-rank-img"><span>${data.current.rank}</span></div>
+        <div class="kcc-elo-bar-bg"><div class="kcc-elo-bar-fill" style="width:${data.progress}%"></div>
+        <div class="kcc-elo-bar-text">${barText}</div></div>${nextHtml}</div>`;
 
     const statsBlock = container.querySelector('.quick-stats');
     if (statsBlock) container.insertBefore(wrapper, statsBlock);
@@ -211,9 +211,9 @@ function injectRankBar(container: Element): void {
 }
 
 function injectRankButton(card: Element): void {
-    if (card.querySelector('#kpc-rank-list-btn')) return;
+    if (card.querySelector('#kcc-rank-list-btn')) return;
     const btn = document.createElement('div');
-    btn.id = 'kpc-rank-list-btn';
+    btn.id = 'kcc-rank-list-btn';
     btn.innerHTML = '<span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px;">list</span> Ranks';
     btn.addEventListener('click', openRankPopup);
     if (getComputedStyle(card as HTMLElement).position === 'static') (card as HTMLElement).style.position = 'relative';
@@ -233,11 +233,11 @@ function checkRankedMenu(): void {
 
 function injectQueueButton(): void {
     const footer = document.querySelector('.footer-controls');
-    if (!footer || footer.querySelector('#kpc-ranked-queue-btn')) return;
+    if (!footer || footer.querySelector('#kcc-ranked-queue-btn')) return;
 
     const btn = document.createElement('button');
-    btn.id = 'kpc-ranked-queue-btn';
-    btn.className = 'kpc-ranked-queue-btn';
+    btn.id = 'kcc-ranked-queue-btn';
+    btn.className = 'kcc-ranked-queue-btn';
     btn.innerHTML = '<span class="material-icons" style="font-size:20px;vertical-align:middle;">open_in_new</span>';
     btn.title = 'Open External Queue';
     btn.addEventListener('click', () => {
@@ -266,7 +266,7 @@ export function initRankProgress(): void {
     let attempts = 0;
     const poll = setInterval(() => {
         const origRanked = (window as any).openRankedMenu;
-        if (origRanked && !origRanked.__kpcRankPatched) {
+        if (origRanked && !origRanked.__kccRankPatched) {
             clearInterval(poll);
 
             let rankObserver: MutationObserver | null = null;
@@ -290,7 +290,7 @@ export function initRankProgress(): void {
                     }
                 }, 5000);
             };
-            (patched as any).__kpcRankPatched = true;
+            (patched as any).__kccRankPatched = true;
             (window as any).openRankedMenu = patched;
         } else if (++attempts > 75) { // 15s timeout
             clearInterval(poll);

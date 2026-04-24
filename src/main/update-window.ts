@@ -7,9 +7,9 @@ const UPDATE_HTML = `<!DOCTYPE html>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #1a1a2e;
-    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #1a1a1a;
+    color: rgba(255,255,255,0.8);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -18,29 +18,30 @@ const UPDATE_HTML = `<!DOCTYPE html>
     padding: 20px;
   }
   h2 {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     color: #fff;
+    letter-spacing: -0.01em;
   }
   #status {
     font-size: 13px;
-    margin-bottom: 12px;
-    color: #ccc;
+    margin-bottom: 14px;
+    color: rgba(255,255,255,0.65);
     text-align: center;
   }
   .progress-container {
     width: 100%;
-    height: 8px;
-    background: #16213e;
-    border-radius: 4px;
+    height: 6px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
     overflow: hidden;
   }
   .progress-bar {
     height: 100%;
     width: 0%;
-    background: #0f3460;
-    border-radius: 4px;
+    background: linear-gradient(90deg, #42a5f5, #6ea8fe);
+    border-radius: 3px;
     transition: width 0.3s ease;
   }
 </style>
@@ -62,7 +63,7 @@ export function showUpdateWindow(): { window: BrowserWindow; sendProgress: (mess
     height: 180,
     resizable: false,
     alwaysOnTop: true,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#1a1a1a',
     autoHideMenuBar: true,
     title: 'Krunker Civilian Client - Update',
     webPreferences: {

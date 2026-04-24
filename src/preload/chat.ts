@@ -101,10 +101,10 @@ function updatePauseState(): void {
     const atBottom = isNearBottom(chatList);
     if (scrollPaused && atBottom) {
         scrollPaused = false;
-        chatList.classList.remove('kpc-chat-paused');
+        chatList.classList.remove('kcc-chat-paused');
     } else if (!scrollPaused && !atBottom) {
         scrollPaused = true;
-        chatList.classList.add('kpc-chat-paused');
+        chatList.classList.add('kcc-chat-paused');
     }
 }
 
