@@ -91,3 +91,55 @@ export function setMenuTimer(enabled: boolean): void {
     }
 }
 
+// ── KCC Watermark ──
+// 'KCC vX.Y.Z' between the in-game timer and gamemode, and inline on the menu.
+
+const WATERMARK_INGAME_ID = 'kcc-watermark-ingame';
+const WATERMARK_MENU_ID = 'kcc-watermark-menu';
+let watermarkVersion = '';
+
+function makeWatermark(id: string, className: string): HTMLDivElement {
+    const el = document.createElement('div');
+    el.id = id;
+    el.className = className;
+    el.textContent = 'KCC';
+    if (watermarkVersion) {
+        const ver = document.createElement('span');
+        ver.className = 'kcc-watermark-ver';
+        ver.textContent = 'V' + watermarkVersion;
+        el.appendChild(ver);
+    }
+    return el;
+}
+
+function ensureWatermarks(): void {
+    // In-game: between #timerHolder and #matchInfo. 'topLeftOld' is Krunker's
+    // native styling token used on the surrounding elements.
+    if (!document.getElementById(WATERMARK_INGAME_ID)) {
+        const matchData = document.getElementById('topLeftMatchData');
+        const matchInfo = document.getElementById('matchInfo');
+        if (matchData && matchInfo?.parentElement === matchData) {
+            matchData.insertBefore(makeWatermark(WATERMARK_INGAME_ID, 'kcc-watermark topLeftOld'), matchInfo);
+        }
+    }
+    // Menu: appended to #matchInfoHolder so it sits on the "Now Playing" row.
+    if (!document.getElementById(WATERMARK_MENU_ID)) {
+        const holder = document.getElementById('matchInfoHolder');
+        if (holder) holder.appendChild(makeWatermark(WATERMARK_MENU_ID, 'kcc-watermark'));
+    }
+}
+
+let watermarkInterval: ReturnType<typeof setInterval> | null = null;
+
+export function setWatermark(enabled: boolean, version?: string): void {
+    if (version !== undefined) watermarkVersion = version;
+    if (enabled) {
+        ensureWatermarks();
+        if (!watermarkInterval) watermarkInterval = setInterval(ensureWatermarks, 2000);
+    } else {
+        if (watermarkInterval) { clearInterval(watermarkInterval); watermarkInterval = null; }
+        document.getElementById(WATERMARK_INGAME_ID)?.remove();
+        document.getElementById(WATERMARK_MENU_ID)?.remove();
+    }
+}
+

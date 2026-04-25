@@ -746,5 +746,17 @@ export const RANK_TRACKER_CSS = `
 #kcc-ranked-queue-btn:hover { background-color: #4bc94a; }
 `;
 
+// ── KCC watermark CSS ──
+// Font/shadow inherit from Krunker (topLeftOld class in-game, matchInfoHolder on menu).
+export const WATERMARK_CSS = `
+.kcc-watermark, .kcc-watermark-ver { color: #fff; }
+.kcc-watermark-ver { margin-left: 6px; }
+#kcc-watermark-menu {
+  display: inline-block;
+  margin-left: 12px;
+  vertical-align: middle;
+}
+`;
+
 /** Pre-concatenated CSS for single-call injection (excludes HIDE_ADS_CSS which is separate) */
-export const ALL_CLIENT_CSS = `${CLIENT_SETTINGS_CSS}\n${MATCHMAKER_SETTINGS_CSS}\n${TRANSLATOR_CSS}\n${ALT_MANAGER_CSS}\n${HP_COUNTER_CSS}\n${BP_CLAIM_ALL_CSS}\n${RANK_TRACKER_CSS}`;
+export const ALL_CLIENT_CSS = `${CLIENT_SETTINGS_CSS}\n${MATCHMAKER_SETTINGS_CSS}\n${TRANSLATOR_CSS}\n${ALT_MANAGER_CSS}\n${HP_COUNTER_CSS}\n${BP_CLAIM_ALL_CSS}\n${RANK_TRACKER_CSS}\n${WATERMARK_CSS}`;

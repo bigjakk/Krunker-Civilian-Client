@@ -4,7 +4,7 @@ import type { MatchmakerConfig } from './matchmaker';
 import { initUserscripts, getInstances, setScriptEnabled } from './userscripts';
 import type { UserscriptInstance } from './userscripts';
 import { initTranslator, updateTranslatorConfig } from './translator';
-import { setDeathAnimBlock, setMenuTimer, escapeHtml } from './utils';
+import { setDeathAnimBlock, setMenuTimer, setWatermark, escapeHtml } from './utils';
 import { initChat, setBetterChat, setChatHistorySize } from './chat';
 import { initHPCounter, destroyHPCounter, initRankProgress } from './competitive';
 import { checkChangelog, showChangelogNow } from './changelog';
@@ -622,7 +622,7 @@ function buildGameSection(
   body: HTMLElement, gameConf: any, uiConfRaw: any, bag: SettingsBag,
 ): void {
   const game = { rawInput: true, showPing: true, hpEnemyCounter: true, hideBunnies: false, ...gameConf };
-  const ui = { deathscreenAnimation: false, hideMenuPopups: false, menuTimer: true, doublePing: true, ...uiConfRaw };
+  const ui = { deathscreenAnimation: false, hideMenuPopups: false, menuTimer: true, watermark: true, doublePing: true, ...uiConfRaw };
 
   function saveGame(): void {
     ipcRenderer.invoke('set-config', 'game', game);
@@ -693,6 +693,13 @@ function buildGameSection(
     desc: 'Show the game/spectate timer on the menu screen',
     checked: ui.menuTimer ?? true, instant: true,
     onChange: (v) => { ui.menuTimer = v; saveUI(); setMenuTimer(v); },
+  }));
+
+  body.appendChild(createToggleRow({
+    label: 'KCC Watermark',
+    desc: 'Show the KCC version watermark in-game and on the menu',
+    checked: ui.watermark ?? true, instant: true,
+    onChange: (v) => { ui.watermark = v; saveUI(); setWatermark(v); },
   }));
 
   if (ui.deathscreenAnimation) setDeathAnimBlock(true);
@@ -1847,6 +1854,11 @@ ipcRenderer.on('main_did-finish-load', () => {
     }
     if (isGamePage) {
       initRankProgress();
+    }
+
+    // ── KCC watermark (in-game + menu) ──
+    if (isGamePage) {
+      setWatermark(uiConf?.watermark ?? true, currentVersion);
     }
 
     // ── CPU throttle state notifications ──

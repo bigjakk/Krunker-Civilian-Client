@@ -77,6 +77,7 @@ export interface AppConfig {
     deathscreenAnimation: boolean;
     hideMenuPopups: boolean;
     menuTimer: boolean;
+    watermark: boolean;
     doublePing: boolean;
     cssTheme: string;
     loadingTheme: string;
@@ -187,6 +188,7 @@ export const config = new Store<AppConfig>({
       deathscreenAnimation: true,
       hideMenuPopups: false,
       menuTimer: true,
+      watermark: true,
       doublePing: true,
       cssTheme: 'disabled',
       loadingTheme: 'disabled',
