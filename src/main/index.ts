@@ -12,7 +12,7 @@ import { UserscriptManager } from './userscripts';
 import { ALL_CLIENT_CSS } from './client-ui';
 import { electronLog, getLogPath, closeLogStreams } from './logger';
 import { checkForUpdate, downloadUpdate, installUpdate } from './updater';
-import { showUpdateWindow } from './update-window';
+import { showUpdateWindow, showUpdatePrompt } from './update-window';
 import { DiscordRPC } from './discord-rpc';
 import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS } from './css-themes';
 import { TabManager } from './tab-manager';
@@ -267,38 +267,45 @@ app.whenReady().then(async () => {
       const update = await checkForUpdate(appVersion);
       if (update) {
         electronLog.log(`[KCC] Update available: v${update.version}`);
-        const { window: updateWin, sendProgress } = showUpdateWindow();
-        sendProgress(`Update available (v${update.version})`, 0);
 
-      const tempDir = join(app.getPath('temp'), 'kcc-update');
-      if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true });
-      const installerPath = join(tempDir, `KCC-${update.version}-Setup.exe`);
+        // Ask user before downloading
+        const accepted = await showUpdatePrompt(update.version, appVersion);
+        if (!accepted) {
+          electronLog.log('[KCC] User skipped update');
+        } else {
+          const { window: updateWin, sendProgress } = showUpdateWindow();
+          sendProgress(`Update available (v${update.version})`, 0);
 
-      let cancelled = false;
-      updateWin.on('closed', () => { cancelled = true; });
+          const tempDir = join(app.getPath('temp'), 'kcc-update');
+          if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true });
+          const installerPath = join(tempDir, `KCC-${update.version}-Setup.exe`);
 
-      try {
-        await downloadUpdate(update.downloadUrl, installerPath, (pct) => {
-          if (!cancelled && !updateWin.isDestroyed()) {
-            sendProgress(`Downloading update... ${pct}%`, pct);
+          let cancelled = false;
+          updateWin.on('closed', () => { cancelled = true; });
+
+          try {
+            await downloadUpdate(update.downloadUrl, installerPath, (pct) => {
+              if (!cancelled && !updateWin.isDestroyed()) {
+                sendProgress(`Downloading update... ${pct}%`, pct);
+              }
+            }, update.sha256);
+
+            if (!cancelled) {
+              sendProgress('Installing update...', 100);
+              installUpdate(installerPath);
+              return; // app.quit() called by installUpdate
+            }
+          } catch (err) {
+            electronLog.error('[KCC] Update download failed:', err);
+            if (!updateWin.isDestroyed()) updateWin.close();
           }
-        }, update.sha256);
-
-        if (!cancelled) {
-          sendProgress('Installing update...', 100);
-          installUpdate(installerPath);
-          return; // app.quit() called by installUpdate
         }
-      } catch (err) {
-        electronLog.error('[KCC] Update download failed:', err);
-        if (!updateWin.isDestroyed()) updateWin.close();
+      } else {
+        electronLog.log('[KCC] No updates available');
       }
-    } else {
-      electronLog.log('[KCC] No updates available');
+    } catch (err) {
+      electronLog.error('[KCC] Update check failed:', err);
     }
-  } catch (err) {
-    electronLog.error('[KCC] Update check failed:', err);
-  }
   }
 
   await launchApp();
