@@ -86,7 +86,7 @@ export interface AppConfig {
     hideMenuPopups: boolean;
     menuTimer: boolean;
     watermark: boolean;
-    doublePing: boolean;
+    directServerPing: boolean;
     cssTheme: string;
     loadingTheme: string;
     backgroundUrl: string;
@@ -206,7 +206,7 @@ export const config = new Store<AppConfig>({
       hideMenuPopups: false,
       menuTimer: true,
       watermark: true,
-      doublePing: true,
+      directServerPing: false,
       cssTheme: 'disabled',
       loadingTheme: 'disabled',
       backgroundUrl: '',

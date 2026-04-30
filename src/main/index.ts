@@ -1,9 +1,10 @@
-import { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, safeStorage, session, shell } from 'electron';
+import { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, safeStorage, session, shell, webContents } from 'electron';
 import { join, extname } from 'path';
 import { existsSync, mkdirSync, promises as fsp, readFileSync, statSync } from 'fs';
 import { get as httpsGet } from 'https';
 import { execFile } from 'child_process';
 import * as os from 'os';
+import { Socket } from 'net';
 import { detectPlatform, applyPlatformFlags } from './platform';
 import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount } from './config';
 import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper } from './swapper';
@@ -73,6 +74,43 @@ function osPing(host: string): Promise<number> {
     });
   });
 }
+
+// ── Direct server ping (TCP-connect timing — measures the same TCP path the game's WebSocket uses) ──
+let _pingTimer: NodeJS.Timeout | null = null;
+let _pingTarget: { host: string; port: number } | null = null;
+
+function tcpPing(host: string, port: number): Promise<number> {
+  return new Promise((resolve) => {
+    const sock = new Socket();
+    const start = process.hrtime.bigint();
+    const done = (ms: number) => { sock.destroy(); resolve(ms); };
+    sock.setTimeout(1800);
+    sock.once('connect', () => done(Math.round(Number(process.hrtime.bigint() - start) / 1_000_000)));
+    sock.once('error', () => done(-1));
+    sock.once('timeout', () => done(-1));
+    try { sock.connect(port, host); } catch { done(-1); }
+  });
+}
+
+function setPingTarget(host: string, port: number, win: BrowserWindow): void {
+  if (_pingTarget?.host === host && _pingTarget?.port === port) return;
+  if (_pingTimer) clearInterval(_pingTimer);
+  _pingTarget = { host, port };
+  const measure = async () => {
+    if (!_pingTarget || win.isDestroyed()) return;
+    const ms = await tcpPing(_pingTarget.host, _pingTarget.port);
+    if (ms >= 0 && !win.isDestroyed()) win.webContents.send('server-ping', ms);
+  };
+  measure();
+  _pingTimer = setInterval(measure, 2000);
+}
+
+function stopServerPing(): void {
+  if (_pingTimer) clearInterval(_pingTimer);
+  _pingTimer = null;
+  _pingTarget = null;
+}
+
 
 // ── Platform flags (must run before app.ready) ──
 const platformInfo = detectPlatform();
@@ -300,11 +338,28 @@ async function launchApp(): Promise<void> {
   // swapper.getRedirect() returns null before its async scan completes, so swapped
   // resources simply pass through until the scan finishes — no re-registration needed.
   hideBunnies = config.get('game')?.hideBunnies ?? false;
-  const requestFilterUrls = swapper
-    ? [...BLOCKED_URL_PATTERNS, ...BUNNY_URL_PATTERNS, '*://*.krunker.io/*']
-    : [...BLOCKED_URL_PATTERNS, ...BUNNY_URL_PATTERNS];
+  // *://* matches only http/https — wss needs an explicit pattern so the
+  // webRequest handler fires on WebSocket upgrades for direct-ping detection.
+  const requestFilterUrls = [
+    ...BLOCKED_URL_PATTERNS,
+    ...BUNNY_URL_PATTERNS,
+    '*://*.krunker.io/*',
+    'wss://*.krunker.io/*',
+  ];
 
   ses.webRequest.onBeforeRequest({ urls: requestFilterUrls }, (details, callback) => {
+    // Direct ping: detect game-server WebSocket (lobby-* host) and start TCP timing.
+    if (details.resourceType === 'webSocket'
+        && details.url.includes('lobby-')
+        && config.get('ui')?.directServerPing) {
+      try {
+        const u = new URL(details.url);
+        const port = u.port ? parseInt(u.port) : (u.protocol === 'wss:' ? 443 : 80);
+        const wc = webContents.fromId(details.webContentsId);
+        const w = wc ? BrowserWindow.fromWebContents(wc) : null;
+        if (w) setPingTarget(u.hostname, port, w);
+      } catch { /* invalid URL — ignore */ }
+    }
     // Bunny NPC block — redirect to empty body (matches Glorp's SetUri(null))
     if (hideBunnies && BUNNY_URL_RE.test(details.url)) {
       return callback({ redirectURL: EMPTY_RESPONSE_URL });
@@ -982,6 +1037,7 @@ async function launchApp(): Promise<void> {
   win.on('close', () => {
     win.webContents.setAudioMuted(true);
     win.webContents.stop();
+    stopServerPing();
   });
 
   // ── Shutdown: disconnect Discord, then close log streams ──

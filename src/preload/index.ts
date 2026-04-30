@@ -440,33 +440,24 @@ function createCheckboxGrid(opts: {
   return row;
 }
 
-// ── Double Ping Display (Krunker shows half the actual ping) ──
-let _doublePingObserver: MutationObserver | null = null;
-
-function initDoublePing(): void {
-    function attach(pingEl: HTMLElement): void {
-        _doublePingObserver = new MutationObserver(() => {
-            const text = pingEl.textContent;
-            if (!text) return;
-            const match = text.match(/(\d+)/);
-            if (!match) return;
-            const doubled = parseInt(match[1]) * 2;
-            _doublePingObserver!.disconnect();
-            pingEl.textContent = text.replace(match[1], String(doubled));
-            _doublePingObserver!.observe(pingEl, { childList: true, characterData: true, subtree: true });
-        });
-        _doublePingObserver.observe(pingEl, { childList: true, characterData: true, subtree: true });
-    }
-
-    const el = document.getElementById('pingText');
-    if (el) { attach(el); return; }
-
-    let attempts = 0;
-    const poll = setInterval(() => {
-        if (++attempts > 60) { clearInterval(poll); return; }
-        const pingEl = document.getElementById('pingText');
-        if (pingEl) { clearInterval(poll); attach(pingEl); }
-    }, 500);
+// ── Direct Server Ping Display (TCP RTT from main, overrides #pingText + #menuPingText) ──
+// Locks the textContent setter on first value arrival so Krunker's writes become
+// no-ops; we write via innerText (different setter) so our value sticks. The
+// lock is deferred so Krunker's value passes through if our IPC never fires.
+function initDirectPingDisplay(): void {
+    const locked = new WeakSet<HTMLElement>();
+    ipcRenderer.on('server-ping', (_e, ms: number) => {
+        const text = String(ms);
+        for (const id of ['pingText', 'menuPingText']) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            if (!locked.has(el)) {
+                Object.defineProperty(el, 'textContent', { set: () => {}, configurable: true });
+                locked.add(el);
+            }
+            el.innerText = text;
+        }
+    });
 }
 
 // ── Show Ping in Player List (numeric ms instead of icon) ──
@@ -679,7 +670,7 @@ function buildGameSection(
   body: HTMLElement, gameConf: any, uiConfRaw: any, bag: SettingsBag,
 ): void {
   const game = { rawInput: true, showPing: true, hpEnemyCounter: true, hideBunnies: false, ...gameConf };
-  const ui = { deathscreenAnimation: false, hideMenuPopups: false, menuTimer: true, watermark: true, doublePing: true, ...uiConfRaw };
+  const ui = { deathscreenAnimation: false, hideMenuPopups: false, menuTimer: true, watermark: true, directServerPing: false, ...uiConfRaw };
 
   function saveGame(): void {
     ipcRenderer.invoke('set-config', 'game', game);
@@ -705,10 +696,10 @@ function buildGameSection(
   }));
 
   body.appendChild(createToggleRow({
-    label: 'Double Ping Display',
-    desc: 'Show the real ping value (Krunker displays half the actual latency)',
-    checked: ui.doublePing ?? true, refreshOnly: true,
-    onChange: (v) => { ui.doublePing = v; saveUI(); },
+    label: 'Direct Server Ping',
+    desc: 'Replace Krunker\'s ping with a TCP round-trip measurement to the game server',
+    checked: ui.directServerPing ?? false, refreshOnly: true,
+    onChange: (v) => { ui.directServerPing = v; saveUI(); },
   }));
 
   body.appendChild(createToggleRow({
@@ -1983,9 +1974,9 @@ ipcRenderer.on('main_did-finish-load', () => {
     if (uiConf?.hideMenuPopups) startHidePopups();
     if (uiConf?.menuTimer ?? true) setMenuTimer(true);
 
-    // ── Double ping display ──
-    if (isGamePage && (uiConf?.doublePing ?? true)) {
-      initDoublePing();
+    // ── Direct server ping (TCP RTT to the game server, replaces Krunker's display) ──
+    if (isGamePage && uiConf?.directServerPing) {
+      initDirectPingDisplay();
     }
 
     // ── Show ping in player list ──
