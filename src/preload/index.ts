@@ -1882,50 +1882,55 @@ function saveScriptSetting(inst: UserscriptInstance): void {
   ipcRenderer.invoke('userscripts-save-prefs', inst.filename, prefs);
 }
 
-// ── Hide menu popups (polling-based, safe per MutationObserver constraint) ──
-let _hidePopupsInterval: ReturnType<typeof setInterval> | null = null;
+// ── Hide menu popups ──
+// Bundle/claim popups need clearPops(), not CSS — Krunker renders them via
+// #popupHolder + #popupBack (the dim backdrop), so CSS-only hiding leaves the
+// backdrop visible (the "dark screen") and breaks user-clicked bundles in the
+// shop. Only fire on the main menu so shop bundles still work.
 const HIDE_POPUPS_CSS =
   '#leftTabsHolder > .youNewDiv:not(#battlepassAd), .webpush-container, ' +
-  '#homeStoreAd, #streamContainerNew, #bundlePop, #genericPop.claimPop, ' +
+  '#homeStoreAd, #streamContainerNew, ' +
   '#newsHolder, #streamContainer { display: none !important; }';
-const HIDE_POPUPS_ELS = ['homeStoreAd', 'streamContainerNew'];
+let _hidePopupsStyle: HTMLStyleElement | null = null;
+const _hidePopupsObservers: MutationObserver[] = [];
+
+function dismissPromos(): void {
+  const wh = document.getElementById('windowHolder');
+  if (wh && wh.style.display && wh.style.display !== 'none') return;
+  const bp = document.getElementById('bundlePop');
+  const gp = document.getElementById('genericPop');
+  if (!bp?.children.length && !gp?.classList.contains('claimPop')) return;
+  (window as any).clearPops?.();
+}
 
 function startHidePopups(): void {
-  if (_hidePopupsInterval) return;
-  if (!document.getElementById('kcc-hideMenuPopups')) {
-    const style = document.createElement('style');
-    style.id = 'kcc-hideMenuPopups';
-    style.textContent = HIDE_POPUPS_CSS;
-    document.head.appendChild(style);
+  if (_hidePopupsStyle) return;
+  _hidePopupsStyle = document.createElement('style');
+  _hidePopupsStyle.id = 'kcc-hideMenuPopups';
+  _hidePopupsStyle.textContent = HIDE_POPUPS_CSS;
+  document.head.appendChild(_hidePopupsStyle);
+
+  const bp = document.getElementById('bundlePop');
+  if (bp) {
+    const obs = new MutationObserver(dismissPromos);
+    obs.observe(bp, { childList: true });
+    _hidePopupsObservers.push(obs);
   }
-  _hidePopupsInterval = setInterval(() => {
-    if (document.pointerLockElement) return;
-    for (const id of HIDE_POPUPS_ELS) {
-      const el = document.getElementById(id);
-      if (el && el.style.display !== 'none') el.style.display = 'none';
-    }
-    const bundlePop = document.getElementById('bundlePop');
-    if (bundlePop && bundlePop.children.length > 0) {
-      while (bundlePop.firstChild) bundlePop.firstChild.remove();
-      bundlePop.style.display = 'none';
-    }
-    const genericPop = document.getElementById('genericPop');
-    if (genericPop && genericPop.classList.contains('claimPop')) {
-      genericPop.classList.remove('claimPop');
-      while (genericPop.firstChild) genericPop.firstChild.remove();
-      genericPop.style.display = 'none';
-    }
-  }, 1000);
+  const gp = document.getElementById('genericPop');
+  if (gp) {
+    const obs = new MutationObserver(dismissPromos);
+    obs.observe(gp, { attributes: true, attributeFilter: ['class'] });
+    _hidePopupsObservers.push(obs);
+  }
+  dismissPromos(); // Catch popups already showing
 }
 
 function stopHidePopups(): void {
-  if (_hidePopupsInterval) { clearInterval(_hidePopupsInterval); _hidePopupsInterval = null; }
-  const style = document.getElementById('kcc-hideMenuPopups');
-  if (style) style.remove();
-  for (const id of HIDE_POPUPS_ELS) {
-    const el = document.getElementById(id);
-    if (el) el.style.display = '';
-  }
+  if (!_hidePopupsStyle) return;
+  _hidePopupsStyle.remove();
+  _hidePopupsStyle = null;
+  for (const obs of _hidePopupsObservers) obs.disconnect();
+  _hidePopupsObservers.length = 0;
 }
 
 // ── Matchmaker IPC listener ──
