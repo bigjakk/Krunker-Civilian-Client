@@ -109,6 +109,7 @@ export interface AppConfig {
     verboseLogging: boolean;
   };
   accounts: SavedAccount[];
+  collapsedSections: Record<string, boolean>;
   tabWindow: {
     width: number;
     height: number;
@@ -220,6 +221,7 @@ export const config = new Store<AppConfig>({
       verboseLogging: false,
     },
     accounts: [],
+    collapsedSections: {},
     tabWindow: {
       width: 1280,
       height: 720,

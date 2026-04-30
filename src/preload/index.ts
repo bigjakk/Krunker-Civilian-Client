@@ -520,7 +520,20 @@ function hookSettings(): void {
   safeRender();
 }
 
-function createSection(title: string, collapsed?: boolean): { section: HTMLElement; body: HTMLElement } {
+// Persisted collapsed-state map; populated at render time, mutated on click
+let collapsedState: Record<string, boolean> = {};
+let collapsedSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function persistCollapsedState(): void {
+  if (collapsedSaveTimer) clearTimeout(collapsedSaveTimer);
+  collapsedSaveTimer = setTimeout(() => {
+    ipcRenderer.invoke('set-config', 'collapsedSections', collapsedState);
+    collapsedSaveTimer = null;
+  }, 200);
+}
+
+function createSection(title: string, defaultCollapsed?: boolean): { section: HTMLElement; body: HTMLElement } {
+  const collapsed = collapsedState[title] ?? defaultCollapsed ?? false;
   const section = document.createElement('div');
   const header = document.createElement('div');
   header.className = 'setHed';
@@ -531,6 +544,8 @@ function createSection(title: string, collapsed?: boolean): { section: HTMLEleme
     const isCollapsed = body.classList.toggle('setting-category-collapsed');
     const arrow = header.querySelector('.plusOrMinus');
     if (arrow) arrow.textContent = isCollapsed ? 'keyboard_arrow_right' : 'keyboard_arrow_down';
+    collapsedState[title] = isCollapsed;
+    persistCollapsedState();
   });
   section.appendChild(header);
   section.appendChild(body);
@@ -1465,35 +1480,39 @@ function renderSettings(searchQuery?: string): void {
   }
   container.appendChild(actionGrid);
 
-  // ── Create section shells ──
-  const genSec = createSection('General');
-  container.appendChild(genSec.section);
-  const gameSec = createSection('Game');
-  container.appendChild(gameSec.section);
-  const perfSec = createSection('Performance');
-  container.appendChild(perfSec.section);
-  const swapSec = createSection('Swapper');
-  container.appendChild(swapSec.section);
-  const appearSec = createSection('Appearance');
-  container.appendChild(appearSec.section);
-  const mmSec = createSection('Matchmaker');
-  container.appendChild(mmSec.section);
-  const chatSec = createSection('Chat');
-  container.appendChild(chatSec.section);
-  const discordSec = createSection('Discord');
-  container.appendChild(discordSec.section);
-  const accSec = createSection('Accounts', true);
-  container.appendChild(accSec.section);
-  const advSec = createSection('Advanced');
-  container.appendChild(advSec.section);
-  const usSec = createSection('Userscripts');
-  container.appendChild(usSec.section);
-
-  // Load all configs in a single IPC call + platform info
+  // Load all configs in a single IPC call + platform info.
+  // Section shells are created inside the .then() so the persisted collapsed
+  // state is loaded before createSection consults it.
   Promise.all([
-    ipcRenderer.invoke('get-all-config', ['swapper', 'matchmaker', 'keybinds', 'advanced', 'game', 'ui', 'discord', 'translator', 'accounts', 'performance']),
+    ipcRenderer.invoke('get-all-config', ['swapper', 'matchmaker', 'keybinds', 'advanced', 'game', 'ui', 'discord', 'translator', 'accounts', 'performance', 'collapsedSections']),
     ipcRenderer.invoke('get-platform'),
   ]).then(([allConf, platformInfo]: [any, any]) => {
+    collapsedState = (allConf.collapsedSections as Record<string, boolean>) || {};
+
+    // ── Create section shells (after collapsed state is loaded) ──
+    const genSec = createSection('General');
+    container.appendChild(genSec.section);
+    const gameSec = createSection('Game');
+    container.appendChild(gameSec.section);
+    const perfSec = createSection('Performance');
+    container.appendChild(perfSec.section);
+    const swapSec = createSection('Swapper');
+    container.appendChild(swapSec.section);
+    const appearSec = createSection('Appearance');
+    container.appendChild(appearSec.section);
+    const mmSec = createSection('Matchmaker');
+    container.appendChild(mmSec.section);
+    const chatSec = createSection('Chat');
+    container.appendChild(chatSec.section);
+    const discordSec = createSection('Discord');
+    container.appendChild(discordSec.section);
+    const accSec = createSection('Accounts', true);
+    container.appendChild(accSec.section);
+    const advSec = createSection('Advanced');
+    container.appendChild(advSec.section);
+    const usSec = createSection('Userscripts');
+    container.appendChild(usSec.section);
+
     const swapperConf = allConf.swapper;
     const mmConf = allConf.matchmaker;
     const keybindsConf = allConf.keybinds;

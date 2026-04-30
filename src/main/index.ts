@@ -642,7 +642,7 @@ async function launchApp(): Promise<void> {
   const ALLOWED_CONFIG_KEYS = new Set<string>([
     'window', 'performance', 'game', 'swapper', 'matchmaker',
     'keybinds', 'userscripts', 'ui', 'discord', 'translator',
-    'advanced', 'accounts', 'tabWindow',
+    'advanced', 'accounts', 'tabWindow', 'collapsedSections',
   ]);
 
   ipcMain.handle('get-version', () => appVersion);
