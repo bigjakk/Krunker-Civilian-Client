@@ -42,6 +42,14 @@ export interface AppConfig {
     hpEnemyCounter: boolean;
     hideBunnies: boolean;
   };
+  keystrokes: {
+    enabled: boolean;
+    size: number;
+    auxKey1: string;
+    auxKey2: string;
+    showAuxKeys: boolean;
+    mouseEnabled: boolean;
+  };
   swapper: {
     enabled: boolean;
     path: string;
@@ -162,6 +170,14 @@ export const config = new Store<AppConfig>({
       showPing: true,
       hpEnemyCounter: true,
       hideBunnies: false,
+    },
+    keystrokes: {
+      enabled: false,
+      size: 2.5,
+      auxKey1: 'r',
+      auxKey2: 'n',
+      showAuxKeys: true,
+      mouseEnabled: false,
     },
     swapper: {
       enabled: false,

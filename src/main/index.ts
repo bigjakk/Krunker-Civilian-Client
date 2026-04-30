@@ -642,7 +642,7 @@ async function launchApp(): Promise<void> {
   const ALLOWED_CONFIG_KEYS = new Set<string>([
     'window', 'performance', 'game', 'swapper', 'matchmaker',
     'keybinds', 'userscripts', 'ui', 'discord', 'translator',
-    'advanced', 'accounts', 'tabWindow', 'collapsedSections',
+    'advanced', 'accounts', 'tabWindow', 'keystrokes', 'collapsedSections',
   ]);
 
   ipcMain.handle('get-version', () => appVersion);
@@ -722,6 +722,7 @@ async function launchApp(): Promise<void> {
   ipcMain.handle('window-close', () => win.close());
   ipcMain.handle('window-is-maximized', () => win.isMaximized());
   ipcMain.handle('toggle-devtools', () => win.webContents.toggleDevTools());
+  ipcMain.handle('open-external', (_e, url: string) => safeOpenExternal(url));
   ipcMain.handle('inject-game-click', () => {
     const [width, height] = win.getContentSize();
     const x = Math.round(width / 2);

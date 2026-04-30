@@ -7,6 +7,8 @@ import { initTranslator, updateTranslatorConfig } from './translator';
 import { setDeathAnimBlock, setMenuTimer, setWatermark, escapeHtml } from './utils';
 import { initChat, setBetterChat, setChatHistorySize } from './chat';
 import { initHPCounter, destroyHPCounter, initRankProgress } from './competitive';
+import { initKeystrokes, updateKeystrokes } from './keystrokes';
+import type { KeystrokesConfig } from './keystrokes';
 import { checkChangelog, showChangelogNow } from './changelog';
 import type { Keybind } from '../main/config';
 
@@ -129,7 +131,7 @@ function keybindDisplayString(bind: Keybind): string {
 }
 
 // ── Keybind capture dialog (Crankshaft-style) ──
-let capturingKeybind: { resolve: (bind: Keybind) => void } | null = null;
+let capturingKeybind: { resolve: (bind: Keybind) => void; simple: boolean } | null = null;
 
 const kbOverlay = document.createElement('div');
 kbOverlay.className = 'kcc-keybind-overlay';
@@ -179,6 +181,7 @@ function dismissKeybindDialog(): void {
 function kbKeydownHandler(event: KeyboardEvent): void {
   event.stopImmediatePropagation();
   event.preventDefault();
+  if (capturingKeybind?.simple) return;
   if (event.key === 'Control') kbCtrl.classList.add('active');
   else if (event.key === 'Shift') kbShift.classList.add('active');
   else if (event.key === 'Alt') kbAlt.classList.add('active');
@@ -194,28 +197,40 @@ function kbKeyupHandler(event: KeyboardEvent): void {
     return;
   }
 
-  // Modifier-only releases just clear indicators
-  if (event.key === 'Shift' || event.key === 'Control' || event.key === 'Alt') {
-    const bind: Keybind = { key: event.key, ctrl: false, shift: false, alt: false };
-    capturingKeybind.resolve(bind);
+  const isModifier = event.key === 'Shift' || event.key === 'Control' || event.key === 'Alt';
+  if (capturingKeybind.simple) {
+    // Single-key picker: ignore modifier presses entirely, never capture them
+    if (isModifier) return;
+    capturingKeybind.resolve({ key: event.key, ctrl: false, shift: false, alt: false });
     dismissKeybindDialog();
     return;
   }
 
-  const bind: Keybind = {
+  if (isModifier) {
+    // Modifier-only release returns the modifier as the bound key (full keybind mode)
+    capturingKeybind.resolve({ key: event.key, ctrl: false, shift: false, alt: false });
+    dismissKeybindDialog();
+    return;
+  }
+
+  capturingKeybind.resolve({
     key: event.key,
     ctrl: event.ctrlKey,
     shift: event.shiftKey,
     alt: event.altKey,
-  };
-  capturingKeybind.resolve(bind);
+  });
   dismissKeybindDialog();
 }
 
-function openKeybindDialog(title: string): Promise<Keybind> {
+function openKeybindDialog(title: string, opts?: { simple?: boolean }): Promise<Keybind> {
+  const simple = !!opts?.simple;
   return new Promise((resolve) => {
-    capturingKeybind = { resolve };
-    kbTitle.textContent = 'Edit Keybind: ' + title;
+    capturingKeybind = { resolve, simple };
+    kbTitle.textContent = (simple ? 'Set Key: ' : 'Edit Keybind: ') + title;
+    kbSub.innerHTML = simple
+      ? 'Press any key. Press <code>Shift+Escape</code> to cancel.'
+      : 'Press any key. Press <code>Shift+Escape</code> to cancel.';
+    kbModifiers.style.display = simple ? 'none' : '';
     kbShift.classList.remove('active');
     kbCtrl.classList.remove('active');
     kbAlt.classList.remove('active');
@@ -240,6 +255,33 @@ function createKeybindRow(label: string, desc: string, currentBind: Keybind, onB
     openKeybindDialog(label).then((newBind) => {
       keyEl.textContent = keybindDisplayString(newBind);
       onBind(newBind);
+    });
+  });
+  return row;
+}
+
+// Single-key picker (no modifiers) — used for keystroke overlay aux keys
+function createSimpleKeyRow(opts: {
+  label: string;
+  desc: string;
+  value: string;
+  onChange: (value: string) => void;
+  safety?: number;
+  instant?: boolean;
+}): HTMLElement {
+  const s = opts.safety || 0;
+  const row = document.createElement('div');
+  row.className = 'setting settName safety-' + s + ' keybind';
+  row.innerHTML =
+    settingIcon(s, opts.instant) +
+    '<span class="setting-title">' + escapeHtml(opts.label) + '</span>' +
+    '<span class="keyIcon kcc-keyIcon">' + escapeHtml((opts.value || '?').toUpperCase()) + '</span>' +
+    '<div class="setting-desc-new">' + escapeHtml(opts.desc) + '</div>';
+  const keyEl = row.querySelector('.kcc-keyIcon') as HTMLElement;
+  keyEl.addEventListener('click', () => {
+    openKeybindDialog(opts.label, { simple: true }).then((bind) => {
+      keyEl.textContent = bind.key.toUpperCase();
+      opts.onChange(bind.key);
     });
   });
   return row;
@@ -720,6 +762,102 @@ function buildGameSection(
   if (ui.deathscreenAnimation) setDeathAnimBlock(true);
   if (ui.menuTimer ?? true) setMenuTimer(true);
   if (ui.hideMenuPopups) startHidePopups();
+}
+
+function buildKeystrokesRows(body: HTMLElement): void {
+  const defaults: KeystrokesConfig = {
+    enabled: false, size: 2.5, auxKey1: 'r', auxKey2: 'n',
+    showAuxKeys: true, mouseEnabled: false,
+  };
+  const ks: KeystrokesConfig = { ...defaults };
+  let loaded = false;
+
+  function save(): void {
+    if (!loaded) return;
+    ipcRenderer.invoke('set-config', 'keystrokes', ks);
+    updateKeystrokes(ks);
+  }
+
+  const enableRow = createToggleRow({
+    label: 'Keystrokes Overlay',
+    desc: 'Show on-screen WASD/Shift/Space + 2 aux keys (great for streaming)',
+    checked: false, instant: true,
+    onChange: (v) => { ks.enabled = v; save(); },
+  });
+  body.appendChild(enableRow);
+
+  const mouseRow = createToggleRow({
+    label: 'Mouse Overlay',
+    desc: 'Show on-screen mouse buttons (L/M/R) and scroll wheel direction',
+    checked: false, instant: true,
+    onChange: (v) => { ks.mouseEnabled = v; save(); },
+  });
+  body.appendChild(mouseRow);
+
+  const sizeRow = createNumberRow({
+    label: 'Overlay Size',
+    desc: 'Visual scale of the keystroke and mouse indicators (rem)',
+    min: 1, max: 6, step: 0.1, value: 2.5, instant: true,
+    onChange: (v) => { ks.size = v; save(); },
+  });
+  body.appendChild(sizeRow);
+
+  const showAuxRow = createToggleRow({
+    label: 'Show Aux Keys',
+    desc: 'Display the two configurable aux key indicators in the keyboard overlay',
+    checked: true, instant: true,
+    onChange: (v) => { ks.showAuxKeys = v; save(); },
+  });
+  body.appendChild(showAuxRow);
+
+  const aux1Row = createSimpleKeyRow({
+    label: 'Aux Key 1',
+    desc: 'First configurable key (default R, e.g. weapon switch). Click to rebind.',
+    value: 'r', instant: true,
+    onChange: (v) => { ks.auxKey1 = v; save(); },
+  });
+  body.appendChild(aux1Row);
+
+  const aux2Row = createSimpleKeyRow({
+    label: 'Aux Key 2',
+    desc: 'Second configurable key (default N, e.g. knife). Click to rebind.',
+    value: 'n', instant: true,
+    onChange: (v) => { ks.auxKey2 = v; save(); },
+  });
+  body.appendChild(aux2Row);
+
+  const KEYSTROKES_CREDIT_URL = 'https://gist.github.com/KraXen72/2ea1332440b0c66b83ca9b73afc38269';
+  const creditRow = document.createElement('div');
+  creditRow.className = 'setting settName safety-0';
+  creditRow.innerHTML =
+    '<span class="setting-title" style="font-weight:normal;opacity:0.75;font-size:0.9em;">' +
+      'Keyboard overlay adapted from <a class="kcc-credit-link" style="color:#4cb3ff;cursor:pointer;text-decoration:underline;">KraXen72\'s Keystrokes userscript</a> for the Crankshaft Krunker client.' +
+    '</span>';
+  const creditLink = creditRow.querySelector('.kcc-credit-link') as HTMLElement;
+  creditLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    ipcRenderer.invoke('open-external', KEYSTROKES_CREDIT_URL);
+  });
+  body.appendChild(creditRow);
+
+  ipcRenderer.invoke('get-config', 'keystrokes').then((conf: KeystrokesConfig | undefined) => {
+    Object.assign(ks, defaults, conf || {});
+    const enableCb = enableRow.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    if (enableCb) enableCb.checked = !!ks.enabled;
+    const mouseCb = mouseRow.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    if (mouseCb) mouseCb.checked = !!ks.mouseEnabled;
+    const sizeRange = sizeRow.querySelector('input[type="range"]') as HTMLInputElement;
+    const sizeNum = sizeRow.querySelector('input[type="number"]') as HTMLInputElement;
+    if (sizeRange) sizeRange.value = String(ks.size);
+    if (sizeNum) sizeNum.value = String(ks.size);
+    const showAuxCb = showAuxRow.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    if (showAuxCb) showAuxCb.checked = !!ks.showAuxKeys;
+    const aux1KeyEl = aux1Row.querySelector('.kcc-keyIcon') as HTMLElement;
+    if (aux1KeyEl) aux1KeyEl.textContent = (ks.auxKey1 || 'R').toUpperCase();
+    const aux2KeyEl = aux2Row.querySelector('.kcc-keyIcon') as HTMLElement;
+    if (aux2KeyEl) aux2KeyEl.textContent = (ks.auxKey2 || 'N').toUpperCase();
+    loaded = true;
+  }).catch(() => { loaded = true; });
 }
 
 function buildPerformanceSection(
@@ -1508,6 +1646,8 @@ function renderSettings(searchQuery?: string): void {
     container.appendChild(discordSec.section);
     const accSec = createSection('Accounts', true);
     container.appendChild(accSec.section);
+    const ksSec = createSection('Keystrokes', true);
+    container.appendChild(ksSec.section);
     const advSec = createSection('Advanced');
     container.appendChild(advSec.section);
     const usSec = createSection('Userscripts');
@@ -1545,6 +1685,7 @@ function renderSettings(searchQuery?: string): void {
     buildChatSection(chatSec.body, gameConf, translatorConf);
     buildDiscordSection(discordSec.body, discordConf);
     buildAccountsSection(accSec.body, allConf.accounts);
+    buildKeystrokesRows(ksSec.body);
     buildAdvancedSection(advSec.body, advConf, isWindows);
     renderUserscriptsSection(usSec.body);
 
@@ -1873,6 +2014,13 @@ ipcRenderer.on('main_did-finish-load', () => {
     }
     if (isGamePage) {
       initRankProgress();
+    }
+
+    // ── Keystrokes + Mouse overlay ──
+    if (isGamePage) {
+      ipcRenderer.invoke('get-config', 'keystrokes').then((ksConf: KeystrokesConfig | undefined) => {
+        if (ksConf && (ksConf.enabled || ksConf.mouseEnabled)) initKeystrokes(ksConf);
+      }).catch(() => { /* ignore */ });
     }
 
     // ── KCC watermark (in-game + menu) ──
