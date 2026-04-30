@@ -14,12 +14,12 @@
 ## Features
 
 - unlimited FPS with no aim freeze (custom Electron build, see [below](#custom-electron-build))
-- unobtrusive — nearly all features can be disabled, no watermarks
+- unobtrusive — nearly all features can be disabled
 - hides ads by default
 - resource swapper (textures, sounds, models)
 - CSS theme system with `@import` support (drop `.css` files in `swap/themes/`)
 - custom loading screen backgrounds (`swap/backgrounds/`)
-- customisable matchmaker with lobby scan animation
+- customizable matchmaker with lobby scan animation
   - filter by region, gamemode, map, player count, remaining time
   - auto-join with server capacity verification
 - external ranked queue (works even when the game is closed)
