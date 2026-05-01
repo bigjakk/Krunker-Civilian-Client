@@ -5,7 +5,9 @@
 [![Latest Release](https://img.shields.io/github/v/release/bigjakk/Krunker-Civilian-Client?style=flat&label=Latest)](https://github.com/bigjakk/Krunker-Civilian-Client/releases/latest)
 [![License](https://img.shields.io/github/license/bigjakk/Krunker-Civilian-Client?style=flat&label=License)](https://github.com/bigjakk/Krunker-Civilian-Client/blob/main/LICENSE)
 
-> a high-performance krunker client with unlimited FPS, built on a custom-patched Electron
+Was AI used in the creation of this client? Yes, if you came across this client and don't want to use it due to that, I highly recommend looking at [Glorp](https://github.com/slavcp/glorp) by slav or [Crankshaft](https://github.com/KraXen72/crankshaft) by KraXen72
+
+
 
 **Download:**
 [Windows (x64)](https://github.com/bigjakk/Krunker-Civilian-Client/releases/latest) -
@@ -38,7 +40,7 @@
 - hardpoint enemy counter HUD
 - changelog popup on update
 - configurable keybinds with visual rebinding dialog
-- configurable ANGLE backend (D3D11, OpenGL, Vulkan, D3D9, D3D11on12)
+- configurable ANGLE backend (D3D11, OpenGL, D3D11on12)
 - advanced Chromium flag settings (GPU rasterization, low latency, QUIC, and more)
 - CPU throttling (game vs menu) and process priority control
 - auto-updater
