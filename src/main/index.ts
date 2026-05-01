@@ -9,7 +9,7 @@ import { detectPlatform, applyPlatformFlags } from './platform';
 import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount } from './config';
 import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper } from './swapper';
 import { UserscriptManager } from './userscripts';
-import { ALL_CLIENT_CSS } from './client-ui';
+import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog, getLogPath, closeLogStreams } from './logger';
 import { checkForUpdate, downloadUpdate, installUpdate } from './updater';
 import { showUpdateWindow, showUpdatePrompt } from './update-window';
@@ -169,32 +169,6 @@ const BUNNY_URL_PATTERNS = [
 const BUNNY_URL_RE = /user-assets\.krunker\.io\/(?:60585\/|(?:61806|61814|61815|61818|61820|61821|61822|61823|61824)\/model\.obj)/;
 const EMPTY_RESPONSE_URL = 'data:,';
 let hideBunnies = false;
-
-// ── CSS to hide ad containers ──
-const HIDE_ADS_CSS = `
-.endAHolder,
-#aHider,
-#adCon,
-#rightABox,
-#aContainer,
-#topRightAdHolder,
-div#aContainer,
-#braveWarning,
-#topRightAdHolder {
-  display: none !important;
-}`;
-
-// ── Consent dismiss script (polling only — NO MutationObserver on main frame) ──
-const CONSENT_DISMISS_MAIN_JS = `
-(function dismissConsent() {
-  let attempts = 0;
-  const timer = setInterval(() => {
-    attempts++;
-    const btn = document.querySelector('.fc-cta-consent, [aria-label="Consent"], .css-47sehv');
-    if (btn) { btn.click(); clearInterval(timer); }
-    if (attempts > 30) clearInterval(timer);
-  }, 500);
-})();`;
 
 // ── Escape pointer lock fix ──
 const ESCAPE_POINTERLOCK_FIX_JS = `
@@ -695,7 +669,7 @@ async function launchApp(): Promise<void> {
     applyCpuThrottle(win.webContents, perf?.cpuThrottleMenu ?? 1.5);
 
     win.webContents.executeJavaScript(ESCAPE_POINTERLOCK_FIX_JS).catch((err) => electronLog.warn('[KCC] Pointerlock fix inject failed:', err));
-    win.webContents.executeJavaScript(CONSENT_DISMISS_MAIN_JS).catch((err) => electronLog.warn('[KCC] Consent dismiss inject failed:', err));
+    win.webContents.executeJavaScript(CONSENT_DISMISS_JS).catch((err) => electronLog.warn('[KCC] Consent dismiss inject failed:', err));
     // Notify preload to start hooking settings (matches Crankshaft's timing)
     win.webContents.send('main_did-finish-load');
   });

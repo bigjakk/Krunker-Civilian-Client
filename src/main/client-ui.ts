@@ -758,5 +758,31 @@ export const WATERMARK_CSS = `
 }
 `;
 
-/** Pre-concatenated CSS for single-call injection (excludes HIDE_ADS_CSS which is separate) */
+/** Pre-concatenated CSS for single-call injection */
 export const ALL_CLIENT_CSS = `${CLIENT_SETTINGS_CSS}\n${MATCHMAKER_SETTINGS_CSS}\n${TRANSLATOR_CSS}\n${ALT_MANAGER_CSS}\n${HP_COUNTER_CSS}\n${BP_CLAIM_ALL_CSS}\n${RANK_TRACKER_CSS}\n${WATERMARK_CSS}`;
+
+/** Hides leftover ad container divs after the network-level URL block cancels their payloads. */
+export const HIDE_ADS_CSS = `
+.endAHolder,
+#aHider,
+#adCon,
+#rightABox,
+#aContainer,
+#topRightAdHolder,
+div#aContainer,
+#braveWarning,
+#topRightAdHolder {
+  display: none !important;
+}`;
+
+/** Auto-clicks the cookie/GDPR consent banner so it doesn't block the UI. Polling-only — never use a MutationObserver here, see CLAUDE.md WebGL-hang note. */
+export const CONSENT_DISMISS_JS = `
+(function dismissConsent() {
+  let attempts = 0;
+  const timer = setInterval(() => {
+    attempts++;
+    const btn = document.querySelector('.fc-cta-consent, [aria-label="Consent"], .css-47sehv');
+    if (btn) { btn.click(); clearInterval(timer); }
+    if (attempts > 30) clearInterval(timer);
+  }, 500);
+})();`;

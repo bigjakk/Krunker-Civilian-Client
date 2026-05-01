@@ -1,6 +1,6 @@
 import { BrowserWindow, WebContentsView, View, Menu, clipboard, ipcMain, shell } from 'electron';
 import { TAB_BAR_DATA_URL } from './tab-bar-html';
-import { ALL_CLIENT_CSS } from './client-ui';
+import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog } from './logger';
 
 const KRUNKER_SOCIAL = 'https://krunker.io/social.html';
@@ -284,6 +284,8 @@ export class TabManager {
 
         wc.on('did-finish-load', () => {
             wc.insertCSS(ALL_CLIENT_CSS).catch(() => {});
+            wc.insertCSS(HIDE_ADS_CSS).catch(() => {});
+            wc.executeJavaScript(CONSENT_DISMISS_JS).catch(() => {});
             wc.send('main_did-finish-load-tab');
             // Apply CPU throttle directly to this tab's webContents (always menu rate — tabs are social pages)
             this.applyCpuThrottleFn(wc, this.getCpuThrottleMenu());
