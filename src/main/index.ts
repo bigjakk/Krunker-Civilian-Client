@@ -5,7 +5,7 @@ import { get as httpsGet } from 'https';
 import { execFile } from 'child_process';
 import * as os from 'os';
 import { Socket } from 'net';
-import { detectPlatform, applyPlatformFlags } from './platform';
+import { detectPlatform, applyPlatformFlags, getValidAngleBackends } from './platform';
 import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount } from './config';
 import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper } from './swapper';
 import { UserscriptManager } from './userscripts';
@@ -124,6 +124,15 @@ const advancedDefaults = {
 };
 const advancedConfig = { ...advancedDefaults, ...config.get('advanced') };
 const perfConfig = { fpsUnlocked: true, ...config.get('performance') };
+
+// Self-heal angleBackend if a previous version's value is no longer valid for this platform (e.g. user picked 'vulkan', 'd3d9', etc., and we removed it).
+const validBackends = getValidAngleBackends(platformInfo);
+if (advancedConfig.angleBackend && !validBackends.includes(advancedConfig.angleBackend)) {
+  electronLog.warn(`[KCC] Invalid angleBackend '${advancedConfig.angleBackend}' for ${platformInfo.os}, resetting to 'default'`);
+  advancedConfig.angleBackend = 'default';
+  config.set('advanced', { ...config.get('advanced'), angleBackend: 'default' });
+}
+
 applyPlatformFlags(platformInfo, advancedConfig, perfConfig);
 
 // ── App identity (must match electron-builder appId for taskbar pin persistence) ──

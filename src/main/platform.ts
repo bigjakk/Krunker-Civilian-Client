@@ -26,6 +26,13 @@ export function detectPlatform(): PlatformInfo {
   };
 }
 
+/** Canonical set of valid `angleBackend` values per platform. The settings UI dropdown must stay in sync. */
+export function getValidAngleBackends(info: PlatformInfo): readonly string[] {
+  return info.isWindows
+    ? ['default', 'gl', 'd3d11', 'd3d11on12']
+    : ['default', 'gl', 'vulkan'];
+}
+
 export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['advanced'], performance: AppConfig['performance']): void {
   // ── FPS uncap ──
   // disable-frame-rate-limit causes compositor CPU spin on Chromium 84+, starving
@@ -136,5 +143,6 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('no-proxy-server');
     app.commandLine.appendSwitch('enable-features', 'BlinkCompositorUseDisplayThreadPriority,GpuUseDisplayThreadPriority');
   }
+
 }
 

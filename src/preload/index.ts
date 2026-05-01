@@ -1481,10 +1481,8 @@ function buildAdvancedSection(
     ? [
         { value: 'default', label: 'Default (D3D11)' },
         { value: 'gl',      label: 'OpenGL' },
-        { value: 'd3d9',    label: 'Direct3D 9' },
         { value: 'd3d11',   label: 'Direct3D 11' },
         { value: 'd3d11on12', label: 'D3D11on12' },
-        { value: 'vulkan',  label: 'Vulkan' },
       ]
     : [
         { value: 'default', label: 'Default' },
