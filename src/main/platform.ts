@@ -69,6 +69,11 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
   }
 
   if (info.isLinux) {
+    // NOTE: --ozone-platform must be set on the launcher CLI — Chromium parses it
+    // during early C++ startup, before our JS runs, so app.commandLine.appendSwitch
+    // is silently ignored at module-load time. The x11 flag is injected by:
+    //   - npm start / npm run dev → scripts/launch-electron.js
+    //   - packaged AppImage → scripts/afterPack-linux.js (wrapper)
     app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
     // GPU sandbox can fail inside AppImage FUSE mounts and on certain Mesa driver versions,
     // causing the GPU process to crash and leaving a black screen.
