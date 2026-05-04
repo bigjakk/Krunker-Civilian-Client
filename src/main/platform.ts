@@ -95,6 +95,12 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     // GPU sandbox can fail inside AppImage FUSE mounts and on certain Mesa driver versions,
     // causing the GPU process to crash and leaving a black screen.
     app.commandLine.appendSwitch('disable-gpu-sandbox');
+    // NVIDIA proprietary doesn't implement VAAPI; if the GPU process probes libva
+    // it logs `vaInitialize failed` and can segfault during command-buffer creation.
+    // Krunker doesn't use HW video decode anyway, so disable defensively.
+    app.commandLine.appendSwitch('disable-accelerated-video-decode');
+    app.commandLine.appendSwitch('disable-accelerated-video-encode');
+    app.commandLine.appendSwitch('disable-accelerated-mjpeg-decode');
   }
 
   // ── Remove useless features ──
