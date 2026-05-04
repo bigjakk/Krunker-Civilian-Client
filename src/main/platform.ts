@@ -34,6 +34,14 @@ export function getValidAngleBackends(info: PlatformInfo): readonly string[] {
 }
 
 export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['advanced'], performance: AppConfig['performance']): void {
+  // Chromium's CommandLine stores ONE value per switch name — every
+  // `appendSwitch('enable-features', X)` call overwrites the previous one.
+  // Accumulate into Sets and emit a single combined value at the end.
+  const enabledFeatures = new Set<string>();
+  const disabledFeatures = new Set<string>();
+  const enableFeatures = (...names: string[]): void => { for (const n of names) enabledFeatures.add(n); };
+  const disableFeatures = (...names: string[]): void => { for (const n of names) disabledFeatures.add(n); };
+
   // ── FPS uncap ──
   // disable-frame-rate-limit causes compositor CPU spin on Chromium 84+, starving
   // input events. On Electron 42 (Chromium 147), this is fixed by a patch to
@@ -44,7 +52,7 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('disable-frame-rate-limit');
     app.commandLine.appendSwitch('disable-gpu-vsync');
     app.commandLine.appendSwitch('max-gum-fps', '9999');
-    app.commandLine.appendSwitch('enable-features', 'ImplLatencyRecovery,MainLatencyRecovery');
+    enableFeatures('ImplLatencyRecovery', 'MainLatencyRecovery');
   }
 
   // ── Always-on platform flags ──
@@ -65,7 +73,7 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
   }
 
   if (info.isWindows) {
-    app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,HardwareMediaKeyHandling');
+    disableFeatures('CalculateNativeWinOcclusion', 'HardwareMediaKeyHandling');
   }
 
   if (info.isLinux) {
@@ -94,7 +102,7 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('disable-component-update');
     app.commandLine.appendSwitch('disable-bundled-ppapi-flash');
     app.commandLine.appendSwitch('disable-nacl');
-    app.commandLine.appendSwitch('disable-features', 'NativeNotifications,MediaRouter,PerformanceInterventionUI,HappinessTrackingSurveysForDesktopDemo');
+    disableFeatures('NativeNotifications', 'MediaRouter', 'PerformanceInterventionUI', 'HappinessTrackingSurveysForDesktopDemo');
   }
 
   // ── GPU rasterization ──
@@ -115,7 +123,7 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('disable-renderer-backgrounding');
     app.commandLine.appendSwitch('disable-best-effort-tasks');
     app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
-    app.commandLine.appendSwitch('enable-features', 'V8VmFuture,WebAssemblyBaseline,WebAssemblyTiering,WebAssemblyLazyCompilation');
+    enableFeatures('V8VmFuture', 'WebAssemblyBaseline', 'WebAssemblyTiering', 'WebAssemblyLazyCompilation');
   }
 
   // ── Increase limits ──
@@ -146,8 +154,11 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('ignore-gpu-blocklist');
     app.commandLine.appendSwitch('no-pings');
     app.commandLine.appendSwitch('no-proxy-server');
-    app.commandLine.appendSwitch('enable-features', 'BlinkCompositorUseDisplayThreadPriority,GpuUseDisplayThreadPriority');
+    enableFeatures('BlinkCompositorUseDisplayThreadPriority', 'GpuUseDisplayThreadPriority');
   }
 
+  // ── Single emission of accumulated feature flag sets ──
+  if (enabledFeatures.size) app.commandLine.appendSwitch('enable-features', [...enabledFeatures].join(','));
+  if (disabledFeatures.size) app.commandLine.appendSwitch('disable-features', [...disabledFeatures].join(','));
 }
 
