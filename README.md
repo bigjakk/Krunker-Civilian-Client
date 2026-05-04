@@ -81,24 +81,7 @@ For details on the patch and build instructions, see [Electron-Websocket-Fix](ht
 
 ## Linux Performance at High Resolutions
 
-On Linux + NVIDIA at 4K (3840×2160) with FPS Uncap enabled, you may see the FPS counter read 1000+ while the visible output stutters. This is a Linux compositor/present-pipeline limitation, not a GPU bottleneck.
-
-The cause: at 4K each frame is ~33MB of pixel data. At 1000fps the renderer pumps ~33GB/s of pixel data through Chromium → XWayland → Mutter. Windows handles this gracefully via DXGI flip-discard (only the latest committed frame gets presented at vsync, the rest are dropped cheaply); on Linux + multi-monitor + XWayland the equivalent buffer-queue handling is far less efficient and the resulting frame-pacing variance reads as visual stutter even though the renderer is fast.
-
-Mitigations the client already applies (Linux):
-
-- Forces XWayland via `--ozone-platform=x11` (native Wayland's pointer-constraints implementation has multi-monitor bugs the X11 path doesn't)
-- Always-on `BlinkCompositorUseDisplayThreadPriority` + `GpuUseDisplayThreadPriority` so the compositor thread isn't starved by the renderer at high frame rates
-- `__GL_SYNC_TO_VBLANK=0` and `__GL_THREADED_OPTIMIZATIONS=1` injected for the NVIDIA proprietary driver
-- `disable-accelerated-video-decode/encode/mjpeg-decode` to stop the GPU process from probing libva (not implemented by NVIDIA proprietary)
-
-If you still see visual stutter at 4K with FPS Uncap on, the practical workarounds are:
-
-- Drop the monitor mode to 1080p while playing
-- Run the app windowed at 1080p on the 4K display (Mutter only re-composites the damaged window region)
-- Disable FPS Uncap and rely on the patched Electron's input-priority fix for input fluidity at the display refresh
-
-This is a Linux-ecosystem limitation rather than something the client can fully paper over.
+On Linux at high monitor resolutions (e.g., 4K) with FPS Uncap on, you may see visual stutter even though the FPS counter reads high. If this happens, raise the CPU throttle in settings — it's the most effective workaround.
 
 ## Building From Source
 
