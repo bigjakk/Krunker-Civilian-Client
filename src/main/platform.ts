@@ -57,7 +57,6 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
 
   // ── Always-on platform flags ──
   app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
-  app.commandLine.appendSwitch('disable-threaded-scrolling');
   app.commandLine.appendSwitch('overscroll-history-navigation', '0');
   app.commandLine.appendSwitch('pull-to-refresh', '0');
   // WebGL is mandatory for Krunker — force it past any GPU blocklist.
