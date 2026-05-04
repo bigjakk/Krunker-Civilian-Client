@@ -55,6 +55,16 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     enableFeatures('ImplLatencyRecovery', 'MainLatencyRecovery');
   }
 
+  // ── Compositor / GPU display thread priority ──
+  // Always-on. With FPS uncap the renderer can produce frames faster than the
+  // GPU/compositor can present them; without these flags the present pipeline
+  // gets starved by the renderer thread, so the FPS counter reads 1000+ while
+  // visible output stutters to ~20fps. These flags raise the Blink compositor
+  // and GPU process display threads above renderer priority so frames actually
+  // make it to the screen. Most acute on Linux + NVIDIA + XWayland (where the
+  // present path has more overhead than Windows D3D11), but harmless on Windows.
+  enableFeatures('BlinkCompositorUseDisplayThreadPriority', 'GpuUseDisplayThreadPriority');
+
   // ── Always-on platform flags ──
   app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
   app.commandLine.appendSwitch('overscroll-history-navigation', '0');
@@ -153,7 +163,6 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('ignore-gpu-blocklist');
     app.commandLine.appendSwitch('no-pings');
     app.commandLine.appendSwitch('no-proxy-server');
-    enableFeatures('BlinkCompositorUseDisplayThreadPriority', 'GpuUseDisplayThreadPriority');
   }
 
   // ── Single emission of accumulated feature flag sets ──
