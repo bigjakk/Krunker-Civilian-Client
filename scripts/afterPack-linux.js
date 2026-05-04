@@ -32,6 +32,12 @@ else
   SANDBOX=--no-sandbox
 fi
 
+# NVIDIA driver knobs — disable driver-level vsync (Chromium's --disable-gpu-vsync
+# doesn't reach the GLX/EGL swap path) and enable threaded GL command submission
+# to reduce GPU-process CPU overhead at high frame rates. No-ops on non-NVIDIA.
+export __GL_SYNC_TO_VBLANK=0
+export __GL_THREADED_OPTIMIZATIONS=1
+
 exec "$SELF" --ozone-platform=x11 "$SANDBOX" "$@"
 `;
 

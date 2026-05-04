@@ -16,11 +16,22 @@ const path = require('path');
 
 const electron = require('electron');
 const args = ['.'];
+
+// NVIDIA proprietary driver env vars — only applied if we're on NVIDIA.
+// __GL_SYNC_TO_VBLANK=0 disables driver-level vsync (Chromium's --disable-gpu-vsync
+// only reaches Chromium's compositor, not the underlying GLX/EGL swap). On
+// XWayland this is the closest analogue to Windows D3D11's flip-discard.
+// __GL_THREADED_OPTIMIZATIONS=1 enables the NVIDIA driver's threaded GL command
+// submission, which significantly reduces CPU overhead on the GPU process at
+// high frame rates.
+const env = { ...process.env };
 if (process.platform === 'linux') {
     args.unshift('--ozone-platform=x11');
+    env.__GL_SYNC_TO_VBLANK = '0';
+    env.__GL_THREADED_OPTIMIZATIONS = '1';
 }
 // pass through any extra args from the npm caller
 args.push(...process.argv.slice(2));
 
-const child = spawn(electron, args, { stdio: 'inherit', cwd: path.resolve(__dirname, '..') });
+const child = spawn(electron, args, { stdio: 'inherit', cwd: path.resolve(__dirname, '..'), env });
 child.on('exit', (code) => process.exit(code ?? 0));
