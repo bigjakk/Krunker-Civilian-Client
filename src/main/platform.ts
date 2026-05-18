@@ -34,6 +34,14 @@ export function getValidAngleBackends(info: PlatformInfo): readonly string[] {
 }
 
 export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['advanced'], performance: AppConfig['performance']): void {
+  // Chromium's CommandLine stores ONE value per switch name — every
+  // `appendSwitch('enable-features', X)` call overwrites the previous one.
+  // Accumulate into Sets and emit a single combined value at the end.
+  const enabledFeatures = new Set<string>();
+  const disabledFeatures = new Set<string>();
+  const enableFeatures = (...names: string[]): void => { for (const n of names) enabledFeatures.add(n); };
+  const disableFeatures = (...names: string[]): void => { for (const n of names) disabledFeatures.add(n); };
+
   // ── FPS uncap ──
   // disable-frame-rate-limit causes compositor CPU spin on Chromium 84+, starving
   // input events. On Electron 42 (Chromium 147), this is fixed by a patch to
@@ -44,12 +52,21 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('disable-frame-rate-limit');
     app.commandLine.appendSwitch('disable-gpu-vsync');
     app.commandLine.appendSwitch('max-gum-fps', '9999');
-    app.commandLine.appendSwitch('enable-features', 'ImplLatencyRecovery,MainLatencyRecovery');
+    enableFeatures('ImplLatencyRecovery', 'MainLatencyRecovery');
   }
+
+  // ── Compositor / GPU display thread priority ──
+  // Always-on. With FPS uncap the renderer can produce frames faster than the
+  // GPU/compositor can present them; without these flags the present pipeline
+  // gets starved by the renderer thread, so the FPS counter reads 1000+ while
+  // visible output stutters to ~20fps. These flags raise the Blink compositor
+  // and GPU process display threads above renderer priority so frames actually
+  // make it to the screen. Most acute on Linux + NVIDIA + XWayland (where the
+  // present path has more overhead than Windows D3D11), but harmless on Windows.
+  enableFeatures('BlinkCompositorUseDisplayThreadPriority', 'GpuUseDisplayThreadPriority');
 
   // ── Always-on platform flags ──
   app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
-  app.commandLine.appendSwitch('disable-threaded-scrolling');
   app.commandLine.appendSwitch('overscroll-history-navigation', '0');
   app.commandLine.appendSwitch('pull-to-refresh', '0');
   // WebGL is mandatory for Krunker — force it past any GPU blocklist.
@@ -65,14 +82,25 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
   }
 
   if (info.isWindows) {
-    app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,HardwareMediaKeyHandling');
+    disableFeatures('CalculateNativeWinOcclusion', 'HardwareMediaKeyHandling');
   }
 
   if (info.isLinux) {
+    // NOTE: --ozone-platform must be set on the launcher CLI — Chromium parses it
+    // during early C++ startup, before our JS runs, so app.commandLine.appendSwitch
+    // is silently ignored at module-load time. The x11 flag is injected by:
+    //   - npm start / npm run dev → scripts/launch-electron.js
+    //   - packaged AppImage → scripts/afterPack-linux.js (wrapper)
     app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
     // GPU sandbox can fail inside AppImage FUSE mounts and on certain Mesa driver versions,
     // causing the GPU process to crash and leaving a black screen.
     app.commandLine.appendSwitch('disable-gpu-sandbox');
+    // NVIDIA proprietary doesn't implement VAAPI; if the GPU process probes libva
+    // it logs `vaInitialize failed` and can segfault during command-buffer creation.
+    // Krunker doesn't use HW video decode anyway, so disable defensively.
+    app.commandLine.appendSwitch('disable-accelerated-video-decode');
+    app.commandLine.appendSwitch('disable-accelerated-video-encode');
+    app.commandLine.appendSwitch('disable-accelerated-mjpeg-decode');
   }
 
   // ── Remove useless features ──
@@ -89,7 +117,7 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('disable-component-update');
     app.commandLine.appendSwitch('disable-bundled-ppapi-flash');
     app.commandLine.appendSwitch('disable-nacl');
-    app.commandLine.appendSwitch('disable-features', 'NativeNotifications,MediaRouter,PerformanceInterventionUI,HappinessTrackingSurveysForDesktopDemo');
+    disableFeatures('NativeNotifications', 'MediaRouter', 'PerformanceInterventionUI', 'HappinessTrackingSurveysForDesktopDemo');
   }
 
   // ── GPU rasterization ──
@@ -110,7 +138,7 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('disable-renderer-backgrounding');
     app.commandLine.appendSwitch('disable-best-effort-tasks');
     app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
-    app.commandLine.appendSwitch('enable-features', 'V8VmFuture,WebAssemblyBaseline,WebAssemblyTiering,WebAssemblyLazyCompilation');
+    enableFeatures('V8VmFuture', 'WebAssemblyBaseline', 'WebAssemblyTiering', 'WebAssemblyLazyCompilation');
   }
 
   // ── Increase limits ──
@@ -141,8 +169,10 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('ignore-gpu-blocklist');
     app.commandLine.appendSwitch('no-pings');
     app.commandLine.appendSwitch('no-proxy-server');
-    app.commandLine.appendSwitch('enable-features', 'BlinkCompositorUseDisplayThreadPriority,GpuUseDisplayThreadPriority');
   }
 
+  // ── Single emission of accumulated feature flag sets ──
+  if (enabledFeatures.size) app.commandLine.appendSwitch('enable-features', [...enabledFeatures].join(','));
+  if (disabledFeatures.size) app.commandLine.appendSwitch('disable-features', [...disabledFeatures].join(','));
 }
 

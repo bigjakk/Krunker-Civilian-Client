@@ -3,6 +3,14 @@ productName: Krunker Civilian Client
 directories:
   output: out
   buildResources: build
+afterPack: "./scripts/afterPack-linux.js"
+# Force electron-builder to use the patched Electron in node_modules/electron/dist/
+# that scripts/download-electron.js installs during postinstall. Without this, builder
+# reads electronVersion from package.json (42.x) and discards the local dist/ when it
+# doesn't match — Linux's patched binary is v43 (Win is v42), so it would silently
+# download stock v42 from CDN and we'd lose the FPS-uncap input-priority patch.
+# CI / cross-compile must override on CLI: --electronDist=./node_modules/electron/dist-{linux,win}
+electronDist: "./node_modules/electron/dist"
 files:
   - dist/**/*
   - node_modules/electron-store/**/*
@@ -51,8 +59,6 @@ portable:
 linux:
   target:
     - target: AppImage
-      arch: [x64]
-    - target: deb
       arch: [x64]
   icon: build/icon.png
   category: Game
