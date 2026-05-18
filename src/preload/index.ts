@@ -627,12 +627,19 @@ function buildGeneralSection(
     onChange: (v) => { game.rememberTabs = v; ipcRenderer.invoke('set-config', 'game', game); },
   }));
 
-  const uiDefaults = { showExitButton: true, deathscreenAnimation: false, hideMenuPopups: false };
+  const uiDefaults = { showExitButton: true, deathscreenAnimation: false, hideMenuPopups: false, classicSocial: false };
   const ui = { ...uiDefaults, ...uiConfRaw };
 
   function saveUI(): void {
     ipcRenderer.invoke('set-config', 'ui', ui);
   }
+
+  body.appendChild(createToggleRow({
+    label: 'Classic Social',
+    desc: 'Open the standalone social page in a tab instead of the in-game panel',
+    checked: ui.classicSocial ?? false, instant: true,
+    onChange: (v) => { ui.classicSocial = v; saveUI(); setClassicSocial(v); },
+  }));
 
   body.appendChild(createToggleRow({
     label: 'Show Exit Button',
@@ -1935,6 +1942,63 @@ function stopHidePopups(): void {
   _hidePopupsObservers.length = 0;
 }
 
+// ── Classic Social ──
+// Injects a second menu item below "Social" that opens the standalone
+// /social.html page in a tab (pre-9.2 behaviour). Hidden by default;
+// the setting toggles its visibility.
+let _classicSocialPoll: number | null = null;
+
+function injectClassicSocialBtn(): boolean {
+  if (document.getElementById('kccClassicSocialBtn')) return true;
+  const socialItem = document.getElementById('menuBtnSocial')?.closest('.menuItem');
+  if (!socialItem || !socialItem.parentNode) return false;
+
+  const scoped = Array.from(socialItem.classList).find((c) => c.startsWith('svelte-')) || '';
+  const sfx = scoped ? ' ' + scoped : '';
+
+  const btn = document.createElement('div');
+  btn.id = 'kccClassicSocialBtn';
+  btn.className = 'menuItem' + sfx;
+  btn.setAttribute('onmouseenter', 'playTick()');
+  btn.innerHTML =
+    '<span class="material-icons-outlined menuItemIcon' + sfx + '">handshake</span>' +
+    '<div class="menuItemTitle' + sfx + '">Classic Social</div>';
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    (window as any).playSelect?.();
+    window.open('https://krunker.io/social.html', '_blank');
+  });
+
+  socialItem.parentNode.insertBefore(btn, socialItem.nextSibling);
+  return true;
+}
+
+function removeClassicSocialBtn(): void {
+  document.getElementById('kccClassicSocialBtn')?.remove();
+  if (_classicSocialPoll !== null) {
+    clearInterval(_classicSocialPoll);
+    _classicSocialPoll = null;
+  }
+}
+
+function setClassicSocial(enabled: boolean): void {
+  if (!enabled) {
+    removeClassicSocialBtn();
+    return;
+  }
+  if (injectClassicSocialBtn()) return;
+  if (_classicSocialPoll !== null) return;
+  let attempts = 0;
+  _classicSocialPoll = window.setInterval(() => {
+    if (injectClassicSocialBtn() || ++attempts > 60) {
+      if (_classicSocialPoll !== null) {
+        clearInterval(_classicSocialPoll);
+        _classicSocialPoll = null;
+      }
+    }
+  }, 500);
+}
+
 // ── Matchmaker IPC listener ──
 ipcRenderer.on('matchmaker-find', (_e, mmConfig: MatchmakerConfig) => {
   fetchGame(mmConfig, _console).catch((err) => _console.error('[KCC] Matchmaker error:', err));
@@ -1984,6 +2048,7 @@ ipcRenderer.on('main_did-finish-load', () => {
     if (uiConf?.deathscreenAnimation) setDeathAnimBlock(true);
     if (uiConf?.hideMenuPopups) startHidePopups();
     if (uiConf?.menuTimer ?? true) setMenuTimer(true);
+    if (isGamePage && uiConf?.classicSocial) setClassicSocial(true);
 
     // ── Direct server ping (TCP RTT to the game server, replaces Krunker's display) ──
     if (isGamePage && uiConf?.directServerPing) {

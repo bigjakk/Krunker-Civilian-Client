@@ -87,6 +87,7 @@ export interface AppConfig {
     menuTimer: boolean;
     watermark: boolean;
     directServerPing: boolean;
+    classicSocial: boolean;
     cssTheme: string;
     loadingTheme: string;
     backgroundUrl: string;
@@ -207,6 +208,7 @@ export const config = new Store<AppConfig>({
       menuTimer: true,
       watermark: true,
       directServerPing: false,
+      classicSocial: false,
       cssTheme: 'disabled',
       loadingTheme: 'disabled',
       backgroundUrl: '',
