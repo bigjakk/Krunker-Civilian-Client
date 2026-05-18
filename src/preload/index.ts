@@ -1891,7 +1891,7 @@ function saveScriptSetting(inst: UserscriptInstance): void {
 // shop. Only fire on the main menu so shop bundles still work.
 const HIDE_POPUPS_CSS =
   '#leftTabsHolder > .youNewDiv:not(#battlepassAd), .webpush-container, ' +
-  '#homeStoreAd, #streamContainerNew, ' +
+  '#homeStoreAd, #streamContainerNew, .streams-overlay, ' +
   '#newsHolder, #streamContainer { display: none !important; }';
 let _hidePopupsStyle: HTMLStyleElement | null = null;
 const _hidePopupsObservers: MutationObserver[] = [];
