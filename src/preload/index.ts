@@ -2401,27 +2401,30 @@ ipcRenderer.on('main_did-finish-load', () => {
 
         function injectAltBtn(): boolean {
           if (document.getElementById('kccAltBtn')) return true;
-          const menuContainer = document.getElementById('menuItemContainer');
-          if (!menuContainer) return false;
-          const exitBtn = document.getElementById('clientExit');
+          const headerRight = document.querySelector('.headerBarRight');
+          if (!headerRight) return false;
 
-          // Krunker's menu items use Svelte-scoped classes (e.g. svelte-fgmdj8).
+          // Krunker's header items use Svelte-scoped classes (e.g. svelte-11p80bh).
           // Copy the hash off a sibling so our button picks up the same styles.
-          const ref = exitBtn || menuContainer.querySelector('.menuItem');
+          const ref = headerRight.querySelector('.nav-item');
           const scoped = ref
             ? Array.from(ref.classList).find((c) => c.startsWith('svelte-')) || ''
             : '';
           const sfx = scoped ? ' ' + scoped : '';
-          altBtn.className = 'menuItem' + sfx;
+          altBtn.className = 'nav-item' + sfx;
+          altBtn.setAttribute('role', 'button');
+          altBtn.setAttribute('tabindex', '0');
           altBtn.innerHTML =
-            '<span class="material-icons-outlined menuItemIcon' + sfx + '" style="color:#4fc3f7">people</span>' +
-            '<div class="menuItemTitle' + sfx + '">Accounts</div>';
+            '<span class="material-icons nav-mat-icon' + sfx + '" style="color:#4fc3f7">people</span>' +
+            '<span class="nav-label' + sfx + '">Accounts</span>';
 
-          if (exitBtn) {
-            menuContainer.insertBefore(altBtn, exitBtn);
-          } else {
-            menuContainer.appendChild(altBtn);
-          }
+          const sep = document.createElement('div');
+          sep.id = 'kccAltBtnSep';
+          sep.className = 'verticalSeparator';
+          sep.setAttribute('style', 'height:35px;');
+
+          headerRight.insertBefore(altBtn, headerRight.firstChild);
+          headerRight.insertBefore(sep, altBtn.nextSibling);
           return true;
         }
 
