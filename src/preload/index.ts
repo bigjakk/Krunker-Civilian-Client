@@ -2220,11 +2220,7 @@ ipcRenderer.on('main_did-finish-load', () => {
       ipcRenderer.invoke('alt-list').then(() => {
         const altBtn = document.createElement('div');
         altBtn.id = 'kccAltBtn';
-        altBtn.className = 'menuItem';
         altBtn.setAttribute('onmouseenter', 'playTick()');
-        altBtn.innerHTML =
-          '<span class="material-icons-outlined menBtnIcn" style="color:#4fc3f7">people</span>' +
-          '<div class="menuItemTitle" style="font-size:13px">Accounts</div>';
 
         function showAltManager(): void {
           const windowHolder = document.getElementById('windowHolder') as HTMLElement;
@@ -2343,6 +2339,19 @@ ipcRenderer.on('main_did-finish-load', () => {
           const menuContainer = document.getElementById('menuItemContainer');
           if (!menuContainer) return false;
           const exitBtn = document.getElementById('clientExit');
+
+          // Krunker's menu items use Svelte-scoped classes (e.g. svelte-fgmdj8).
+          // Copy the hash off a sibling so our button picks up the same styles.
+          const ref = exitBtn || menuContainer.querySelector('.menuItem');
+          const scoped = ref
+            ? Array.from(ref.classList).find((c) => c.startsWith('svelte-')) || ''
+            : '';
+          const sfx = scoped ? ' ' + scoped : '';
+          altBtn.className = 'menuItem' + sfx;
+          altBtn.innerHTML =
+            '<span class="material-icons-outlined menuItemIcon' + sfx + '" style="color:#4fc3f7">people</span>' +
+            '<div class="menuItemTitle' + sfx + '">Accounts</div>';
+
           if (exitBtn) {
             menuContainer.insertBefore(altBtn, exitBtn);
           } else {
