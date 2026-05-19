@@ -1963,8 +1963,7 @@ function injectClassicSocialBtn(): boolean {
   btn.innerHTML =
     '<span class="material-icons-outlined menuItemIcon' + sfx + '">handshake</span>' +
     '<div class="menuItemTitle' + sfx + '">Classic Social</div>';
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
+  btn.addEventListener('click', () => {
     (window as any).playSelect?.();
     window.open('https://krunker.io/social.html', '_blank');
   });

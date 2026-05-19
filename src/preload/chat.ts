@@ -121,17 +121,87 @@ function tryAttach(): boolean {
     return true;
 }
 
+// ── Dynamic max-height so chat never overlaps menu items KCC injects ──
+// Krunker 9.2.1 added its own chat clamp based on the bottom of #menuItemContainer,
+// but it's calibrated against Krunker's stock menu — our injected Classic Social
+// pushes Community & Events and Exit below Krunker's expected bottom, so chat
+// overlaps them. We measure the *actual* bottom (which includes our items),
+// translate the visual gap into CSS pixels (#uiBase is transform-scaled), and
+// apply a tighter cap via .kcc-chat-clamped only when our value is tighter
+// than Krunker's would be.
+const CHAT_MENU_PADDING = 10; // visual px gap between chat top and menu bottom
+let _chatClampTimer: number | null = null;
+let _chatClampObserver: MutationObserver | null = null;
+
+function updateChatClamp(): void {
+    const root = document.documentElement;
+    const list = chatList ?? document.getElementById('chatList');
+    const menu = document.getElementById('menuItemContainer');
+    if (!list || !menu || menu.offsetHeight === 0) {
+        // Menu hidden (in-game) — let Krunker manage the chat normally.
+        list?.classList.remove('kcc-chat-clamped');
+        root.style.removeProperty('--kcc-chat-max');
+        return;
+    }
+    // getBoundingClientRect is post-transform (display px); max-height is CSS px.
+    // Divide by --ui-scale to convert display → CSS. Krunker sets it on <body>;
+    // fall back to <html> in case it moves, then 1 if absent.
+    const scaleRaw = getComputedStyle(document.body).getPropertyValue('--ui-scale')
+        || getComputedStyle(document.documentElement).getPropertyValue('--ui-scale');
+    const scale = parseFloat(scaleRaw) || 1;
+    const menuBottom = menu.getBoundingClientRect().bottom;
+    const chatBottom = list.getBoundingClientRect().bottom;
+    const ceilingDisplay = chatBottom - menuBottom - CHAT_MENU_PADDING;
+    if (ceilingDisplay <= 0) {
+        list.classList.remove('kcc-chat-clamped');
+        root.style.removeProperty('--kcc-chat-max');
+        return;
+    }
+    const ceilingCss = Math.floor(ceilingDisplay / scale);
+    root.style.setProperty('--kcc-chat-max', ceilingCss + 'px');
+    list.classList.add('kcc-chat-clamped');
+}
+
+function attachChatClampObserver(): void {
+    if (_chatClampObserver) return;
+    const menu = document.getElementById('menuItemContainer');
+    const uiBase = document.getElementById('uiBase');
+    if (!menu && !uiBase) return;
+    // Targeted observation — no subtree+childList combo (safe per CLAUDE.md).
+    // - menuItemContainer childList: catches button injection/removal.
+    // - uiBase class attr: catches onMenu/onGame transitions instantly.
+    _chatClampObserver = new MutationObserver(updateChatClamp);
+    if (menu) _chatClampObserver.observe(menu, { childList: true });
+    if (uiBase) _chatClampObserver.observe(uiBase, { attributes: true, attributeFilter: ['class'] });
+}
+
+function startChatClamp(): void {
+    if (_chatClampTimer !== null) return;
+    updateChatClamp();
+    attachChatClampObserver();
+    window.addEventListener('resize', updateChatClamp);
+    // Poll as a safety net — catches Svelte attribute-driven show/hide of
+    // individual menu items, which the targeted observers miss.
+    _chatClampTimer = window.setInterval(() => {
+        if (!_chatClampObserver) attachChatClampObserver();
+        updateChatClamp();
+    }, 250);
+}
+
 export function initChat(options: { betterChat: boolean; chatHistorySize: number }, con?: SavedConsole): void {
     _con = con ?? null;
     betterChatEnabled = options.betterChat;
     historyMax = options.chatHistorySize;
 
-    if (tryAttach()) return;
+    if (tryAttach()) { startChatClamp(); return; }
 
     // Poll until #chatList appears
     let attempts = 0;
     const poll = setInterval(() => {
-        if (++attempts > 120 || tryAttach()) clearInterval(poll);
+        if (++attempts > 120 || tryAttach()) {
+            clearInterval(poll);
+            if (chatList) startChatClamp();
+        }
     }, 500);
 }
 

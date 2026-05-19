@@ -456,6 +456,12 @@ ${THEME_CSS}
 #chatList.kcc-chat-paused {
   border-left: 2px solid var(--kcc-yellow);
 }
+/* Dynamic chat clamp so the message list never overlaps menu items injected
+   by KCC (e.g. Classic Social). Only applies when chat.ts adds the
+   .kcc-chat-clamped class, so Krunker's own clamp wins when ours is unset. */
+#chatList.kcc-chat-clamped {
+  max-height: var(--kcc-chat-max) !important;
+}
 `;
 
 
