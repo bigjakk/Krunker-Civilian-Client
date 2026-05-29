@@ -1896,8 +1896,13 @@ function saveScriptSetting(inst: UserscriptInstance): void {
 // #popupHolder + #popupBack (the dim backdrop), so CSS-only hiding leaves the
 // backdrop visible (the "dark screen") and breaks user-clicked bundles in the
 // shop. Only fire on the main menu so shop bundles still work.
+// .nav-notif-section is the header "Notifications" widget; hide the whole
+// section (not just its inner .webpush-container) plus its trailing
+// .verticalSeparator, otherwise the collapsed section leaves a doubled-up
+// pillar between Inbox and Settings.
 const HIDE_POPUPS_CSS =
-  '#leftTabsHolder > .youNewDiv:not(#battlepassAd), .webpush-container, ' +
+  '#leftTabsHolder > .youNewDiv:not(#battlepassAd), ' +
+  '.nav-notif-section, .nav-notif-section + .verticalSeparator, ' +
   '#homeStoreAd, #streamContainerNew, .streams-overlay, ' +
   '#newsHolder, #streamContainer { display: none !important; }';
 let _hidePopupsStyle: HTMLStyleElement | null = null;
