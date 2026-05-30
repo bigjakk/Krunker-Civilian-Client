@@ -1,5 +1,5 @@
 import { ipcRenderer } from 'electron';
-import { fetchGame, MATCHMAKER_GAMEMODE_FILTER, MATCHMAKER_REGIONS, MATCHMAKER_REGION_NAMES, MATCHMAKER_MAP_FILTER, MATCHMAKER_MAP_NAMES } from './matchmaker';
+import { fetchGame, MATCHMAKER_GAMEMODE_FILTER, MATCHMAKER_REGIONS, MATCHMAKER_REGION_NAMES, MATCHMAKER_MAP_FILTER, MATCHMAKER_MAP_NAMES, mapIconUrl } from './matchmaker';
 import type { MatchmakerConfig } from './matchmaker';
 import { initUserscripts, getInstances, setScriptEnabled } from './userscripts';
 import type { UserscriptInstance } from './userscripts';
@@ -421,7 +421,7 @@ function createNumberRow(opts: {
 
 function createCheckboxGrid(opts: {
   header: string;
-  items: Array<{ value: string; label: string }>;
+  items: Array<{ value: string; label: string; icon?: string }>;
   selected: string[];
   onChange: (selected: string[]) => void;
 }): HTMLElement {
@@ -430,13 +430,26 @@ function createCheckboxGrid(opts: {
   row.innerHTML = '<span class="setting-title">' + escapeHtml(opts.header) + '</span>';
   const grid = document.createElement('div');
   grid.className = 'kcc-multisel-parent';
+  if (opts.items.some(it => it.icon)) grid.classList.add('kcc-multisel-has-icons');
   for (const item of opts.items) {
     const label = document.createElement('label');
     label.className = 'hostOpt';
     label.innerHTML =
+      (item.icon ? '<img class="kcc-mapopt-icon" alt="" src="' + item.icon + '">' : '') +
       '<span class="optName">' + escapeHtml(item.label) + '</span>' +
       '<input type="checkbox"' + (opts.selected.includes(item.value) ? ' checked' : '') + '>' +
       '<div class="optCheck"></div>';
+    const iconImg = label.querySelector('.kcc-mapopt-icon') as HTMLImageElement | null;
+    if (iconImg) {
+      // Inline (not stylesheet): Krunker's hostOpt button paints over the icon, so it
+      // needs its own stacking context (position+z-index) to show. Injected CSS lost
+      // the cascade here; inline styles win. px size avoids hostOpt's font-size:0.
+      iconImg.style.cssText = 'width:46px;height:46px;object-fit:cover;border-radius:4px;margin-right:10px;display:inline-block;vertical-align:middle;position:relative;z-index:9';
+      iconImg.onerror = () => { iconImg.style.visibility = 'hidden'; };
+      // Tighten the button vertically so the larger icon fills it (inline beats hostOpt padding)
+      label.style.paddingTop = '5px';
+      label.style.paddingBottom = '5px';
+    }
     const cb = label.querySelector('input') as HTMLInputElement;
     cb.addEventListener('change', () => {
       if (cb.checked) {
@@ -1117,7 +1130,7 @@ function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag
   if (!mm.maps) mm.maps = [];
   body.appendChild(createCheckboxGrid({
     header: 'Maps (none selected = all)',
-    items: MATCHMAKER_MAP_FILTER.map(m => ({ value: m, label: MATCHMAKER_MAP_NAMES[m] || m })),
+    items: MATCHMAKER_MAP_FILTER.map(m => ({ value: m, label: MATCHMAKER_MAP_NAMES[m] || m, icon: mapIconUrl(m) ?? undefined })),
     selected: mm.maps,
     onChange: () => saveMM(),
   }));

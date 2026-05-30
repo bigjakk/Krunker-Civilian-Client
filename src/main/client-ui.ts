@@ -129,6 +129,13 @@ ${THEME_CSS}
 	box-sizing: border-box;
 }
 
+/* maps multisel: responsive columns sized to the icon + name (no wasted width).
+   Icon sizing/stacking is applied inline in the preload (createCheckboxGrid) —
+   Krunker's hostOpt context defeats injected stylesheet rules. */
+.kcc-multisel-parent.kcc-multisel-has-icons {
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
 .kcc-settings .settName.multisel label {
 	font-size: 1.1rem;
 }
@@ -596,6 +603,21 @@ export const MATCHMAKER_SETTINGS_CSS = `
 .mm-feed-region { min-width: 2.5em; font-weight: bold; }
 .mm-feed-map { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mm-feed-players { min-width: 3em; text-align: right; font-weight: 600; }
+.mm-feed-icon {
+  width: 1.7em;
+  height: 1.7em;
+  flex: none;
+  object-fit: cover;
+  border-radius: 0.25em;
+  align-self: center;
+  background: rgba(255,255,255,0.06);
+}
+.mm-feed-entry.mm-fail .mm-feed-icon { opacity: 0.45; }
+.mm-feed-icon-found {
+  width: 2.4em;
+  height: 2.4em;
+  border-radius: 0.3em;
+}
 #matchmakerSearchCounter {
   font-size: 0.85em;
   color: var(--kcc-yellow);

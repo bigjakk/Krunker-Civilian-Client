@@ -34,6 +34,30 @@ export const MATCHMAKER_MAP_FILTER = [
     'Slide Moonlight', 'Eterno Sim',
 ];
 
+// Krunker hosts a top-down preview image per official map at a fixed index — the
+// map's position in MAP_ICON_INDICES. Community maps aren't indexed (no icon).
+// Lookup is normalized (lowercase, separators stripped) so live IDs like
+// "slide_moonlight" still resolve to "Slide Moonlight".
+const MAP_ICON_INDEX_BY_NORM = new Map<string, number>(
+    MAP_ICON_INDICES.map((name, i) => [name.toLowerCase().replace(/[^a-z0-9]/g, ''), i]),
+);
+export function mapIconUrl(mapName: string): string | null {
+    const idx = MAP_ICON_INDEX_BY_NORM.get(mapName.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    return idx === undefined ? null : `https://assets.krunker.io/img/maps/map_${idx}.png`;
+}
+
+function createMapIcon(mapName: string, className: string): HTMLImageElement | null {
+    const url = mapIconUrl(mapName);
+    if (!url) return null;
+    const img = document.createElement('img');
+    img.className = className;
+    img.src = url;
+    img.alt = '';
+    img.loading = 'lazy';
+    img.onerror = () => img.remove();
+    return img;
+}
+
 // ── Animation constants ──
 const MAX_FEED_ENTRIES = 4;
 const MAX_ANIMATION_MS = 2000;
@@ -210,6 +234,9 @@ function createFeedEntry(lobby: RawLobby): HTMLDivElement {
     const entry = document.createElement('div');
     entry.className = `mm-feed-entry ${lobby.passesFilter ? 'mm-pass' : 'mm-fail'}`;
 
+    const icon = createMapIcon(lobby.map, 'mm-feed-icon');
+    if (icon) entry.appendChild(icon);
+
     const region = document.createElement('span');
     region.className = 'mm-feed-region';
     region.textContent = lobby.region;
@@ -379,6 +406,8 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
             `<span class="mm-feed-region">${escapeHtml(best.region)}</span>` +
             `<span class="mm-feed-map">${escapeHtml(best.map)}</span>` +
             `<span class="mm-feed-players">${best.playerCount}/${best.playerLimit}</span>`;
+        const foundIcon = createMapIcon(best.map, 'mm-feed-icon mm-feed-icon-found');
+        if (foundIcon) found.prepend(foundIcon);
         searchFeed.appendChild(found);
         searchCounter.textContent = `${best.gamemode} \u00B7 ${regionName} \u00B7 ${pings[best.region] ?? '?'}ms`;
         await new Promise(r => setTimeout(r, 1200));
