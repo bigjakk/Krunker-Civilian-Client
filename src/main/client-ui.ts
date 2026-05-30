@@ -618,6 +618,25 @@ export const MATCHMAKER_SETTINGS_CSS = `
   height: 2.4em;
   border-radius: 0.3em;
 }
+/* Found-lobby reveal: the scroll settles on the match, then it grows into focus */
+#matchmakerSearchFeed.mm-feed-found {
+  justify-content: center;
+}
+.mm-feed-entry.mm-feed-landed {
+  box-shadow: inset 0 0 0 2px var(--kcc-blue);
+}
+@keyframes mmFoundGrow {
+  0%   { opacity: 0; transform: scale(0.55); }
+  65%  { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.mm-feed-entry.mm-found {
+  font-size: 1.25em;
+  justify-content: center;
+  gap: 0.7em;
+  transform-origin: center;
+  animation: mmFoundGrow 0.34s cubic-bezier(0.2, 0.85, 0.3, 1.25) forwards;
+}
 #matchmakerSearchCounter {
   font-size: 0.85em;
   color: var(--kcc-yellow);

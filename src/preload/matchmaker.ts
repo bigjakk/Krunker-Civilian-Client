@@ -60,11 +60,11 @@ function createMapIcon(mapName: string, className: string): HTMLImageElement | n
 
 // ── Animation constants ──
 const MAX_FEED_ENTRIES = 4;
-const MAX_ANIMATION_MS = 2000;
+const MAX_ANIMATION_MS = 1100;
 const BASE_TICK_MS = 80;
 const MIN_TICK_MS = 20;
-const POST_SCAN_PAUSE_MS = 300;
-const SCAN_FLASH_MS = 800;
+const POST_SCAN_PAUSE_MS = 180;
+const FOUND_HOLD_MS = 1200;
 
 interface MatchmakerGame {
     gameID: string;
@@ -221,6 +221,7 @@ function showSearchPopup(): void {
     popupElement.style.backgroundImage = 'none';
     searchStatus.textContent = 'Connecting...';
     searchFeed.innerHTML = '';
+    searchFeed.classList.remove('mm-feed-found');
     searchCounter.textContent = '';
 
 
@@ -255,7 +256,7 @@ function createFeedEntry(lobby: RawLobby): HTMLDivElement {
     return entry;
 }
 
-async function animateLobbyScan(lobbies: RawLobby[]): Promise<void> {
+async function animateLobbyScan(lobbies: RawLobby[], finalLobby?: MatchmakerGame): Promise<void> {
     if (lobbies.length === 0) return;
 
     searchStatus.textContent = 'Scanning lobbies...';
@@ -282,10 +283,19 @@ async function animateLobbyScan(lobbies: RawLobby[]): Promise<void> {
     }
 
     searchCounter.textContent = `Checked: ${total} / ${total} lobbies`;
+    if (searchAborted) return;
 
-    if (!searchAborted) {
-        await new Promise(r => setTimeout(r, POST_SCAN_PAUSE_MS));
+    // Settle the scroll on the matched lobby so it visibly "lands" on the result
+    if (finalLobby) {
+        const landed = createFeedEntry({ ...finalLobby, passesFilter: true });
+        landed.classList.add('mm-feed-landed');
+        searchFeed.appendChild(landed);
+        while (searchFeed.children.length > MAX_FEED_ENTRIES) {
+            searchFeed.removeChild(searchFeed.firstChild!);
+        }
     }
+
+    await new Promise(r => setTimeout(r, POST_SCAN_PAUSE_MS));
 }
 
 async function fetchAllGames(mmConfig: MatchmakerConfig): Promise<{ all: RawLobby[]; filtered: MatchmakerGame[] }> {
@@ -375,14 +385,8 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
     if (filtered.length > 0) sortGames(filtered, pings, mmConfig.sortByPlayers);
     popupCandidates = filtered;
 
-    // Fire animation in background (non-blocking eye candy)
-    animateLobbyScan(allLobbies);
-
-    // Brief visual flash of the feed before showing result
-    await new Promise(r => setTimeout(r, SCAN_FLASH_MS));
-    if (searchAborted) return;
-
-    // Phase 3: Show result
+    // Phase 3: pick the match (if any), then play the scan and reveal the result
+    let best: MatchmakerGame | undefined;
     if (filtered.length > 0) {
         // Pick randomly from the top tier of comparable matches for variety
         const top = filtered[0];
@@ -392,16 +396,22 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
             return Math.abs(gPing - topPing) <= 20
                 && top.playerCount - g.playerCount <= 2;
         });
-        const best = pool[Math.floor(Math.random() * pool.length)];
+        best = pool[Math.floor(Math.random() * pool.length)];
         _con?.log('[KCC-MM] Best match:', best.gameID, best.region, best.map, `(${pings[best.region] ?? '?'}ms, pool: ${pool.length})`);
+    }
 
-        // Brief "Lobby Found!" flash before auto-joining
+    // Scan scrolls the lobbies and, when there's a match, settles on it before stopping
+    await animateLobbyScan(allLobbies, best);
+    if (searchAborted) return;
+
+    if (best) {
+        // Grow the matched lobby into focus, then auto-join
         const regionName = MATCHMAKER_REGION_NAMES[best.region] ?? best.region;
         searchStatus.textContent = 'Lobby Found!';
+        searchFeed.classList.add('mm-feed-found');
         searchFeed.innerHTML = '';
         const found = document.createElement('div');
-        found.className = 'mm-feed-entry mm-pass';
-        found.style.cssText = 'font-size:1.1em;justify-content:center;';
+        found.className = 'mm-feed-entry mm-pass mm-found';
         found.innerHTML =
             `<span class="mm-feed-region">${escapeHtml(best.region)}</span>` +
             `<span class="mm-feed-map">${escapeHtml(best.map)}</span>` +
@@ -410,11 +420,10 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
         if (foundIcon) found.prepend(foundIcon);
         searchFeed.appendChild(found);
         searchCounter.textContent = `${best.gamemode} \u00B7 ${regionName} \u00B7 ${pings[best.region] ?? '?'}ms`;
-        await new Promise(r => setTimeout(r, 1200));
+        await new Promise(r => setTimeout(r, FOUND_HOLD_MS));
         await verifyAndJoin(best.gameID);
     } else {
         _con?.log('[KCC-MM] No matching games found');
-
         dismissPopup();
         if (openServerBrowser && typeof (window as any).openServerWindow === 'function') {
             (window as any).openServerWindow(0);
