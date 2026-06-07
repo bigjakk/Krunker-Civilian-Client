@@ -16,7 +16,7 @@ import { showUpdateWindow, showUpdatePrompt } from './update-window';
 import { DiscordRPC } from './discord-rpc';
 import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS } from './css-themes';
 import { TabManager } from './tab-manager';
-import { openRankedQueue, reapplyRankedQueueThrottle, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
+import { openRankedQueue, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
 
 const AUDIO_MIME: Record<string, string> = {
   '.mp3': 'audio/mpeg',
@@ -456,45 +456,6 @@ async function launchApp(): Promise<void> {
     }
   }
 
-  // ── CPU Throttling via Chrome DevTools Protocol ──
-  // Uses wc.debugger.isAttached() so it shares a debugger session with tab freeze/unfreeze.
-  function applyCpuThrottle(wc: Electron.WebContents, rate: number): void {
-    if (wc.isDestroyed()) return;
-    const clamped = Math.max(1, Math.min(3, rate));
-    try {
-      if (!wc.debugger.isAttached()) wc.debugger.attach('1.3');
-    } catch (err: any) {
-      electronLog.warn(`[KCC] CPU throttle attach failed: ${err?.message || err}`);
-      return;
-    }
-    wc.debugger.sendCommand('Emulation.setCPUThrottlingRate', { rate: clamped })
-      .catch((err: any) => electronLog.warn(`[KCC] CPU throttle send failed: ${err?.message || err}`));
-  }
-
-  // Track current game/menu state so we can re-apply throttle on settings changes
-  let currentThrottleState: 'game' | 'menu' = 'menu';
-
-  // Re-apply throttle on events that drop the CDP state:
-  //  - render-process-gone: renderer crashed; throttle is lost when it recovers
-  //  - devtools-closed: DevTools stole the debugger session while open
-  function attachThrottleLifecycle(wc: Electron.WebContents, getRate: () => number): void {
-    wc.on('render-process-gone', () => {
-      // Wait briefly for renderer to recover before re-applying
-      setTimeout(() => { if (!wc.isDestroyed()) applyCpuThrottle(wc, getRate()); }, 500);
-    });
-    wc.on('devtools-closed', () => {
-      if (!wc.isDestroyed()) applyCpuThrottle(wc, getRate());
-    });
-  }
-
-  // Wire crash + DevTools recovery for the main game window
-  attachThrottleLifecycle(win.webContents, () => {
-    const perf = config.get('performance');
-    return currentThrottleState === 'game'
-      ? (perf?.cpuThrottleGame ?? 1)
-      : (perf?.cpuThrottleMenu ?? 1.5);
-  });
-
   // ── Keybind capture lock (suppresses shortcuts while the keybind dialog is open) ──
   let keybindCapturing = false;
   ipcMain.on('keybind-capture', (_e, capturing: boolean) => {
@@ -592,8 +553,6 @@ async function launchApp(): Promise<void> {
     () => sessionTabs,
     (urls) => { sessionTabs = urls; },
     () => config.get('game.rememberTabs') ?? false,
-    applyCpuThrottle,
-    () => config.get('performance')?.cpuThrottleMenu ?? 1.5,
   );
 
   // Intercept in-page navigation (e.g. window.location = '/social.html')
@@ -673,10 +632,6 @@ async function launchApp(): Promise<void> {
 
     Promise.all(cssInjections).catch(() => {});
 
-    // Apply initial CPU throttle (menu state)
-    const perf = config.get('performance');
-    applyCpuThrottle(win.webContents, perf?.cpuThrottleMenu ?? 1.5);
-
     win.webContents.executeJavaScript(ESCAPE_POINTERLOCK_FIX_JS).catch((err) => electronLog.warn('[KCC] Pointerlock fix inject failed:', err));
     win.webContents.executeJavaScript(CONSENT_DISMISS_JS).catch((err) => electronLog.warn('[KCC] Consent dismiss inject failed:', err));
     // Notify preload to start hooking settings (matches Crankshaft's timing)
@@ -714,17 +669,6 @@ async function launchApp(): Promise<void> {
       cachedKeybinds = null;
       return;
     }
-    // Re-apply CPU throttle immediately (don't wait for next game/menu transition)
-    if (key === 'performance') {
-      const newPerf = value as any;
-      const menuRate = newPerf?.cpuThrottleMenu ?? 1.5;
-      const mainRate = currentThrottleState === 'game'
-        ? (newPerf?.cpuThrottleGame ?? 1)
-        : menuRate;
-      applyCpuThrottle(win.webContents, mainRate);
-      tabManager.applyCpuThrottleToAll(menuRate);
-      reapplyRankedQueueThrottle(applyCpuThrottle, menuRate);
-    }
     // Invalidate caches immediately (not on flush) to prevent stale reads
     if (key === 'game') {
       cachedGameConf = null;
@@ -743,8 +687,6 @@ async function launchApp(): Promise<void> {
             () => sessionTabs,
             (urls) => { sessionTabs = urls; },
             () => config.get('game.rememberTabs') ?? false,
-            applyCpuThrottle,
-            () => config.get('performance')?.cpuThrottleMenu ?? 1.5,
           );
         }
       }
@@ -828,11 +770,7 @@ async function launchApp(): Promise<void> {
   ipcMain.on('open-ranked-queue', (_e, token: string, region: string, allRegions: boolean) => {
     const mm = config.get('matchmaker');
     const audioUrl = resolveRankedAudioUrl(mm?.rankedMatchSound || '');
-    openRankedQueue(
-      token, region, allRegions, audioUrl,
-      applyCpuThrottle,
-      () => config.get('performance')?.cpuThrottleMenu ?? 1.5,
-    );
+    openRankedQueue(token, region, allRegions, audioUrl);
   });
 
   ipcMain.handle('pick-audio-file', async () => {
@@ -860,18 +798,6 @@ async function launchApp(): Promise<void> {
     if (level === 'error') electronLog.error(...args);
     else if (level === 'warn') electronLog.warn(...args);
     else electronLog.log(...args);
-  });
-
-  // ── CPU throttle IPC handler ──
-  ipcMain.on('throttle-state', (_e, state: string) => {
-    currentThrottleState = (state === 'game') ? 'game' : 'menu';
-    const perf = config.get('performance');
-    const menuRate = perf?.cpuThrottleMenu ?? 1.5;
-    const mainRate = currentThrottleState === 'game' ? (perf?.cpuThrottleGame ?? 1) : menuRate;
-    applyCpuThrottle(win.webContents, mainRate);
-    // Tabs, tab bar, and ranked queue are always menu-rate (not gameplay surfaces)
-    tabManager.applyCpuThrottleToAll(menuRate);
-    reapplyRankedQueueThrottle(applyCpuThrottle, menuRate);
   });
 
   // ── CSS theme & loading background IPC handlers ──

@@ -26,8 +26,6 @@ export interface AppConfig {
     fpsUnlocked: boolean;
     hardwareAccel: boolean;
     gpuPreference: 'high-performance' | 'low-power' | 'default';
-    cpuThrottleGame: number;
-    cpuThrottleMenu: number;
     processPriority: string;
   };
   game: {
@@ -156,8 +154,6 @@ export const config = new Store<AppConfig>({
       fpsUnlocked: true,
       hardwareAccel: true,
       gpuPreference: 'high-performance',
-      cpuThrottleGame: 1,
-      cpuThrottleMenu: 1.5,
       processPriority: 'Normal',
     },
     game: {

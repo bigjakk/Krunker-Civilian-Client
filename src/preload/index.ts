@@ -887,7 +887,7 @@ function buildKeystrokesRows(body: HTMLElement): void {
 function buildPerformanceSection(
   body: HTMLElement, perfConf: any, isWindows: boolean,
 ): void {
-  const perf = { fpsUnlocked: true, cpuThrottleGame: 1, cpuThrottleMenu: 1.5, processPriority: 'Normal', ...perfConf };
+  const perf = { fpsUnlocked: true, processPriority: 'Normal', ...perfConf };
 
   function savePerf(): void {
     ipcRenderer.invoke('set-config', 'performance', perf);
@@ -898,18 +898,6 @@ function buildPerformanceSection(
     desc: 'Uncap the frame rate (requires restart)',
     checked: perf.fpsUnlocked, restart: true,
     onChange: (v) => { perf.fpsUnlocked = v; savePerf(); },
-  }));
-
-  body.appendChild(createNumberRow({
-    label: 'CPU Throttle (Game)', desc: 'CPU throttle rate during gameplay (1 = no throttle, 3 = heavy throttle)',
-    min: 1, max: 3, step: 0.01, value: perf.cpuThrottleGame, instant: true, safety: 2,
-    onChange: (v) => { perf.cpuThrottleGame = v; savePerf(); },
-  }));
-
-  body.appendChild(createNumberRow({
-    label: 'CPU Throttle (Menu)', desc: 'CPU throttle rate on menu screens (1 = no throttle, 3 = heavy throttle)',
-    min: 1, max: 3, step: 0.01, value: perf.cpuThrottleMenu, instant: true, safety: 1,
-    onChange: (v) => { perf.cpuThrottleMenu = v; savePerf(); },
   }));
 
   if (isWindows) {
@@ -2115,19 +2103,6 @@ ipcRenderer.on('main_did-finish-load', () => {
     // ── KCC watermark (in-game + menu) ──
     if (isGamePage) {
       setWatermark(uiConf?.watermark ?? true, currentVersion);
-    }
-
-    // ── CPU throttle state notifications ──
-    if (isGamePage) {
-      let inGame = false;
-      setInterval(() => {
-        const uiBase = document.getElementById('uiBase');
-        const nowInGame = !!uiBase && uiBase.className !== 'onMenu' && uiBase.className !== '';
-        if (nowInGame !== inGame) {
-          inGame = nowInGame;
-          ipcRenderer.send('throttle-state', inGame ? 'game' : 'menu');
-        }
-      }, 2000);
     }
 
     // ── Changelog popup ──

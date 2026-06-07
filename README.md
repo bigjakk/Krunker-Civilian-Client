@@ -79,10 +79,6 @@ This client uses a custom-patched Electron 42 build to overcome the aim freezing
 
 For details on the patch and build instructions, see [Electron-Websocket-Fix](https://github.com/bigjakk/Electron-Websocket-Fix).
 
-## Linux Performance at High Resolutions
-
-On Linux at high monitor resolutions (e.g., 4K) with FPS Uncap on, you may see visual stutter even though the FPS counter reads high. If this happens, raise the CPU throttle in settings — it's the most effective workaround.
-
 ## Building From Source
 
 1. Install [git](https://git-scm.com/downloads), [Node.js](https://nodejs.org/), and npm
