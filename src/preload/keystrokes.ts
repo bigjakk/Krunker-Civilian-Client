@@ -256,7 +256,7 @@ let keyTargets: KeyTarget[] = [];
 function buildKeyTargets(host: HTMLElement, aux1: string, aux2: string): KeyTarget[] {
     const q = (sel: string) => host.querySelector(sel) as HTMLElement;
     const matchAux = (key: string) => (e: KeyboardEvent) => !!key && e.key.toLowerCase() === key.toLowerCase();
-    return [
+    const targets: KeyTarget[] = [
         { test: (e) => e.code === 'KeyW', el: q('.key-w') },
         { test: (e) => e.code === 'KeyA', el: q('.key-a') },
         { test: (e) => e.code === 'KeyS', el: q('.key-s') },
@@ -265,7 +265,8 @@ function buildKeyTargets(host: HTMLElement, aux1: string, aux2: string): KeyTarg
         { test: (e) => e.code === 'Space', el: q('.key-space') },
         { test: matchAux(aux1), el: q('.key-aux1') },
         { test: matchAux(aux2), el: q('.key-aux2') },
-    ].filter((t) => t.el);
+    ];
+    return targets.filter((t) => t.el);
 }
 
 function handleKeyDown(e: KeyboardEvent): void {
