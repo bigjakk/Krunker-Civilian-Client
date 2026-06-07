@@ -123,7 +123,7 @@ const advancedDefaults = {
   experimentalFlags: false,
 };
 const advancedConfig = { ...advancedDefaults, ...config.get('advanced') };
-const perfConfig = { fpsUnlocked: true, ...config.get('performance') };
+const perfConfig = { ...config.get('performance') };
 
 // Self-heal angleBackend if a previous version's value is no longer valid for this platform (e.g. user picked 'vulkan', 'd3d9', etc., and we removed it).
 const validBackends = getValidAngleBackends(platformInfo);
