@@ -345,7 +345,7 @@ async function launchApp(): Promise<void> {
       try {
         const u = new URL(details.url);
         const port = u.port ? parseInt(u.port) : (u.protocol === 'wss:' ? 443 : 80);
-        const wc = webContents.fromId(details.webContentsId);
+        const wc = details.webContentsId != null ? webContents.fromId(details.webContentsId) : null;
         const w = wc ? BrowserWindow.fromWebContents(wc) : null;
         if (w) setPingTarget(u.hostname, port, w);
       } catch { /* invalid URL — ignore */ }
