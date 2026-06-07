@@ -30,7 +30,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.0.0",
-    "electron": "npm:electron-nightly@42.0.0-nightly.20260227",
+    "electron": "42.3.3",
     "electron-builder": "^26.0.0",
     "eslint": "^10.0.2",
     "husky": "^9.1.7",
