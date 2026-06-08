@@ -30,7 +30,7 @@ export const MATCHMAKER_MAP_FILTER = [
     'Lostworld', 'Citadel', 'Oasis', 'Kanji', 'Industry', 'Lumber', 'Evacuation',
     'Site', 'SkyTemple', 'Lagoon', 'Tropicano', 'Habitat', 'Atomic', 'Old_Burg',
     'Throwback', 'Clockwork', 'Bazaar', 'Erupt', 'HQ', 'Lush', 'Vivo',
-    'Slide Moonlight', 'Eterno Simulator',
+    'Slide Moonlight', 'Eterno Simulator', 'Eterno Jump',
 ];
 
 // Normalize a map identifier for comparison: lowercase, strip non-alphanumerics.
@@ -47,6 +47,11 @@ function normalizeMapId(name: string): string {
 const MAP_ICON_INDEX_BY_NORM = new Map<string, number>(
     MAP_ICON_INDICES.map((name, i) => [normalizeMapId(name), i]),
 );
+// Official maps Krunker added after MAP_ICON_INDICES was last synced: their preview
+// images (map_<idx>.png) exist beyond index 39. Registered explicitly with the icon
+// index verified by inspecting the live image. (map_40 is another official map not
+// surfaced in the filter, so it's intentionally left out here.)
+MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Eterno Jump'), 41);
 export function mapIconUrl(mapName: string): string | null {
     const idx = MAP_ICON_INDEX_BY_NORM.get(normalizeMapId(mapName));
     return idx === undefined ? null : `https://assets.krunker.io/img/maps/map_${idx}.png`;
