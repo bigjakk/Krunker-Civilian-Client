@@ -75,10 +75,28 @@ ${THEME_CSS}
 }
 .kcc-settings .settName.multisel {
 	grid-template-rows: min-content 1fr;
-	grid-template-columns: 0fr 1fr;
+	grid-template-columns: 0fr 1fr min-content;
 	grid-template-areas:
-	"icon title"
-	"input input";
+	"icon title button"
+	"input input input";
+}
+.kcc-settings .settName.multisel .kcc-clear-btn {
+	grid-area: button;
+	justify-self: end;
+	cursor: pointer;
+	font-size: 0.9rem;
+	line-height: 1;
+	padding: 5px 12px;
+	border-radius: 5px;
+	color: #969696;
+	background-color: rgba(99, 99, 99, 0.16);
+	border: 2px solid rgba(78, 78, 78, 0.81);
+	white-space: nowrap;
+	user-select: none;
+}
+.kcc-settings .settName.multisel .kcc-clear-btn:hover {
+	color: #fff;
+	border-color: rgba(120, 120, 120, 0.9);
 }
 .kcc-settings .settName.has-button {
 	grid-template-areas:

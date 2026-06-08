@@ -462,6 +462,22 @@ function createCheckboxGrid(opts: {
     });
     grid.appendChild(label);
   }
+
+  const clearBtn = document.createElement('div');
+  clearBtn.className = 'kcc-clear-btn';
+  clearBtn.textContent = 'Clear';
+  clearBtn.setAttribute('onmouseenter', 'playTick()');
+  clearBtn.addEventListener('click', () => {
+    const w = window as any;
+    if (typeof w.playSelect === 'function') w.playSelect();
+    for (const cb of grid.querySelectorAll('input[type="checkbox"]')) {
+      (cb as HTMLInputElement).checked = false;
+    }
+    opts.selected.length = 0;
+    opts.onChange(opts.selected);
+  });
+  row.appendChild(clearBtn);
+
   row.appendChild(grid);
   return row;
 }
