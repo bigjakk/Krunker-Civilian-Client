@@ -329,7 +329,9 @@ async function fetchAllGames(mmConfig: MatchmakerConfig): Promise<{ all: RawLobb
         else if (mapFilter.size > 0 && !mapFilter.has(normalizeMapId(map))) passesFilter = false;
         else if (playerCount < mmConfig.minPlayers) passesFilter = false;
         else if (playerCount > mmConfig.maxPlayers) passesFilter = false;
-        else if (remainingTime < mmConfig.minRemainingTime) passesFilter = false;
+        // remainingTime of 0 means "no round timer / unlimited" (parkour, 24-7 servers),
+        // not "0 seconds left" — only enforce the minimum on games that actually count down.
+        else if (remainingTime > 0 && remainingTime < mmConfig.minRemainingTime) passesFilter = false;
         else if (playerCount === playerLimit) passesFilter = false;
         else if (window.location.href.includes(gameID)) passesFilter = false;
 
