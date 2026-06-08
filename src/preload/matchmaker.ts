@@ -19,7 +19,7 @@ export const MATCHMAKER_GAMEMODE_FILTER = [
 ];
 export const MATCHMAKER_REGIONS = ['SV', 'TOK', 'FRA', 'MBI', 'SYD', 'SIN', 'DAL', 'BHN', 'BRZ', 'NY'];
 export const MATCHMAKER_REGION_NAMES: Record<string, string> = { SV: 'Silicon Valley', TOK: 'Tokyo', FRA: 'Frankfurt', MBI: 'Mumbai', SYD: 'Sydney', SIN: 'Singapore', DAL: 'Dallas', BHN: 'Bahrain', BRZ: 'Brazil', NY: 'New York' };
-export const MAP_ICON_INDICES = ['Burg', 'Littletown', 'Sandstorm', 'Subzero', 'Undergrowth', 'Shipment', 'Freight', 'Lostworld', 'Citadel', 'Oasis', 'Kanji', 'Industry', 'Lumber', 'Evacuation', 'Site', 'SkyTemple', 'Lagoon', 'Bureau', 'Tortuga', 'Tropicano', 'Krunk_Plaza', 'Arena', 'Habitat', 'Atomic', 'Old_Burg', 'Throwback', 'Stockade', 'Facility', 'Clockwork', 'Laboratory', 'Shipyard', 'Soul Sanctum', 'Bazaar', 'Erupt', 'HQ', 'Khepri', 'Lush', 'Vivo', 'Slide Moonlight', 'Eterno Sim'];
+export const MAP_ICON_INDICES = ['Burg', 'Littletown', 'Sandstorm', 'Subzero', 'Undergrowth', 'Shipment', 'Freight', 'Lostworld', 'Citadel', 'Oasis', 'Kanji', 'Industry', 'Lumber', 'Evacuation', 'Site', 'SkyTemple', 'Lagoon', 'Bureau', 'Tortuga', 'Tropicano', 'Krunk_Plaza', 'Arena', 'Habitat', 'Atomic', 'Old_Burg', 'Throwback', 'Stockade', 'Facility', 'Clockwork', 'Laboratory', 'Shipyard', 'Soul Sanctum', 'Bazaar', 'Erupt', 'HQ', 'Khepri', 'Lush', 'Vivo', 'Slide Moonlight', 'Eterno Simulator'];
 export const MATCHMAKER_MAP_NAMES: Record<string, string> = {
     SkyTemple: 'Sky Temple', Krunk_Plaza: 'Krunk Plaza', Old_Burg: 'Old Burg',
     'Soul Sanctum': 'Soul Sanctum', 'Slide Moonlight': 'Slide Moonlight', 'Eterno Sim': 'Eterno Sim',
@@ -31,7 +31,7 @@ export const MATCHMAKER_MAP_FILTER = [
     'Lostworld', 'Citadel', 'Oasis', 'Kanji', 'Industry', 'Lumber', 'Evacuation',
     'Site', 'SkyTemple', 'Lagoon', 'Tropicano', 'Habitat', 'Atomic', 'Old_Burg',
     'Throwback', 'Clockwork', 'Bazaar', 'Erupt', 'HQ', 'Lush', 'Vivo',
-    'Slide Moonlight', 'Eterno Sim',
+    'Slide Moonlight', 'Eterno Simulator',
 ];
 
 // Normalize a map identifier for comparison: lowercase, strip non-alphanumerics.
