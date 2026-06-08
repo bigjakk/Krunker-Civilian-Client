@@ -34,15 +34,22 @@ export const MATCHMAKER_MAP_FILTER = [
     'Slide Moonlight', 'Eterno Sim',
 ];
 
+// Normalize a map identifier for comparison: lowercase, strip non-alphanumerics.
+// Live game IDs use different casing/separators than the display names in
+// MATCHMAKER_MAP_FILTER — e.g. the live ID "slide_moonlight" must match the
+// filter entry "Slide Moonlight". Both sides are normalized before comparing.
+function normalizeMapId(name: string): string {
+    return name.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 // Krunker hosts a top-down preview image per official map at a fixed index — the
 // map's position in MAP_ICON_INDICES. Community maps aren't indexed (no icon).
-// Lookup is normalized (lowercase, separators stripped) so live IDs like
-// "slide_moonlight" still resolve to "Slide Moonlight".
+// Lookup is normalized so live IDs like "slide_moonlight" still resolve.
 const MAP_ICON_INDEX_BY_NORM = new Map<string, number>(
-    MAP_ICON_INDICES.map((name, i) => [name.toLowerCase().replace(/[^a-z0-9]/g, ''), i]),
+    MAP_ICON_INDICES.map((name, i) => [normalizeMapId(name), i]),
 );
 export function mapIconUrl(mapName: string): string | null {
-    const idx = MAP_ICON_INDEX_BY_NORM.get(mapName.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const idx = MAP_ICON_INDEX_BY_NORM.get(normalizeMapId(mapName));
     return idx === undefined ? null : `https://assets.krunker.io/img/maps/map_${idx}.png`;
 }
 
@@ -304,6 +311,10 @@ async function fetchAllGames(mmConfig: MatchmakerConfig): Promise<{ all: RawLobb
     const all: RawLobby[] = [];
     const filtered: MatchmakerGame[] = [];
 
+    // Normalize configured maps once so live IDs (e.g. "slide_moonlight") match
+    // the display names stored in config (e.g. "Slide Moonlight").
+    const mapFilter = new Set(mmConfig.maps.map(normalizeMapId));
+
     for (const game of result.games) {
         const gameID: string = game[0];
         const region = gameID.split(':')[0];
@@ -316,7 +327,7 @@ async function fetchAllGames(mmConfig: MatchmakerConfig): Promise<{ all: RawLobb
         let passesFilter = true;
         if (mmConfig.regions.length > 0 && !mmConfig.regions.includes(region)) passesFilter = false;
         else if (mmConfig.gamemodes.length > 0 && !mmConfig.gamemodes.includes(gamemode)) passesFilter = false;
-        else if (mmConfig.maps.length > 0 && !mmConfig.maps.includes(map)) passesFilter = false;
+        else if (mapFilter.size > 0 && !mapFilter.has(normalizeMapId(map))) passesFilter = false;
         else if (playerCount < mmConfig.minPlayers) passesFilter = false;
         else if (playerCount > mmConfig.maxPlayers) passesFilter = false;
         else if (remainingTime < mmConfig.minRemainingTime) passesFilter = false;
