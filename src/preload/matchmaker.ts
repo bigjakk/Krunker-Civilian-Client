@@ -22,7 +22,6 @@ export const MATCHMAKER_REGION_NAMES: Record<string, string> = { SV: 'Silicon Va
 export const MAP_ICON_INDICES = ['Burg', 'Littletown', 'Sandstorm', 'Subzero', 'Undergrowth', 'Shipment', 'Freight', 'Lostworld', 'Citadel', 'Oasis', 'Kanji', 'Industry', 'Lumber', 'Evacuation', 'Site', 'SkyTemple', 'Lagoon', 'Bureau', 'Tortuga', 'Tropicano', 'Krunk_Plaza', 'Arena', 'Habitat', 'Atomic', 'Old_Burg', 'Throwback', 'Stockade', 'Facility', 'Clockwork', 'Laboratory', 'Shipyard', 'Soul Sanctum', 'Bazaar', 'Erupt', 'HQ', 'Khepri', 'Lush', 'Vivo', 'Slide Moonlight', 'Eterno Simulator'];
 export const MATCHMAKER_MAP_NAMES: Record<string, string> = {
     SkyTemple: 'Sky Temple', Krunk_Plaza: 'Krunk Plaza', Old_Burg: 'Old Burg',
-    'Soul Sanctum': 'Soul Sanctum', 'Slide Moonlight': 'Slide Moonlight', 'Eterno Sim': 'Eterno Sim',
 };
 
 // Official maps shown in matchmaker settings
