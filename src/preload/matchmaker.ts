@@ -76,6 +76,7 @@ const BASE_TICK_MS = 80;
 const MIN_TICK_MS = 20;
 const POST_SCAN_PAUSE_MS = 180;
 const FOUND_HOLD_MS = 1200;
+const NOT_FOUND_HOLD_MS = 1100;
 
 interface MatchmakerGame {
     gameID: string;
@@ -173,6 +174,8 @@ let popupCandidates: MatchmakerGame[] = [];
 let openServerBrowser = true;
 let cancelKey: Keybind = { key: 'Escape', ctrl: false, shift: false, alt: false };
 let searchAborted = false;
+// Bumped on each fetchGame() call; a delayed continuation checks it survived re-entry.
+let searchGeneration = 0;
 
 function abortSearch(): void {
     searchAborted = true;
@@ -231,6 +234,7 @@ function showSearchPopup(): void {
     popupElement.classList.add('searching');
     popupElement.style.backgroundImage = 'none';
     searchStatus.textContent = 'Connecting...';
+    searchStatus.classList.remove('mm-status-fail');
     searchFeed.innerHTML = '';
     searchFeed.classList.remove('mm-feed-found');
     searchCounter.textContent = '';
@@ -364,6 +368,7 @@ function sortGames(games: MatchmakerGame[], pings: Record<string, number>, sortB
 export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole): Promise<void> {
     openServerBrowser = mmConfig.openServerBrowser;
     cancelKey = mmConfig.cancelKey;
+    const myRun = ++searchGeneration;
 
     // Dismiss existing popup if active (also aborts in-flight search)
     searchAborted = true;
@@ -441,6 +446,21 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
         await verifyAndJoin(best.gameID);
     } else {
         _con?.log('[KCC-MM] No matching games found');
+        // Mirror the "Lobby Found!" reveal with a clear "not found" state before
+        // falling back to the server browser.
+        searchStatus.textContent = 'No Lobby Found';
+        searchStatus.classList.add('mm-status-fail');
+        searchFeed.classList.add('mm-feed-found');
+        searchFeed.innerHTML = '';
+        const notFound = document.createElement('div');
+        notFound.className = 'mm-feed-entry mm-notfound';
+        notFound.textContent = 'No matching lobbies';
+        searchFeed.appendChild(notFound);
+        searchCounter.textContent = openServerBrowser ? 'Opening server browser…' : '';
+        await new Promise(r => setTimeout(r, NOT_FOUND_HOLD_MS));
+        // A new search may have started during the hold (fetchGame is re-entrant and
+        // resets searchAborted); bail if this run is no longer the active one.
+        if (searchAborted || myRun !== searchGeneration) return;
         dismissPopup();
         if (openServerBrowser && typeof (window as any).openServerWindow === 'function') {
             (window as any).openServerWindow(0);

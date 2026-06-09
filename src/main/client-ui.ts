@@ -655,6 +655,17 @@ export const MATCHMAKER_SETTINGS_CSS = `
   transform-origin: center;
   animation: mmFoundGrow 0.34s cubic-bezier(0.2, 0.85, 0.3, 1.25) forwards;
 }
+/* No-match reveal: parallels the found state before falling back to the server browser */
+.mm-feed-entry.mm-notfound {
+  font-size: 1.2em;
+  justify-content: center;
+  color: var(--kcc-text-muted, rgba(255,255,255,0.55));
+  background: rgba(255,255,255,0.03);
+  transform-origin: center;
+  animation: mmFoundGrow 0.34s cubic-bezier(0.2, 0.85, 0.3, 1.25) forwards;
+}
+.mm-feed-entry.mm-notfound::before { content: none; }
+#matchmakerSearchStatus.mm-status-fail { color: var(--kcc-red); }
 #matchmakerSearchCounter {
   font-size: 0.85em;
   color: var(--kcc-yellow);
