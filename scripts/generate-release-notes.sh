@@ -27,7 +27,7 @@ fi
 TMPDIR_NOTES=$(mktemp -d)
 trap 'rm -rf "$TMPDIR_NOTES"' EXIT
 
-for prefix in feat fix refactor perf other; do
+for prefix in feat fix perf other; do
   : > "${TMPDIR_NOTES}/${prefix}"
 done
 
@@ -37,11 +37,11 @@ while IFS= read -r line; do
   # Skip version bump commits (e.g. "v0.6.1", "v0.6.2 — description")
   [[ "$line" =~ ^v[0-9] ]] && continue
 
-  # Skip chore/docs/test/ci commits — not user-facing
-  [[ "$line" =~ ^(chore|docs|test|ci)(\(.*\))?:  ]] && continue
+  # Skip chore/docs/test/ci/refactor commits — internal, not user-facing
+  [[ "$line" =~ ^(chore|docs|test|ci|refactor)(\(.*\))?:  ]] && continue
 
   MATCHED=false
-  for prefix in feat fix refactor perf; do
+  for prefix in feat fix perf; do
     if [[ "$line" =~ ^${prefix}(\(.*\))?:\ (.+)$ ]]; then
       MSG="${BASH_REMATCH[2]}"
       echo "- ${MSG}" >> "${TMPDIR_NOTES}/${prefix}"
@@ -59,7 +59,6 @@ section_title() {
   case "$1" in
     feat)     echo "## New" ;;
     fix)      echo "## Fixes" ;;
-    refactor) echo "## Improvements" ;;
     perf)     echo "## Performance" ;;
   esac
 }
@@ -67,7 +66,7 @@ section_title() {
 # Build output — only user-facing sections
 HAS_CONTENT=false
 
-for prefix in feat fix refactor perf; do
+for prefix in feat fix perf; do
   if [ -s "${TMPDIR_NOTES}/${prefix}" ]; then
     section_title "$prefix"
     echo ""
