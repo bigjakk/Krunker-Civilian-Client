@@ -12,26 +12,8 @@ import type { KeystrokesConfig } from './keystrokes';
 import { checkChangelog, showChangelogNow } from './changelog';
 import type { Keybind } from '../main/config';
 import { DEFAULT_CONFIG } from '../main/config-defaults';
+import { savedConsole as _console, setVerbose } from './saved-console';
 
-
-// ── Save console methods before Krunker overwrites them ──
-// Wrapped to forward errors/warnings always, and logs when verbose is enabled
-let _verboseLogging = false;
-
-const _console = {
-  log: (...args: unknown[]) => {
-    console.log(...args);
-    if (_verboseLogging) ipcRenderer.send('verbose-log', 'log', ...args);
-  },
-  warn: (...args: unknown[]) => {
-    console.warn(...args);
-    ipcRenderer.send('verbose-log', 'warn', ...args);
-  },
-  error: (...args: unknown[]) => {
-    console.error(...args);
-    ipcRenderer.send('verbose-log', 'error', ...args);
-  },
-};
 
 _console.log('[KCC] Preload script loaded');
 
@@ -1552,7 +1534,7 @@ function buildAdvancedSection(
     checked: adv.verboseLogging, instant: true,
     onChange: (v) => {
       adv.verboseLogging = v; saveAdv();
-      _verboseLogging = v;
+      setVerbose(v);
     },
   }));
 }
@@ -2048,7 +2030,7 @@ ipcRenderer.on('main_did-finish-load', () => {
     const advConf = allConf.advanced;
 
     // ── Verbose logging toggle ──
-    _verboseLogging = advConf?.verboseLogging ?? false;
+    setVerbose(advConf?.verboseLogging ?? false);
 
     // ── Exit button + UI toggles ──
     const showExit = uiConf ? (uiConf.showExitButton !== false) : true;
