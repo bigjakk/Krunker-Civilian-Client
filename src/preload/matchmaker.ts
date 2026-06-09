@@ -52,6 +52,10 @@ const MAP_ICON_INDEX_BY_NORM = new Map<string, number>(
 // index verified by inspecting the live image. (map_40 is another official map not
 // surfaced in the filter, so it's intentionally left out here.)
 MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Eterno Jump'), 41);
+// Normalized IDs of every official map (those Krunker hosts a preview icon for).
+// Used as the default map filter when the user selects no maps, so custom/community
+// maps (e.g. "AIM_Room") are never matched in "search all" mode.
+const OFFICIAL_MAP_NORMS = new Set(MAP_ICON_INDEX_BY_NORM.keys());
 export function mapIconUrl(mapName: string): string | null {
     const idx = MAP_ICON_INDEX_BY_NORM.get(normalizeMapId(mapName));
     return idx === undefined ? null : `https://assets.krunker.io/img/maps/map_${idx}.png`;
@@ -321,8 +325,12 @@ async function fetchAllGames(mmConfig: MatchmakerConfig): Promise<{ all: RawLobb
     const filtered: MatchmakerGame[] = [];
 
     // Normalize configured maps once so live IDs (e.g. "slide_moonlight") match
-    // the display names stored in config (e.g. "Slide Moonlight").
-    const mapFilter = new Set(mmConfig.maps.map(normalizeMapId));
+    // the display names stored in config (e.g. "Slide Moonlight"). When the user
+    // selects no maps, default to all official maps instead of "everything" — this
+    // keeps custom/community maps (e.g. "AIM_Room") out of the results.
+    const mapFilter = mmConfig.maps.length > 0
+        ? new Set(mmConfig.maps.map(normalizeMapId))
+        : OFFICIAL_MAP_NORMS;
 
     for (const game of result.games) {
         const gameID: string = game[0];
@@ -336,7 +344,7 @@ async function fetchAllGames(mmConfig: MatchmakerConfig): Promise<{ all: RawLobb
         let passesFilter = true;
         if (mmConfig.regions.length > 0 && !mmConfig.regions.includes(region)) passesFilter = false;
         else if (mmConfig.gamemodes.length > 0 && !mmConfig.gamemodes.includes(gamemode)) passesFilter = false;
-        else if (mapFilter.size > 0 && !mapFilter.has(normalizeMapId(map))) passesFilter = false;
+        else if (!mapFilter.has(normalizeMapId(map))) passesFilter = false;
         else if (playerCount < mmConfig.minPlayers) passesFilter = false;
         else if (playerCount > mmConfig.maxPlayers) passesFilter = false;
         // remainingTime of 0 means "no round timer / unlimited" (parkour, 24-7 servers),
