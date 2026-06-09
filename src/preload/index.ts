@@ -1062,7 +1062,7 @@ function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void {
 }
 
 function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag): void {
-  const mm = mmConf || { enabled: true, regions: [], gamemodes: [], minPlayers: 1, maxPlayers: 6, minRemainingTime: 120, openServerBrowser: true, sortByPlayers: false, rankedMatchSound: '' };
+  const mm = mmConf || { enabled: true, regions: [], gamemodes: [], minPlayers: 1, maxPlayers: 6, minRemainingTime: 120, openServerBrowser: true, sortByPlayers: false, hideSearchOverlay: false, rankedMatchSound: '' };
   if (mm.rankedMatchSound === undefined) mm.rankedMatchSound = '';
 
   function saveMM(): void {
@@ -1088,6 +1088,13 @@ function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag
     desc: 'Sort results by most players first, then by ping (default is ping first)',
     checked: mm.sortByPlayers ?? false, instant: true,
     onChange: (v) => { mm.sortByPlayers = v; saveMM(); },
+  }));
+
+  body.appendChild(createToggleRow({
+    label: 'Hide Search Overlay',
+    desc: 'Skip the lobby search animation and join the match instantly',
+    checked: mm.hideSearchOverlay ?? false, instant: true,
+    onChange: (v) => { mm.hideSearchOverlay = v; saveMM(); },
   }));
 
   body.appendChild(createKeybindRow('Matchmaker Hotkey', 'Key to trigger the custom matchmaker', bag.binds.matchmaker, (b) => {

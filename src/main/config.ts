@@ -62,6 +62,7 @@ export interface AppConfig {
     minRemainingTime: number;
     openServerBrowser: boolean;
     sortByPlayers: boolean;
+    hideSearchOverlay: boolean;
     rankedMatchSound: string;
   };
   keybinds: {
@@ -190,6 +191,7 @@ export const config = new Store<AppConfig>({
       minRemainingTime: 120,
       openServerBrowser: true,
       sortByPlayers: false,
+      hideSearchOverlay: false,
       rankedMatchSound: '',
     },
     keybinds: DEFAULT_KEYBINDS,

@@ -102,6 +102,7 @@ export interface MatchmakerConfig {
     minRemainingTime: number;
     openServerBrowser: boolean;
     sortByPlayers: boolean;
+    hideSearchOverlay: boolean;
     cancelKey: Keybind;
 }
 
@@ -368,14 +369,20 @@ function sortGames(games: MatchmakerGame[], pings: Record<string, number>, sortB
 export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole): Promise<void> {
     openServerBrowser = mmConfig.openServerBrowser;
     cancelKey = mmConfig.cancelKey;
+    const hideOverlay = mmConfig.hideSearchOverlay;
     const myRun = ++searchGeneration;
 
     // Dismiss existing popup if active (also aborts in-flight search)
     searchAborted = true;
     dismissPopup();
 
-    // Phase 1: Show search popup immediately
-    showSearchPopup();
+    // Phase 1: Show search popup immediately — unless the overlay is hidden, in
+    // which case search/join happens silently (still reset searchAborted so the
+    // run isn't aborted by the dismiss above). Hidden runs skip showSearchPopup,
+    // so the cancel keybind is intentionally inert — there's nothing to cancel
+    // during a near-instant silent search.
+    if (hideOverlay) searchAborted = false;
+    else showSearchPopup();
     _con?.log('[KCC-MM] Fetching game list + pings...');
 
     // Phase 2: Fetch data
@@ -391,7 +398,7 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
         filtered = fetchResult.filtered;
         pings = pingResult;
     } catch {
-        if (!searchAborted) {
+        if (!searchAborted && !hideOverlay) {
             searchStatus.textContent = 'Failed to fetch lobbies';
             await new Promise(r => setTimeout(r, 2000));
             dismissPopup();
@@ -423,44 +430,48 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
     }
 
     // Scan scrolls the lobbies and, when there's a match, settles on it before stopping
-    await animateLobbyScan(allLobbies, best);
+    if (!hideOverlay) await animateLobbyScan(allLobbies, best);
     if (searchAborted) return;
 
     if (best) {
-        // Grow the matched lobby into focus, then auto-join
-        const regionName = MATCHMAKER_REGION_NAMES[best.region] ?? best.region;
-        searchStatus.textContent = 'Lobby Found!';
-        searchFeed.classList.add('mm-feed-found');
-        searchFeed.innerHTML = '';
-        const found = document.createElement('div');
-        found.className = 'mm-feed-entry mm-pass mm-found';
-        found.innerHTML =
-            `<span class="mm-feed-region">${escapeHtml(best.region)}</span>` +
-            `<span class="mm-feed-map">${escapeHtml(best.map)}</span>` +
-            `<span class="mm-feed-players">${best.playerCount}/${best.playerLimit}</span>`;
-        const foundIcon = createMapIcon(best.map, 'mm-feed-icon mm-feed-icon-found');
-        if (foundIcon) found.prepend(foundIcon);
-        searchFeed.appendChild(found);
-        searchCounter.textContent = `${best.gamemode} \u00B7 ${regionName} \u00B7 ${pings[best.region] ?? '?'}ms`;
-        await new Promise(r => setTimeout(r, FOUND_HOLD_MS));
+        if (!hideOverlay) {
+            // Grow the matched lobby into focus, then auto-join
+            const regionName = MATCHMAKER_REGION_NAMES[best.region] ?? best.region;
+            searchStatus.textContent = 'Lobby Found!';
+            searchFeed.classList.add('mm-feed-found');
+            searchFeed.innerHTML = '';
+            const found = document.createElement('div');
+            found.className = 'mm-feed-entry mm-pass mm-found';
+            found.innerHTML =
+                `<span class="mm-feed-region">${escapeHtml(best.region)}</span>` +
+                `<span class="mm-feed-map">${escapeHtml(best.map)}</span>` +
+                `<span class="mm-feed-players">${best.playerCount}/${best.playerLimit}</span>`;
+            const foundIcon = createMapIcon(best.map, 'mm-feed-icon mm-feed-icon-found');
+            if (foundIcon) found.prepend(foundIcon);
+            searchFeed.appendChild(found);
+            searchCounter.textContent = `${best.gamemode} \u00B7 ${regionName} \u00B7 ${pings[best.region] ?? '?'}ms`;
+            await new Promise(r => setTimeout(r, FOUND_HOLD_MS));
+        }
         await verifyAndJoin(best.gameID);
     } else {
         _con?.log('[KCC-MM] No matching games found');
-        // Mirror the "Lobby Found!" reveal with a clear "not found" state before
-        // falling back to the server browser.
-        searchStatus.textContent = 'No Lobby Found';
-        searchStatus.classList.add('mm-status-fail');
-        searchFeed.classList.add('mm-feed-found');
-        searchFeed.innerHTML = '';
-        const notFound = document.createElement('div');
-        notFound.className = 'mm-feed-entry mm-notfound';
-        notFound.textContent = 'No matching lobbies';
-        searchFeed.appendChild(notFound);
-        searchCounter.textContent = openServerBrowser ? 'Opening server browser…' : '';
-        await new Promise(r => setTimeout(r, NOT_FOUND_HOLD_MS));
-        // A new search may have started during the hold (fetchGame is re-entrant and
-        // resets searchAborted); bail if this run is no longer the active one.
-        if (searchAborted || myRun !== searchGeneration) return;
+        if (!hideOverlay) {
+            // Mirror the "Lobby Found!" reveal with a clear "not found" state before
+            // falling back to the server browser.
+            searchStatus.textContent = 'No Lobby Found';
+            searchStatus.classList.add('mm-status-fail');
+            searchFeed.classList.add('mm-feed-found');
+            searchFeed.innerHTML = '';
+            const notFound = document.createElement('div');
+            notFound.className = 'mm-feed-entry mm-notfound';
+            notFound.textContent = 'No matching lobbies';
+            searchFeed.appendChild(notFound);
+            searchCounter.textContent = openServerBrowser ? 'Opening server browser…' : '';
+            await new Promise(r => setTimeout(r, NOT_FOUND_HOLD_MS));
+            // A new search may have started during the hold (fetchGame is re-entrant and
+            // resets searchAborted); bail if this run is no longer the active one.
+            if (searchAborted || myRun !== searchGeneration) return;
+        }
         dismissPopup();
         if (openServerBrowser && typeof (window as any).openServerWindow === 'function') {
             (window as any).openServerWindow(0);
