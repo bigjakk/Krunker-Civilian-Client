@@ -99,7 +99,10 @@ function setPingTarget(host: string, port: number, win: BrowserWindow): void {
   const measure = async () => {
     if (!_pingTarget || win.isDestroyed()) return;
     const ms = await tcpPing(_pingTarget.host, _pingTarget.port);
-    if (ms >= 0 && !win.isDestroyed()) win.webContents.send('server-ping', ms);
+    if (ms < 0 || win.isDestroyed() || win.webContents.isDestroyed()) return;
+    // The render frame can be disposed mid-navigation (or by a renderer crash) while
+    // the window itself survives; send() then throws "Render frame was disposed".
+    try { win.webContents.send('server-ping', ms); } catch { /* frame gone */ }
   };
   measure();
   _pingTimer = setInterval(measure, 2000);
