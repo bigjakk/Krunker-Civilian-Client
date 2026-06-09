@@ -6,7 +6,7 @@ import { execFile } from 'child_process';
 import * as os from 'os';
 import { Socket } from 'net';
 import { detectPlatform, applyPlatformFlags, getValidAngleBackends } from './platform';
-import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount } from './config';
+import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount, DEFAULT_CONFIG } from './config';
 import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper } from './swapper';
 import { UserscriptManager } from './userscripts';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
@@ -117,15 +117,7 @@ function stopServerPing(): void {
 
 // ── Platform flags (must run before app.ready) ──
 const platformInfo = detectPlatform();
-const advancedDefaults = {
-  removeUselessFeatures: true,
-  gpuRasterizing: false,
-  helpfulFlags: true,
-  increaseLimits: false,
-  lowLatency: false,
-  experimentalFlags: false,
-};
-const advancedConfig = { ...advancedDefaults, ...config.get('advanced') };
+const advancedConfig = { ...DEFAULT_CONFIG.advanced, ...config.get('advanced') };
 const perfConfig = { ...config.get('performance') };
 
 // Self-heal angleBackend if a previous version's value is no longer valid for this platform (e.g. user picked 'vulkan', 'd3d9', etc., and we removed it).
@@ -538,10 +530,9 @@ async function launchApp(): Promise<void> {
   }
 
   // ── Cached game config (invalidated on set-config writes to 'game') ──
-  const gameDefaults = { lastServer: '', socialTabBehaviour: 'New Window' };
-  let cachedGameConf: typeof gameDefaults | null = null;
-  function getGameConf(): typeof gameDefaults {
-    if (!cachedGameConf) cachedGameConf = { ...gameDefaults, ...config.get('game') };
+  let cachedGameConf: typeof DEFAULT_CONFIG.game | null = null;
+  function getGameConf(): typeof DEFAULT_CONFIG.game {
+    if (!cachedGameConf) cachedGameConf = { ...DEFAULT_CONFIG.game, ...config.get('game') };
     return cachedGameConf;
   }
 

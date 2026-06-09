@@ -11,6 +11,7 @@ import { initKeystrokes, updateKeystrokes } from './keystrokes';
 import type { KeystrokesConfig } from './keystrokes';
 import { checkChangelog, showChangelogNow } from './changelog';
 import type { Keybind } from '../main/config';
+import { DEFAULT_CONFIG } from '../main/config-defaults';
 
 
 // ── Save console methods before Krunker overwrites them ──
@@ -638,8 +639,7 @@ interface SettingsBag {
 function buildGeneralSection(
   body: HTMLElement, gameConf: any, uiConfRaw: any, bag: SettingsBag,
 ): void {
-  const gameDefaults = { lastServer: '', socialTabBehaviour: 'New Window', rememberTabs: false };
-  const game = { ...gameDefaults, ...gameConf };
+  const game = { ...DEFAULT_CONFIG.game, ...gameConf };
 
   body.appendChild(createSelectRow({
     label: 'Social/Hub Tab Behaviour',
@@ -656,8 +656,7 @@ function buildGeneralSection(
     onChange: (v) => { game.rememberTabs = v; ipcRenderer.invoke('set-config', 'game', game); },
   }));
 
-  const uiDefaults = { showExitButton: true, deathscreenAnimation: false, hideMenuPopups: false, classicSocial: false };
-  const ui = { ...uiDefaults, ...uiConfRaw };
+  const ui = { ...DEFAULT_CONFIG.ui, ...uiConfRaw };
 
   function saveUI(): void {
     ipcRenderer.invoke('set-config', 'ui', ui);
@@ -718,8 +717,8 @@ function buildGeneralSection(
 function buildGameSection(
   body: HTMLElement, gameConf: any, uiConfRaw: any, bag: SettingsBag,
 ): void {
-  const game = { rawInput: true, showPing: true, hpEnemyCounter: true, hideBunnies: false, ...gameConf };
-  const ui = { deathscreenAnimation: false, hideMenuPopups: false, menuTimer: true, watermark: true, directServerPing: false, ...uiConfRaw };
+  const game = { ...DEFAULT_CONFIG.game, ...gameConf };
+  const ui = { ...DEFAULT_CONFIG.ui, ...uiConfRaw };
 
   function saveGame(): void {
     ipcRenderer.invoke('set-config', 'game', game);
@@ -805,11 +804,7 @@ function buildGameSection(
 }
 
 function buildKeystrokesRows(body: HTMLElement): void {
-  const defaults: KeystrokesConfig = {
-    enabled: false, size: 2.5, auxKey1: 'r', auxKey2: 'n',
-    showAuxKeys: true, mouseEnabled: false,
-  };
-  const ks: KeystrokesConfig = { ...defaults };
+  const ks: KeystrokesConfig = { ...DEFAULT_CONFIG.keystrokes };
   let loaded = false;
 
   function save(): void {
@@ -881,7 +876,7 @@ function buildKeystrokesRows(body: HTMLElement): void {
   body.appendChild(creditRow);
 
   ipcRenderer.invoke('get-config', 'keystrokes').then((conf: KeystrokesConfig | undefined) => {
-    Object.assign(ks, defaults, conf || {});
+    Object.assign(ks, DEFAULT_CONFIG.keystrokes, conf || {});
     const enableCb = enableRow.querySelector('input[type="checkbox"]') as HTMLInputElement;
     if (enableCb) enableCb.checked = !!ks.enabled;
     const mouseCb = mouseRow.querySelector('input[type="checkbox"]') as HTMLInputElement;
@@ -903,7 +898,7 @@ function buildKeystrokesRows(body: HTMLElement): void {
 function buildPerformanceSection(
   body: HTMLElement, perfConf: any, isWindows: boolean,
 ): void {
-  const perf = { fpsUnlocked: true, processPriority: 'Normal', ...perfConf };
+  const perf = { ...DEFAULT_CONFIG.performance, ...perfConf };
 
   function savePerf(): void {
     ipcRenderer.invoke('set-config', 'performance', perf);
@@ -934,7 +929,7 @@ function buildPerformanceSection(
 }
 
 function buildSwapperSection(body: HTMLElement, swapperConf: any): void {
-  const swapEnabled = swapperConf ? swapperConf.enabled : true;
+  const swapEnabled = swapperConf ? swapperConf.enabled : DEFAULT_CONFIG.swapper.enabled;
 
   body.appendChild(createToggleRow({
     label: 'Resource Swapper',
@@ -963,7 +958,7 @@ function buildSwapperSection(body: HTMLElement, swapperConf: any): void {
 }
 
 function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void {
-  const ui = { cssTheme: 'disabled', loadingTheme: 'disabled', backgroundUrl: '', ...uiConfRaw };
+  const ui = { ...DEFAULT_CONFIG.ui, ...uiConfRaw };
 
   function saveUI(): void {
     ipcRenderer.invoke('set-config', 'ui', ui);
@@ -1062,8 +1057,7 @@ function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void {
 }
 
 function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag): void {
-  const mm = mmConf || { enabled: true, regions: [], gamemodes: [], minPlayers: 1, maxPlayers: 6, minRemainingTime: 120, openServerBrowser: true, sortByPlayers: false, hideSearchOverlay: false, rankedMatchSound: '' };
-  if (mm.rankedMatchSound === undefined) mm.rankedMatchSound = '';
+  const mm = { ...DEFAULT_CONFIG.matchmaker, ...mmConf };
 
   function saveMM(): void {
     ipcRenderer.invoke('set-config', 'matchmaker', mm);
@@ -1138,7 +1132,6 @@ function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag
     onChange: () => saveMM(),
   }));
 
-  if (!mm.maps) mm.maps = [];
   body.appendChild(createCheckboxGrid({
     header: 'Maps (none selected = all)',
     items: MATCHMAKER_MAP_FILTER.map(m => ({ value: m, label: MATCHMAKER_MAP_NAMES[m] || m, icon: mapIconUrl(m) ?? undefined })),
@@ -1200,14 +1193,7 @@ function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag
 }
 
 function buildDiscordSection(body: HTMLElement, discordConf: any): void {
-  const discord = {
-    enabled: false,
-    showMapMode: true,
-    showClass: true,
-    showTimer: true,
-    showStatus: true,
-    ...discordConf,
-  };
+  const discord = { ...DEFAULT_CONFIG.discord, ...discordConf };
 
   body.appendChild(createToggleRow({
     label: 'Discord Rich Presence',
@@ -1415,7 +1401,7 @@ function buildAccountsSection(body: HTMLElement): void {
 }
 
 function buildChatSection(body: HTMLElement, gameConf: any, translatorConf: any): void {
-  const game = { betterChat: true, chatHistorySize: 200, ...gameConf };
+  const game = { ...DEFAULT_CONFIG.game, ...gameConf };
 
   function saveGame(): void {
     ipcRenderer.invoke('set-config', 'game', game);
@@ -1435,7 +1421,7 @@ function buildChatSection(body: HTMLElement, gameConf: any, translatorConf: any)
   }));
 
   // Translator settings inline
-  const tl = { enabled: true, targetLanguage: 'en', showLanguageTag: true, customSkipWords: '', ...translatorConf };
+  const tl = { ...DEFAULT_CONFIG.translator, ...translatorConf };
 
   function saveTL(): void {
     ipcRenderer.invoke('set-config', 'translator', tl);
@@ -1515,17 +1501,7 @@ function buildChatSection(body: HTMLElement, gameConf: any, translatorConf: any)
 function buildAdvancedSection(
   body: HTMLElement, advConf: any, isWindows: boolean,
 ): void {
-  const advDefaults = {
-    removeUselessFeatures: true,
-    gpuRasterizing: false,
-    helpfulFlags: true,
-    increaseLimits: false,
-    lowLatency: false,
-    experimentalFlags: false,
-    angleBackend: 'default',
-    verboseLogging: false,
-  };
-  const adv = { ...advDefaults, ...advConf };
+  const adv = { ...DEFAULT_CONFIG.advanced, ...advConf };
 
   function saveAdv(): void {
     ipcRenderer.invoke('set-config', 'advanced', adv);
@@ -1717,12 +1693,7 @@ function renderSettings(searchQuery?: string): void {
     const uiConfRaw = allConf.ui;
     const discordConf = allConf.discord;
     const translatorConf = allConf.translator;
-    const defaultBinds = {
-      matchmaker:       { key: 'F6',     ctrl: false, shift: false, alt: false },
-      matchmakerCancel: { key: 'Escape', ctrl: false, shift: false, alt: false },
-      fullscreenToggle: { key: 'F11',    ctrl: false, shift: false, alt: false },
-    };
-    const binds = { ...defaultBinds, ...keybindsConf };
+    const binds = { ...DEFAULT_CONFIG.keybinds, ...keybindsConf };
     const isWindows = platformInfo && platformInfo.isWindows;
 
     const bag: SettingsBag = {
@@ -1756,7 +1727,7 @@ function renderSettings(searchQuery?: string): void {
 // ── Userscripts settings section ──
 function renderUserscriptsSection(body: HTMLElement): void {
   ipcRenderer.invoke('get-config', 'userscripts').then((usConf: any) => {
-    const us = usConf || { enabled: true, path: '' };
+    const us = { ...DEFAULT_CONFIG.userscripts, ...usConf };
 
     body.appendChild(createToggleRow({
       label: 'Userscripts',
@@ -2235,7 +2206,7 @@ ipcRenderer.on('main_did-finish-load', () => {
 
     // ── Initialize chat translator (game page only) ──
     if (isGamePage) {
-      const mergedTl = { enabled: true, targetLanguage: 'en', showLanguageTag: true, customSkipWords: '', ...translatorConf };
+      const mergedTl = { ...DEFAULT_CONFIG.translator, ...translatorConf };
       initTranslator(_console, mergedTl);
     }
 
