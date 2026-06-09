@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write       # OIDC token for Sigstore keyless signing
+  attestations: write   # write the provenance attestation
 
 jobs:
   build-and-release:
@@ -75,6 +77,15 @@ jobs:
         run: |
           echo "=== Build output sizes ==="
           ls -lh out/*.exe out/*.AppImage out/*.deb 2>/dev/null || true
+
+      - name: Attest build provenance
+        if: steps.version-check.outputs.SKIP == 'false'
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            out/*.exe
+            out/*.AppImage
+            out/*.deb
 
       - name: Generate release notes
         if: steps.version-check.outputs.SKIP == 'false'
