@@ -1,7 +1,7 @@
 // ── Settings section builders ──
 // Each build*Section() populates one collapsible section of the injected Client
-// settings tab using the shared row factories. renderSettings (index.ts) builds
-// the SettingsBag and calls these.
+// settings tab using the shared row factories. renderSettings (settings-render.ts)
+// builds the SettingsBag and calls these.
 
 import { ipcRenderer } from 'electron';
 import type { Keybind } from '../main/config';

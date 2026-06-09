@@ -2,7 +2,7 @@
 // Reusable building blocks for the injected Client settings tab: safety/refresh
 // icons, the "needs refresh/restart" notification, the row factories
 // (toggle/select/number/keybind/checkbox-grid), and collapsible sections.
-// Consumers (the section builders + renderSettings) live in index.ts.
+// Consumers (settings-sections.ts + settings-render.ts) import and call these.
 
 import { ipcRenderer } from 'electron';
 import type { Keybind } from '../main/config';
