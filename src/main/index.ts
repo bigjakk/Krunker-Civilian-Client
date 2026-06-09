@@ -805,7 +805,7 @@ async function launchApp(): Promise<void> {
     return getLoadingScreenCSS(loadingTheme, backgroundUrl, swapDir);
   });
 
-  // ── Changelog IPC handler (fetch release notes from Gitea) ──
+  // ── Changelog IPC handler (fetch release notes from GitHub) ──
   ipcMain.handle('changelog-fetch', async (_e, version: string) => {
     const tag = version.startsWith('v') ? version : `v${version}`;
     try {
