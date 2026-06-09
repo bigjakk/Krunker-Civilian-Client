@@ -642,10 +642,13 @@ async function launchApp(): Promise<void> {
   });
 
   // ── IPC handlers ──
+  // 'accounts' is intentionally excluded — it holds encrypted credential blobs.
+  // The renderer must go through the dedicated alt-* handlers (alt-list returns
+  // labels only), never the generic config getter, so page JS can't read it.
   const ALLOWED_CONFIG_KEYS = new Set<string>([
     'window', 'performance', 'game', 'swapper', 'matchmaker',
     'keybinds', 'userscripts', 'ui', 'discord', 'translator',
-    'advanced', 'accounts', 'tabWindow', 'keystrokes', 'collapsedSections',
+    'advanced', 'tabWindow', 'keystrokes', 'collapsedSections',
   ]);
 
   ipcMain.handle('get-version', () => appVersion);

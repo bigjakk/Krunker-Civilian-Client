@@ -1297,8 +1297,10 @@ function switchToAccount(account: { username: string; password: string }): void 
   }
 }
 
-function buildAccountsSection(body: HTMLElement, accountsArr: any[]): void {
-  const accounts: any[] = accountsArr || [];
+function buildAccountsSection(body: HTMLElement): void {
+  // Labels only — fetched via alt-list (never the generic config getter, which
+  // no longer exposes the 'accounts' key). Indices line up with the stored array.
+  const accounts: { label: string }[] = [];
 
   const addBtn = document.createElement('div');
   addBtn.className = 'setting settName safety-0 has-button';
@@ -1372,7 +1374,10 @@ function buildAccountsSection(body: HTMLElement, accountsArr: any[]): void {
       listEl.appendChild(row);
     });
   }
-  renderList();
+  ipcRenderer.invoke('alt-list').then((list: { label: string }[]) => {
+    accounts.push(...(list || []));
+    renderList();
+  });
 
   form.querySelector('.kcc-acc-save')!.addEventListener('click', () => {
     const label = labelIn.value.trim();
@@ -1655,7 +1660,7 @@ function renderSettings(searchQuery?: string): void {
   // Section shells are created inside the .then() so the persisted collapsed
   // state is loaded before createSection consults it.
   Promise.all([
-    ipcRenderer.invoke('get-all-config', ['swapper', 'matchmaker', 'keybinds', 'advanced', 'game', 'ui', 'discord', 'translator', 'accounts', 'performance', 'collapsedSections']),
+    ipcRenderer.invoke('get-all-config', ['swapper', 'matchmaker', 'keybinds', 'advanced', 'game', 'ui', 'discord', 'translator', 'performance', 'collapsedSections']),
     ipcRenderer.invoke('get-platform'),
   ]).then(([allConf, platformInfo]: [any, any]) => {
     collapsedState = (allConf.collapsedSections as Record<string, boolean>) || {};
@@ -1717,7 +1722,7 @@ function renderSettings(searchQuery?: string): void {
     buildMatchmakerSection(mmSec.body, mmConf, bag);
     buildChatSection(chatSec.body, gameConf, translatorConf);
     buildDiscordSection(discordSec.body, discordConf);
-    buildAccountsSection(accSec.body, allConf.accounts);
+    buildAccountsSection(accSec.body);
     buildKeystrokesRows(ksSec.body);
     buildAdvancedSection(advSec.body, advConf, isWindows);
     renderUserscriptsSection(usSec.body);
