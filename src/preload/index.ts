@@ -1297,6 +1297,27 @@ function switchToAccount(account: { username: string; password: string }): void 
   }
 }
 
+// ── Shared alt-manager data operations ──
+// Both the settings-panel section and the in-game popup drive the same IPC
+// handlers; keeping the calls here means the contract lives in one place.
+function altList(): Promise<{ label: string }[]> {
+  return ipcRenderer.invoke('alt-list').then((list: { label: string }[] | null) => list || []);
+}
+
+function altSave(label: string, username: string, password: string): Promise<unknown> {
+  return ipcRenderer.invoke('alt-save', { label, username, password });
+}
+
+function altRemove(index: number): Promise<unknown> {
+  return ipcRenderer.invoke('alt-remove', index);
+}
+
+function altSwitch(index: number): Promise<void> {
+  return ipcRenderer.invoke('alt-get-credentials', index).then((creds: { username: string; password: string } | null) => {
+    if (creds) switchToAccount(creds);
+  });
+}
+
 function buildAccountsSection(body: HTMLElement): void {
   // Labels only — fetched via alt-list (never the generic config getter, which
   // no longer exposes the 'accounts' key). Indices line up with the stored array.
@@ -1361,12 +1382,10 @@ function buildAccountsSection(body: HTMLElement): void {
           '<button class="kcc-acc-delete">Delete</button>' +
         '</div>';
       row.querySelector('.kcc-acc-switch')!.addEventListener('click', () => {
-        ipcRenderer.invoke('alt-get-credentials', i).then((creds: { username: string; password: string } | null) => {
-          if (creds) switchToAccount(creds);
-        });
+        altSwitch(i);
       });
       row.querySelector('.kcc-acc-delete')!.addEventListener('click', () => {
-        ipcRenderer.invoke('alt-remove', i).then(() => {
+        altRemove(i).then(() => {
           accounts.splice(i, 1);
           renderList();
         });
@@ -1374,8 +1393,8 @@ function buildAccountsSection(body: HTMLElement): void {
       listEl.appendChild(row);
     });
   }
-  ipcRenderer.invoke('alt-list').then((list: { label: string }[]) => {
-    accounts.push(...(list || []));
+  altList().then((list) => {
+    accounts.push(...list);
     renderList();
   });
 
@@ -1384,8 +1403,7 @@ function buildAccountsSection(body: HTMLElement): void {
     const user = userIn.value.trim();
     const pass = passIn.value;
     if (!label || !user || !pass) return;
-    const newAcc = { label, username: user, password: pass };
-    ipcRenderer.invoke('alt-save', newAcc).then(() => {
+    altSave(label, user, pass).then(() => {
       accounts.push({ label });
       labelIn.value = '';
       userIn.value = '';
@@ -2302,7 +2320,7 @@ ipcRenderer.on('main_did-finish-load', () => {
     }
     // ── In-game Accounts quick-switch button ──
     if (isGamePage) {
-      ipcRenderer.invoke('alt-list').then(() => {
+      altList().then(() => {
         const altBtn = document.createElement('div');
         altBtn.id = 'kccAltBtn';
         altBtn.setAttribute('onmouseenter', 'playTick()');
@@ -2325,7 +2343,7 @@ ipcRenderer.on('main_did-finish-load', () => {
           windowHeader.innerText = 'Alt Manager';
 
           function renderAccountList(): void {
-            ipcRenderer.invoke('alt-list').then((accs: any[]) => {
+            altList().then((accs) => {
               let html =
                 '<div style="font-size:30px;text-align:center;margin:3px;font-weight:700;color:#fff;">Alt Manager</div>' +
                 '<hr style="color:rgba(28,28,28,.5);">' +
@@ -2360,9 +2378,7 @@ ipcRenderer.on('main_did-finish-load', () => {
                   const idx = parseInt((el as HTMLElement).dataset.idx || '0', 10);
                   if (accs[idx]) {
                     windowHolder.style.display = 'none';
-                    ipcRenderer.invoke('alt-get-credentials', idx).then((creds: { username: string; password: string } | null) => {
-                      if (creds) switchToAccount(creds);
-                    });
+                    altSwitch(idx);
                   }
                 });
               });
@@ -2371,7 +2387,7 @@ ipcRenderer.on('main_did-finish-load', () => {
                 el.addEventListener('click', () => {
                   const idx = parseInt((el as HTMLElement).dataset.idx || '0', 10);
                   if (confirm('Delete account "' + (accs[idx]?.label || '') + '"?')) {
-                    ipcRenderer.invoke('alt-remove', idx).then(() => renderAccountList());
+                    altRemove(idx).then(() => renderAccountList());
                   }
                 });
               });
@@ -2402,11 +2418,7 @@ ipcRenderer.on('main_did-finish-load', () => {
               const user = (document.getElementById('kccAltUser') as HTMLInputElement).value.trim();
               const pass = (document.getElementById('kccAltPass') as HTMLInputElement).value;
               if (!label || !user || !pass) return;
-              ipcRenderer.invoke('alt-save', {
-                label,
-                username: user,
-                password: pass,
-              }).then(() => renderAccountList());
+              altSave(label, user, pass).then(() => renderAccountList());
             });
           }
 
