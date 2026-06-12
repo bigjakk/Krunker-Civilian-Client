@@ -49,13 +49,13 @@ const MAP_ICON_INDEX_BY_NORM = new Map<string, number>(
 );
 // Official maps Krunker added after MAP_ICON_INDICES was last synced: their preview
 // images (map_<idx>.png) exist beyond index 39. Registered explicitly with the icon
-// index verified by inspecting the live image. (map_40 is another official map not
-// surfaced in the filter, so it's intentionally left out here.)
+// index verified by inspecting the live image.
 MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Eterno Jump'), 41);
-// Normalized IDs of every official map (those Krunker hosts a preview icon for).
-// Used as the default map filter when the user selects no maps, so custom/community
-// maps (e.g. "AIM_Room") are never matched in "search all" mode.
-const OFFICIAL_MAP_NORMS = new Set(MAP_ICON_INDEX_BY_NORM.keys());
+// Normalized IDs of the maps offered in the picker. Used as the default map
+// filter when the user selects no maps, so anything outside the curated list —
+// community maps (e.g. "AIM_Room") and unlisted official maps (e.g. "Shipyard")
+// — is never matched in "search all" mode.
+const DEFAULT_MAP_NORMS = new Set(MATCHMAKER_MAP_FILTER.map(normalizeMapId));
 export function mapIconUrl(mapName: string): string | null {
     const idx = MAP_ICON_INDEX_BY_NORM.get(normalizeMapId(mapName));
     return idx === undefined ? null : `https://assets.krunker.io/img/maps/map_${idx}.png`;
@@ -326,11 +326,11 @@ async function fetchAllGames(mmConfig: MatchmakerConfig): Promise<{ all: RawLobb
 
     // Normalize configured maps once so live IDs (e.g. "slide_moonlight") match
     // the display names stored in config (e.g. "Slide Moonlight"). When the user
-    // selects no maps, default to all official maps instead of "everything" — this
-    // keeps custom/community maps (e.g. "AIM_Room") out of the results.
+    // selects no maps, default to the picker's map list instead of "everything" —
+    // this keeps custom/community maps (e.g. "AIM_Room") out of the results.
     const mapFilter = mmConfig.maps.length > 0
         ? new Set(mmConfig.maps.map(normalizeMapId))
-        : OFFICIAL_MAP_NORMS;
+        : DEFAULT_MAP_NORMS;
 
     for (const game of result.games) {
         const gameID: string = game[0];
