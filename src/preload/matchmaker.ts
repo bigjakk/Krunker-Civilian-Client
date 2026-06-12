@@ -56,6 +56,9 @@ MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Eterno Jump'), 41);
 // community maps (e.g. "AIM_Room") and unlisted official maps (e.g. "Shipyard")
 // — is never matched in "search all" mode.
 const DEFAULT_MAP_NORMS = new Set(MATCHMAKER_MAP_FILTER.map(normalizeMapId));
+// Always-on parkour maps that legitimately run with no round timer. An untimed
+// lobby on any other map is a hosted custom game — never matched.
+const PARKOUR_MAP_NORMS = new Set(['Eterno Jump', 'Slide Moonlight'].map(normalizeMapId));
 export function mapIconUrl(mapName: string): string | null {
     const idx = MAP_ICON_INDEX_BY_NORM.get(normalizeMapId(mapName));
     return idx === undefined ? null : `https://assets.krunker.io/img/maps/map_${idx}.png`;
@@ -340,15 +343,18 @@ async function fetchAllGames(mmConfig: MatchmakerConfig): Promise<{ all: RawLobb
         const map: string = game[4].i;
         const gamemode = MATCHMAKER_GAMEMODES[game[4].g] ?? 'Unknown Gamemode';
         const remainingTime: number = game[5];
+        const mapNorm = normalizeMapId(map);
 
         let passesFilter = true;
         if (mmConfig.regions.length > 0 && !mmConfig.regions.includes(region)) passesFilter = false;
         else if (mmConfig.gamemodes.length > 0 && !mmConfig.gamemodes.includes(gamemode)) passesFilter = false;
-        else if (!mapFilter.has(normalizeMapId(map))) passesFilter = false;
+        else if (!mapFilter.has(mapNorm)) passesFilter = false;
         else if (playerCount < mmConfig.minPlayers) passesFilter = false;
         else if (playerCount > mmConfig.maxPlayers) passesFilter = false;
-        // remainingTime of 0 means "no round timer / unlimited" (parkour, 24-7 servers),
-        // not "0 seconds left" — only enforce the minimum on games that actually count down.
+        // remainingTime of 0 means "no round timer / unlimited", not "0 seconds left".
+        // Only the always-on parkour maps legitimately run untimed — an untimed lobby
+        // on any other map is a hosted custom game. Timed lobbies honor the minimum.
+        else if (remainingTime <= 0 && !PARKOUR_MAP_NORMS.has(mapNorm)) passesFilter = false;
         else if (remainingTime > 0 && remainingTime < mmConfig.minRemainingTime) passesFilter = false;
         else if (playerCount === playerLimit) passesFilter = false;
         else if (window.location.href.includes(gameID)) passesFilter = false;
