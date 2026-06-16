@@ -567,7 +567,9 @@ export const MATCHMAKER_SETTINGS_CSS = `
 /* ── Search phase ── */
 #matchmakerPopupContainer.searching {
   background-image: none !important;
-  background: var(--kcc-modal-bg);
+  background: rgba(18,18,22,0.5);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
   width: 24em;
   padding: 18px 22px;
 }
