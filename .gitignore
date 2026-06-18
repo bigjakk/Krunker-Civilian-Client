@@ -15,3 +15,4 @@ Trace-*
 *.cpuprofile
 *.heapprofile
 userscripts/
+docs/
