@@ -176,9 +176,7 @@ let queueInterval = null;
 let queueConnection = null;
 let countdownInterval = null;
 let isConnecting = false;
-let audioContext = null;
-let notificationBuffer = null;
-let currentSource = null;
+let notificationAudio = null;
 let audioInitialized = false;
 const selectedMaps = new Set();
 
@@ -222,42 +220,36 @@ function loadSettings() {
     }
 }
 
-async function fetchAndDecode(url) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const buf = await res.arrayBuffer();
-    return await audioContext.decodeAudioData(buf);
+function loadNotificationAudio(url) {
+    const audio = new Audio(url);
+    audio.preload = 'auto';
+    audio.load();
+    return audio;
 }
 
-async function initializeAudio() {
-    audioContext = new AudioContext();
-    if (audioContext.state === 'suspended') await audioContext.resume();
-    try {
-        notificationBuffer = await fetchAndDecode(AUDIO_URL);
-    } catch (e) {
-        console.warn('Custom ranked sound failed, using default:', e);
-        if (AUDIO_URL !== FALLBACK_AUDIO_URL) {
-            try { notificationBuffer = await fetchAndDecode(FALLBACK_AUDIO_URL); } catch {}
-        }
-    }
+function initializeAudio() {
+    // Use an HTMLAudioElement (same mechanism as the in-client preview button).
+    // A Web Audio AudioContext gets throttled/suspended when this window sits
+    // backgrounded during a long queue under game load, so start() plays silently;
+    // a media element keeps playing reliably in the background.
+    notificationAudio = loadNotificationAudio(AUDIO_URL);
+    notificationAudio.onerror = () => {
+        if (AUDIO_URL !== FALLBACK_AUDIO_URL) notificationAudio = loadNotificationAudio(FALLBACK_AUDIO_URL);
+    };
     audioInitialized = true;
 }
 
 function playNotificationSound() {
-    if (!notificationBuffer || !audioContext) return;
+    if (!notificationAudio) return;
     try {
-        const source = audioContext.createBufferSource();
-        source.buffer = notificationBuffer;
-        source.connect(audioContext.destination);
-        source.start(0);
-        currentSource = source;
+        notificationAudio.currentTime = 0;
+        notificationAudio.play().catch((e) => console.error('Audio play error:', e));
     } catch (e) { console.error('Audio play error:', e); }
 }
 
 function stopNotificationSound() {
-    if (currentSource) {
-        try { currentSource.stop(); currentSource.disconnect(); } catch {}
-        currentSource = null;
+    if (notificationAudio) {
+        try { notificationAudio.pause(); notificationAudio.currentTime = 0; } catch {}
     }
 }
 
@@ -427,7 +419,7 @@ queueButton.onclick = async () => {
     if (isQueued) {
         queueConnection.close();
     } else {
-        if (!audioInitialized) await initializeAudio();
+        if (!audioInitialized) initializeAudio();
         startQueue();
     }
 };
