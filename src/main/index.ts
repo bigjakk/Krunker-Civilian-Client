@@ -11,8 +11,8 @@ import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper } fro
 import { UserscriptManager } from './userscripts';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog, getLogPath, closeLogStreams } from './logger';
-import { checkForUpdate, downloadUpdate, installUpdate } from './updater';
-import { showUpdateWindow, showUpdatePrompt } from './update-window';
+import { checkForUpdate, downloadUpdate, installUpdate, checkForUpdateNotice } from './updater';
+import { showUpdateWindow, showUpdatePrompt, showUpdateAvailableNotice } from './update-window';
 import { DiscordRPC } from './discord-rpc';
 import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS } from './css-themes';
 import { TabManager } from './tab-manager';
@@ -233,13 +233,16 @@ function saveWindowState(win: BrowserWindow): void {
 app.whenReady().then(async () => {
   electronLog.log('[KCC] App ready');
 
-  // ── Auto-update check (mandatory, Windows NSIS install only) ──
+  // ── Update check ──
+  // NSIS installs self-update in place. Portable and AppImage builds can't, so they get
+  // a notice with a link to download the new version manually. Dev builds are skipped.
   const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR;
   const isAppImage = !!process.env.APPIMAGE;
   const isDev = !app.isPackaged;
-  if (isDev || process.platform !== 'win32' || isPortable || isAppImage) {
-    electronLog.log('[KCC] Skipping auto-update (portable or non-Windows)');
-  } else {
+  const isNsisInstall = !isDev && process.platform === 'win32' && !isPortable && !isAppImage;
+  if (isDev) {
+    electronLog.log('[KCC] Skipping update check (dev mode)');
+  } else if (isNsisInstall) {
     try {
       electronLog.log('[KCC] Checking for updates...');
       const update = await checkForUpdate(appVersion);
@@ -284,6 +287,29 @@ app.whenReady().then(async () => {
     } catch (err) {
       electronLog.error('[KCC] Update check failed:', err);
     }
+  } else {
+    // Portable / AppImage / other packaged builds: can't self-install — just notify
+    // and link to the release page so the user can grab the right download.
+    try {
+      electronLog.log('[KCC] Checking for updates (notify-only)...');
+      const notice = await checkForUpdateNotice(appVersion);
+      if (notice) {
+        electronLog.log(`[KCC] Update available (notify-only): v${notice.version}`);
+        const downloading = await showUpdateAvailableNotice(notice.version, appVersion);
+        if (downloading) {
+          // User chose to grab the update manually — open the release page and quit
+          // instead of launching the old version.
+          electronLog.log('[KCC] User chose to download update; opening release page and quitting');
+          await shell.openExternal(notice.releaseUrl).catch(() => {});
+          app.quit();
+          return;
+        }
+      } else {
+        electronLog.log('[KCC] No updates available');
+      }
+    } catch (err) {
+      electronLog.error('[KCC] Update notice check failed:', err);
+    }
   }
 
   await launchApp();
@@ -291,6 +317,10 @@ app.whenReady().then(async () => {
 
 async function launchApp(): Promise<void> {
   electronLog.log('[KCC] Starting initialization');
+
+  // Invariant: create the main window before any `await` below. The update-notice flow
+  // closes its dialog and then calls this; if no window exists when that dialog's
+  // 'closed' event fires, the window-all-closed handler would quit the app instead.
 
   // ── Session: persistent partition + clean user-agent ──
   const ses = session.fromPartition('persist:krunker');

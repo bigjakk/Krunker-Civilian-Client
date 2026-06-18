@@ -12,10 +12,31 @@ export interface UpdateInfo {
   sha256: string;
 }
 
+/** Lightweight "an update exists" result for builds that can't self-install (portable, AppImage). */
+export interface UpdateNotice {
+  version: string;
+  /** Link to the release page, where the user can pick the download for their platform. */
+  releaseUrl: string;
+}
+
 export type ProgressCallback = (percent: number) => void;
+
+interface GithubAsset {
+  name: string;
+  browser_download_url: string;
+  size: number;
+  digest: string;
+}
+
+interface GithubRelease {
+  tag_name: string;
+  html_url: string;
+  assets: GithubAsset[];
+}
 
 const UPDATE_CONFIG = {
   checkUrl: 'https://api.github.com/repos/bigjakk/Krunker-Civilian-Client/releases/latest',
+  releasesUrl: 'https://github.com/bigjakk/Krunker-Civilian-Client/releases/latest',
   assetPattern: /Setup\.exe$/i,
   allowedHosts: ['github.com', 'githubusercontent.com'],
 };
@@ -52,112 +73,141 @@ function versionLessThan(a: string, b: string): boolean {
   return false;
 }
 
-export function checkForUpdate(currentVersion: string): Promise<UpdateInfo | null> {
+/**
+ * Fetch and parse the latest GitHub release. Follows redirects (validated against
+ * allowed hosts) and resolves null on any error, timeout, or non-200 status.
+ */
+function fetchLatestRelease(currentVersion: string): Promise<GithubRelease | null> {
   return new Promise((resolve) => {
-    electronLog.log('[KCC-Update] Checking for updates at:', UPDATE_CONFIG.checkUrl);
-    electronLog.log('[KCC-Update] Current version:', currentVersion);
+    const headers = { 'User-Agent': 'KrunkerCivilianClient/' + currentVersion };
 
-    const req = httpsGet(UPDATE_CONFIG.checkUrl, {
-      headers: { 'User-Agent': 'KrunkerCivilianClient/' + currentVersion },
-    }, (res) => {
-      electronLog.log('[KCC-Update] Check response status:', res.statusCode);
-      // Follow redirects (with domain validation)
-      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        const redirectUrl = res.headers.location;
-        electronLog.log('[KCC-Update] Redirected to:', redirectUrl);
-        if (!isAllowedRedirect(redirectUrl)) {
-          electronLog.error('[KCC-Update] Redirect to untrusted host blocked:', redirectUrl);
-          resolve(null);
-          return;
-        }
-        httpsGet(redirectUrl, {
-          headers: { 'User-Agent': 'KrunkerCivilianClient/' + currentVersion },
-        }, (redirectRes) => {
-          electronLog.log('[KCC-Update] Redirect response status:', redirectRes.statusCode);
-          handleResponse(redirectRes);
-        }).on('error', (err) => {
-          electronLog.error('[KCC-Update] Redirect error:', err);
-          resolve(null);
-        });
-        return;
-      }
-      handleResponse(res);
-    });
-
-    function handleResponse(res: import('http').IncomingMessage): void {
-      if (res.statusCode !== 200) {
-        electronLog.error('[KCC-Update] Check returned status', res.statusCode);
+    function doGet(url: string, redirectCount: number): void {
+      if (redirectCount > 5) {
+        electronLog.error('[KCC-Update] Too many redirects during check');
         resolve(null);
         return;
       }
 
-      let data = '';
-      res.on('data', (chunk: string) => { data += chunk; });
-      res.on('end', () => {
-        try {
-          const release = JSON.parse(data);
-          const tagName: string = release.tag_name || '';
-          const remoteVersion = tagName.replace(/^v/i, '');
-          electronLog.log('[KCC-Update] Latest release:', remoteVersion, '| Current:', currentVersion);
-
-          if (!remoteVersion || !versionLessThan(currentVersion, remoteVersion)) {
-            electronLog.log('[KCC-Update] Already up to date');
+      const req = httpsGet(url, { headers }, (res) => {
+        electronLog.log('[KCC-Update] Check response status:', res.statusCode);
+        // Follow redirects (with domain validation)
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          const redirectUrl = res.headers.location;
+          electronLog.log('[KCC-Update] Redirected to:', redirectUrl);
+          if (!isAllowedRedirect(redirectUrl)) {
+            electronLog.error('[KCC-Update] Redirect to untrusted host blocked:', redirectUrl);
             resolve(null);
             return;
           }
-
-          const assets: Array<{ name: string; browser_download_url: string; size: number; digest: string }> = release.assets || [];
-          const setupAsset = assets.find((a) => UPDATE_CONFIG.assetPattern.test(a.name));
-          if (!setupAsset) {
-            electronLog.error('[KCC-Update] No Setup.exe asset found in release', remoteVersion);
-            resolve(null);
-            return;
-          }
-
-          // Validate the download URL points to an allowed host
-          if (!isAllowedRedirect(setupAsset.browser_download_url)) {
-            electronLog.error('[KCC-Update] Download URL points to untrusted host:', setupAsset.browser_download_url);
-            resolve(null);
-            return;
-          }
-
-          // Extract SHA-256 digest from GitHub API (format: "sha256:<hex>")
-          const sha256 = (setupAsset.digest || '').replace(/^sha256:/i, '');
-          if (!sha256) {
-            electronLog.error('[KCC-Update] No SHA-256 digest found for asset');
-            resolve(null);
-            return;
-          }
-
-          electronLog.log('[KCC-Update] Update available:', remoteVersion, '| SHA-256:', sha256.substring(0, 16) + '...');
-          resolve({
-            version: remoteVersion,
-            downloadUrl: setupAsset.browser_download_url,
-            fileSize: setupAsset.size,
-            sha256,
-          });
-        } catch (err) {
-          electronLog.error('[KCC-Update] Failed to parse release data:', err);
-          resolve(null);
+          res.resume(); // drain so the socket can be reused
+          doGet(redirectUrl, redirectCount + 1);
+          return;
         }
+
+        if (res.statusCode !== 200) {
+          electronLog.error('[KCC-Update] Check returned status', res.statusCode);
+          resolve(null);
+          return;
+        }
+
+        let data = '';
+        res.on('data', (chunk: string) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data) as GithubRelease);
+          } catch (err) {
+            electronLog.error('[KCC-Update] Failed to parse release data:', err);
+            resolve(null);
+          }
+        });
+        res.on('error', (err) => {
+          electronLog.error('[KCC-Update] Response error:', err);
+          resolve(null);
+        });
       });
-      res.on('error', (err) => {
-        electronLog.error('[KCC-Update] Response error:', err);
+
+      req.setTimeout(CHECK_TIMEOUT_MS, () => {
+        electronLog.error('[KCC-Update] Check timed out after', CHECK_TIMEOUT_MS, 'ms');
+        req.destroy();
+        resolve(null);
+      });
+
+      req.on('error', (err) => {
+        electronLog.error('[KCC-Update] Check error:', err);
         resolve(null);
       });
     }
 
-    req.setTimeout(CHECK_TIMEOUT_MS, () => {
-      electronLog.error('[KCC-Update] Check timed out after', CHECK_TIMEOUT_MS, 'ms');
-      req.destroy();
-      resolve(null);
-    });
-
-    req.on('error', (err) => {
-      electronLog.error('[KCC-Update] Check error:', err);
-      resolve(null);
-    });
+    electronLog.log('[KCC-Update] Checking for updates at:', UPDATE_CONFIG.checkUrl);
+    electronLog.log('[KCC-Update] Current version:', currentVersion);
+    doGet(UPDATE_CONFIG.checkUrl, 0);
   });
+}
+
+export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo | null> {
+  const release = await fetchLatestRelease(currentVersion);
+  if (!release) return null;
+
+  const remoteVersion = (release.tag_name || '').replace(/^v/i, '');
+  electronLog.log('[KCC-Update] Latest release:', remoteVersion, '| Current:', currentVersion);
+  if (!remoteVersion || !versionLessThan(currentVersion, remoteVersion)) {
+    electronLog.log('[KCC-Update] Already up to date');
+    return null;
+  }
+
+  const setupAsset = (release.assets || []).find((a) => UPDATE_CONFIG.assetPattern.test(a.name));
+  if (!setupAsset) {
+    electronLog.error('[KCC-Update] No Setup.exe asset found in release', remoteVersion);
+    return null;
+  }
+
+  // Validate the download URL points to an allowed host
+  if (!isAllowedRedirect(setupAsset.browser_download_url)) {
+    electronLog.error('[KCC-Update] Download URL points to untrusted host:', setupAsset.browser_download_url);
+    return null;
+  }
+
+  // Extract SHA-256 digest from GitHub API (format: "sha256:<hex>")
+  const sha256 = (setupAsset.digest || '').replace(/^sha256:/i, '');
+  if (!sha256) {
+    electronLog.error('[KCC-Update] No SHA-256 digest found for asset');
+    return null;
+  }
+
+  electronLog.log('[KCC-Update] Update available:', remoteVersion, '| SHA-256:', sha256.substring(0, 16) + '...');
+  return {
+    version: remoteVersion,
+    downloadUrl: setupAsset.browser_download_url,
+    fileSize: setupAsset.size,
+    sha256,
+  };
+}
+
+/**
+ * Check for a newer release without downloading anything — for builds that can't
+ * self-install (portable, AppImage). Returns the new version plus a link to the
+ * release page, where the user can pick the download for their platform.
+ */
+export async function checkForUpdateNotice(currentVersion: string): Promise<UpdateNotice | null> {
+  const release = await fetchLatestRelease(currentVersion);
+  if (!release) return null;
+
+  const remoteVersion = (release.tag_name || '').replace(/^v/i, '');
+  electronLog.log('[KCC-Update] Latest release:', remoteVersion, '| Current:', currentVersion);
+  if (!remoteVersion || !versionLessThan(currentVersion, remoteVersion)) {
+    electronLog.log('[KCC-Update] Already up to date');
+    return null;
+  }
+
+  const releaseUrl = release.html_url || UPDATE_CONFIG.releasesUrl;
+  // Final guard: never hand out a link to an untrusted host.
+  if (!isAllowedRedirect(releaseUrl)) {
+    electronLog.error('[KCC-Update] Notice URL points to untrusted host:', releaseUrl);
+    return null;
+  }
+
+  electronLog.log('[KCC-Update] Update notice:', remoteVersion, '->', releaseUrl);
+  return { version: remoteVersion, releaseUrl };
 }
 
 function verifyChecksum(filePath: string, expectedSha256: string): Promise<boolean> {

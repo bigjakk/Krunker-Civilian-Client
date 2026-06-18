@@ -93,6 +93,37 @@ function buildPromptHTML(version: string, currentVersion: string): string {
 </body></html>`;
 }
 
+function buildNoticeHTML(version: string, currentVersion: string): string {
+  // For builds that can't self-install: the primary button opens the releases page in
+  // the user's browser (handled in main via shell.openExternal). Signals via console.log
+  // like the prompt above, so it works on a data: URL without a preload. Wording is
+  // deliberately explicit that this build does NOT auto-update, to avoid confusion.
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>${SHARED_CSS}</style></head>
+<body>
+  <h2>Update Available</h2>
+  <div id="status">A newer version (v${version}) is available — you're on v${currentVersion}.<br><br>This build doesn't update automatically. Click <b>Download</b> to open the releases page, then download and run the new version manually.</div>
+  <div class="buttons">
+    <button class="secondary" onclick="console.log('KCC_UPDATE:later')">Later</button>
+    <button class="primary" onclick="console.log('KCC_UPDATE:open')">Download</button>
+  </div>
+</body></html>`;
+}
+
+/**
+ * Pull the logged string out of a 'console-message' event, tolerating both the old
+ * (event, level, message, ...) and new (single event-object) Electron signatures.
+ */
+function extractConsoleMessage(args: unknown[]): string {
+  for (const arg of args) {
+    if (typeof arg === 'string') return arg;
+    if (arg && typeof arg === 'object' && 'message' in arg && typeof (arg as { message: unknown }).message === 'string') {
+      return (arg as { message: string }).message;
+    }
+  }
+  return '';
+}
+
 const BASE_WINDOW_OPTS = {
   width: 450,
   resizable: false,
@@ -120,22 +151,47 @@ export function showUpdatePrompt(version: string, currentVersion: string): Promi
     };
 
     // Capture button click via console.log (works on data: URLs without a preload).
-    // Handle both old (event, level, message, ...) and new (event-object) signatures.
     win.webContents.on('console-message', (...args: unknown[]) => {
-      let message = '';
-      for (const arg of args) {
-        if (typeof arg === 'string') { message = arg; break; }
-        if (arg && typeof arg === 'object' && 'message' in arg && typeof (arg as { message: unknown }).message === 'string') {
-          message = (arg as { message: string }).message;
-          break;
-        }
-      }
+      const message = extractConsoleMessage(args);
       if (message === 'KCC_UPDATE:accept') finish(true);
       else if (message === 'KCC_UPDATE:skip') finish(false);
     });
     win.on('closed', () => finish(false));
 
     win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(buildPromptHTML(version, currentVersion)));
+  });
+}
+
+/**
+ * Notice dialog for builds that can't self-install (portable, AppImage). Resolves true
+ * if the user clicked Download — the caller then opens the release page and quits
+ * instead of launching the old version. Resolves false on Later or closing the window.
+ */
+export function showUpdateAvailableNotice(version: string, currentVersion: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const win = new BrowserWindow({
+      ...BASE_WINDOW_OPTS,
+      height: 235,
+      title: 'Krunker Civilian Client - Update Available',
+    });
+    win.removeMenu();
+
+    let resolved = false;
+    const finish = (download: boolean) => {
+      if (resolved) return;
+      resolved = true;
+      if (!win.isDestroyed()) win.close();
+      resolve(download);
+    };
+
+    win.webContents.on('console-message', (...args: unknown[]) => {
+      const message = extractConsoleMessage(args);
+      if (message === 'KCC_UPDATE:open') finish(true);
+      else if (message === 'KCC_UPDATE:later') finish(false);
+    });
+    win.on('closed', () => finish(false));
+
+    win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(buildNoticeHTML(version, currentVersion)));
   });
 }
 
