@@ -103,6 +103,31 @@ export function buildGeneralSection(
     bag.binds.fullscreenToggle = b;
     bag.saveBinds();
   }, undefined, true));
+
+  body.appendChild(createKeybindRow('Screenshot', 'Copy the game view to your clipboard (default F9)', bag.binds.screenshot, (b) => {
+    bag.binds.screenshot = b;
+    bag.saveBinds();
+  }, undefined, true));
+
+  body.appendChild(createToggleRow({
+    label: 'Save Screenshots to Folder',
+    desc: 'Also save a PNG copy to the screenshots folder (always copies to clipboard)',
+    checked: game.screenshotSave ?? false, instant: true,
+    onChange: (v) => { game.screenshotSave = v; ipcRenderer.invoke('set-config', 'game', game); },
+  }));
+
+  const ssFolderRow = document.createElement('div');
+  ssFolderRow.className = 'setting settName safety-0 has-button';
+  ssFolderRow.innerHTML =
+    '<span class="setting-title">Screenshots Folder</span>' +
+    '<div class="setting-desc-new">Where saved screenshots are written</div>';
+  const ssFolderBtn = document.createElement('div');
+  ssFolderBtn.className = 'settingsBtn';
+  ssFolderBtn.title = 'Open Folder';
+  ssFolderBtn.innerHTML = '<span class="material-icons">folder</span> Screenshots';
+  ssFolderBtn.addEventListener('click', () => ipcRenderer.invoke('open-screenshots-folder'));
+  ssFolderRow.appendChild(ssFolderBtn);
+  body.appendChild(ssFolderRow);
 }
 
 export function buildGameSection(

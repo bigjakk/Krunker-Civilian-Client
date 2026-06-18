@@ -143,3 +143,29 @@ export function setWatermark(enabled: boolean, version?: string): void {
     }
 }
 
+// ── Transient toast ──
+// Brief top-center confirmation (e.g. "Screenshot copied to clipboard"). Reuses a
+// single element; styles inline so it needs no injected stylesheet.
+
+const TOAST_ID = 'kcc-toast';
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function showToast(msg: string): void {
+    let el = document.getElementById(TOAST_ID) as HTMLDivElement | null;
+    if (!el) {
+        el = document.createElement('div');
+        el.id = TOAST_ID;
+        el.style.cssText =
+            'position:fixed;top:18px;left:50%;transform:translateX(-50%);' +
+            'background:rgba(20,20,22,0.92);color:#fff;font-family:inherit;font-size:14px;font-weight:bold;' +
+            'padding:9px 16px;border-radius:8px;z-index:100000;pointer-events:none;' +
+            'box-shadow:0 2px 10px rgba(0,0,0,0.4);opacity:0;transition:opacity 160ms ease;';
+        document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    void el.offsetWidth; // force reflow so re-shows re-trigger the fade
+    el.style.opacity = '1';
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { if (el) el.style.opacity = '0'; }, 1800);
+}
+

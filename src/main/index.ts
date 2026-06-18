@@ -17,6 +17,7 @@ import { DiscordRPC } from './discord-rpc';
 import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS } from './css-themes';
 import { TabManager } from './tab-manager';
 import { openRankedQueue, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
+import { takeScreenshot, openScreenshotsFolder } from './screenshot';
 
 const AUDIO_MIME: Record<string, string> = {
   '.mp3': 'audio/mpeg',
@@ -532,6 +533,9 @@ async function launchApp(): Promise<void> {
     } else if (matchesKeybind(input, binds.fullscreenToggle)) {
       win.setFullScreen(!win.isFullScreen());
       event.preventDefault();
+    } else if (matchesKeybind(input, binds.screenshot)) {
+      void takeScreenshot(win);
+      event.preventDefault();
     } else if (input.key === 't' && input.control && !input.shift && !input.alt) {
       tabManager.openTab('https://krunker.io/social.html');
       event.preventDefault();
@@ -748,6 +752,7 @@ async function launchApp(): Promise<void> {
   ipcMain.handle('open-swap-folder', () => shell.openPath(swapDir));
   ipcMain.handle('open-themes-folder', () => shell.openPath(join(swapDir, 'themes')));
   ipcMain.handle('open-backgrounds-folder', () => shell.openPath(join(swapDir, 'backgrounds')));
+  ipcMain.handle('open-screenshots-folder', () => openScreenshotsFolder());
 
   // ── Ping regions IPC handler (TCP connect timing, cached 60s) ──
   ipcMain.handle('ping-regions', async () => {

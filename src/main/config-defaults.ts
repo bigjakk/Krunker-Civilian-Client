@@ -43,6 +43,7 @@ export interface AppConfig {
     showPing: boolean;
     hpEnemyCounter: boolean;
     hideBunnies: boolean;
+    screenshotSave: boolean;
   };
   keystrokes: {
     enabled: boolean;
@@ -78,6 +79,7 @@ export interface AppConfig {
     matchmaker: Keybind;
     matchmakerCancel: Keybind;
     fullscreenToggle: Keybind;
+    screenshot: Keybind;
   };
   userscripts: {
     enabled: boolean;
@@ -141,6 +143,7 @@ export const DEFAULT_KEYBINDS: AppConfig['keybinds'] = {
   matchmaker:        { key: 'F6',     ctrl: false, shift: false, alt: false },
   matchmakerCancel:  { key: 'Escape', ctrl: false, shift: false, alt: false },
   fullscreenToggle:  { key: 'F11',    ctrl: false, shift: false, alt: false },
+  screenshot:        { key: 'F9',     ctrl: false, shift: false, alt: false },
 };
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -169,6 +172,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     showPing: true,
     hpEnemyCounter: true,
     hideBunnies: false,
+    screenshotSave: false,
   },
   keystrokes: {
     enabled: false,

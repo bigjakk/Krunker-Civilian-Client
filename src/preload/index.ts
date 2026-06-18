@@ -4,7 +4,7 @@ import type { MatchmakerConfig } from './matchmaker';
 import { hookSettings } from './settings-render';
 import { initUserscripts } from './userscripts';
 import { initTranslator } from './translator';
-import { setDeathAnimBlock, setMenuTimer, setWatermark } from './utils';
+import { setDeathAnimBlock, setMenuTimer, setWatermark, showToast } from './utils';
 import { initChat } from './chat';
 import { initHPCounter, initRankProgress } from './competitive';
 import { initKeystrokes } from './keystrokes';
@@ -116,6 +116,9 @@ function initShowPing(): void {
 ipcRenderer.on('matchmaker-find', (_e, mmConfig: MatchmakerConfig) => {
   fetchGame(mmConfig, _console).catch((err) => _console.error('[KCC] Matchmaker error:', err));
 });
+
+// ── Toast from main (e.g. screenshot confirmation) ──
+ipcRenderer.on('kcc-toast', (_e, msg: string) => showToast(msg));
 
 
 // ── Wait for main process to signal page load, then poll for settings window ──
