@@ -1,5 +1,6 @@
 // ── Competitive features: Hardpoint enemy counter + Rank progress tracker + Ranked queue ──
 import { ipcRenderer } from 'electron';
+import { savedConsole as _console } from './saved-console';
 
 // ── Hardpoint Enemy Counter ──
 
@@ -253,6 +254,7 @@ function injectQueueButton(): void {
             else if (regionName.includes('Asia')) region = 'as';
         }
         const allRegions = localStorage.getItem('s_rankedAllRegions') === 'true';
+        if (!token) _console.warn('[KCC-Ranked] No auth token found; the external queue may fail to connect');
         ipcRenderer.send('open-ranked-queue', token, region, allRegions);
     });
 

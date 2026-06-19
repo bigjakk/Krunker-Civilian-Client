@@ -4,10 +4,14 @@
 
 import { ipcRenderer } from 'electron';
 import { escapeHtml } from './utils';
+import { savedConsole as _console } from './saved-console';
 
 function switchToAccount(account: { username: string; password: string }): void {
   const w = window as any;
-  if (typeof w.loginOrRegister !== 'function') return;
+  if (typeof w.loginOrRegister !== 'function') {
+    _console.warn('[KCC-Alt] loginOrRegister unavailable; cannot switch account');
+    return;
+  }
 
   function doLogin(): void {
     w.loginOrRegister();
@@ -54,6 +58,7 @@ function altRemove(index: number): Promise<unknown> {
 function altSwitch(index: number): Promise<void> {
   return ipcRenderer.invoke('alt-get-credentials', index).then((creds: { username: string; password: string } | null) => {
     if (creds) switchToAccount(creds);
+    else _console.warn('[KCC-Alt] No stored credentials for account index ' + index);
   });
 }
 
@@ -150,7 +155,7 @@ export function buildAccountsSection(body: HTMLElement): void {
       passIn.value = '';
       form.style.display = 'none';
       renderList();
-    });
+    }).catch((err) => _console.error('[KCC-Alt] Failed to save account:', err));
   });
 }
 
@@ -254,7 +259,7 @@ export function initAltManagerButton(): void {
           const user = (document.getElementById('kccAltUser') as HTMLInputElement).value.trim();
           const pass = (document.getElementById('kccAltPass') as HTMLInputElement).value;
           if (!label || !user || !pass) return;
-          altSave(label, user, pass).then(() => renderAccountList());
+          altSave(label, user, pass).then(() => renderAccountList()).catch((err) => _console.error('[KCC-Alt] Failed to save account:', err));
         });
       }
 

@@ -105,14 +105,14 @@ export function getLoadingScreenCSS(loadingTheme: string, backgroundUrl: string,
                 const pick = files[Math.floor(Math.random() * files.length)];
                 try {
                     imageUrl = `url(${fileToDataUri(join(bgDir, pick))})`;
-                } catch { /* read failed */ }
+                } catch (err) { electronLog.warn('[KCC] Failed to read loading background:', err); }
             }
         } else if (loadingTheme.startsWith('swap:')) {
             const filename = basename(loadingTheme.slice(5));
             if (!filename) return '';
             try {
                 imageUrl = `url(${fileToDataUri(join(bgDir, filename))})`;
-            } catch { /* read failed */ }
+            } catch (err) { electronLog.warn('[KCC] Failed to read loading background ' + filename + ':', err); }
         }
     }
 

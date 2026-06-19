@@ -854,7 +854,8 @@ async function launchApp(): Promise<void> {
       });
       const release = JSON.parse(data);
       return release.body || '';
-    } catch {
+    } catch (err) {
+      electronLog.warn('[KCC] Changelog fetch failed for ' + tag + ':', err);
       return '';
     }
   });
@@ -891,6 +892,7 @@ async function launchApp(): Promise<void> {
       for (const entry of entries) {
         await fsp.rm(join(swapDir, entry.name), { recursive: true, force: true });
       }
+      electronLog.log('[KCC] Swapper reset (' + entries.length + ' entries cleared)');
       return true;
     } catch (err) {
       electronLog.error('[KCC] Reset swapper failed:', err);
@@ -939,15 +941,21 @@ async function launchApp(): Promise<void> {
   });
 
   ipcMain.handle('alt-save', (_e, data: { label: string; username: string; password: string }) => {
-    const accounts = config.get('accounts') || [];
-    const account: SavedAccount = {
-      label: data.label,
-      username: encryptString(data.username),
-      password: encryptString(data.password),
-    };
-    accounts.push(account);
-    config.set('accounts', accounts);
-    return { success: true, index: accounts.length - 1 };
+    try {
+      const accounts = config.get('accounts') || [];
+      const account: SavedAccount = {
+        label: data.label,
+        username: encryptString(data.username),
+        password: encryptString(data.password),
+      };
+      accounts.push(account);
+      config.set('accounts', accounts);
+      electronLog.log('[KCC] Saved alt account "' + data.label + '"');
+      return { success: true, index: accounts.length - 1 };
+    } catch (err) {
+      electronLog.error('[KCC] Failed to save alt account:', err);
+      return { success: false };
+    }
   });
 
   ipcMain.handle('alt-get-credentials', (_e, index: number) => {

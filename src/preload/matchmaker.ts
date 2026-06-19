@@ -411,7 +411,8 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
         allLobbies = fetchResult.all;
         filtered = fetchResult.filtered;
         pings = pingResult;
-    } catch {
+    } catch (err) {
+        _con?.error('[KCC-MM] Failed to fetch lobby list/pings:', err);
         if (!searchAborted && !hideOverlay) {
             searchStatus.textContent = 'Failed to fetch lobbies';
             await new Promise(r => setTimeout(r, 2000));

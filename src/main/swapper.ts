@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, promises as fsp } from 'fs';
 import { join } from 'path';
 import { protocol, net, Session } from 'electron';
+import { electronLog } from './logger';
 
 const PROTOCOL_NAME = 'kcc-swap';
 const TARGET_DOMAIN = 'krunker.io';
@@ -124,8 +125,8 @@ export class ResourceSwapper {
           this.swapFiles.set(name, join(this.swapDir, name));
         }
       }
-    } catch {
-      console.error(`Failed to scan swap directory prefix: ${prefix}`);
+    } catch (err) {
+      electronLog.error(`[KCC] Failed to scan swap directory prefix: ${prefix}`, err);
     }
   }
 }
