@@ -3,6 +3,7 @@
 
 import { readdirSync, readFileSync } from 'fs';
 import { join, extname, basename } from 'path';
+import { electronLog } from './logger';
 
 export interface ThemeEntry {
     id: string;
@@ -36,7 +37,7 @@ export function getThemeCSS(themeId: string, swapDir: string): string {
     if (!filename) return '';
     try {
         return readFileSync(join(swapDir, 'themes', filename), 'utf-8');
-    } catch { return ''; }
+    } catch (err) { electronLog.warn('[KCC] Failed to read theme ' + filename + ':', err); return ''; }
 }
 
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);

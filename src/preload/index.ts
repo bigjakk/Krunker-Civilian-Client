@@ -386,7 +386,7 @@ ipcRenderer.on('main_did-finish-load', () => {
     // ── In-game Accounts quick-switch button ──
     if (isGamePage) initAltManagerButton();
 
-  }).catch(() => {});
+  }).catch((err) => _console.error('[KCC] preload init failed:', err));
 
   const pollInterval = setInterval(() => {
     const w = window as any;

@@ -250,7 +250,7 @@ function renderSettings(searchQuery?: string): void {
 
     holder.appendChild(container);
   }).catch((err: any) => {
-    console.error('[KCC] Settings render error:', err);
+    _console.error('[KCC] Settings render error:', err);
   });
 }
 

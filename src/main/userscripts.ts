@@ -1,5 +1,6 @@
 import { mkdirSync, promises as fsp } from 'fs';
 import { join, parse } from 'path';
+import { electronLog } from './logger';
 
 export interface ScriptFile {
   filename: string;
@@ -75,7 +76,7 @@ export class UserscriptManager {
   async saveTracker(tracker: ScriptTracker): Promise<void> {
     try {
       await fsp.writeFile(this.trackerPath, JSON.stringify(tracker, null, 2), 'utf-8');
-    } catch { /* write failed */ }
+    } catch (err) { electronLog.error('[KCC] Failed to write userscript tracker.json:', err); }
   }
 
   /** Load per-script preferences from preferences/<name>.json */
@@ -94,6 +95,6 @@ export class UserscriptManager {
     const prefsPath = join(this.prefsDir, name + '.json');
     try {
       await fsp.writeFile(prefsPath, JSON.stringify(prefs, null, 2), 'utf-8');
-    } catch { /* write failed */ }
+    } catch (err) { electronLog.error('[KCC] Failed to write userscript prefs ' + name + '.json:', err); }
   }
 }
