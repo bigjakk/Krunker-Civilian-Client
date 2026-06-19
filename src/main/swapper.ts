@@ -50,7 +50,8 @@ export function registerSwapperFileProtocol(ses: Session): void {
     }
     try {
       return await net.fetch(`file://${filePath}`);
-    } catch {
+    } catch (err) {
+      electronLog.warn(`[KCC] Swap file fetch failed for ${filePath}:`, err);
       return new Response('Not found', { status: 404 });
     }
   });

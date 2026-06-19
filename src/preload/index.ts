@@ -208,7 +208,7 @@ ipcRenderer.on('main_did-finish-load', () => {
     if (isGamePage) {
       ipcRenderer.invoke('get-config', 'keystrokes').then((ksConf: KeystrokesConfig | undefined) => {
         if (ksConf && (ksConf.enabled || ksConf.mouseEnabled)) initKeystrokes(ksConf);
-      }).catch(() => { /* ignore */ });
+      }).catch((err) => _console.warn('[KCC] keystrokes config load failed:', err));
     }
 
     // ── KCC watermark (in-game + menu) ──

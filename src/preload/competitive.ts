@@ -296,6 +296,7 @@ export function initRankProgress(): void {
             (window as any).openRankedMenu = patched;
         } else if (++attempts > 75) { // 15s timeout
             clearInterval(poll);
+            _console.warn('[KCC-Ranked] openRankedMenu not found after 15s; rank bar/queue button unavailable');
         }
     }, 200);
 }

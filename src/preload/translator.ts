@@ -272,7 +272,10 @@ async function translateText(text: string): Promise<{ translation: string; srcLa
     }
 
     const data = await response.json();
-    if (!data?.[0]?.[0]) return null;
+    if (!data?.[0]?.[0]) {
+      _con.warn('[KCC-TL] Unexpected translate response shape');
+      return null;
+    }
 
     const translation = (data[0] as any[]).map((item: any) => item[0]).join('');
     const srcLang: string = data[2] || 'unknown';

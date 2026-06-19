@@ -511,7 +511,11 @@ async function launchApp(): Promise<void> {
       event.preventDefault();
     } else if (matchesKeybind(input, binds.joinFromClipboard)) {
       const text = clipboard.readText();
-      try { const u = new URL(text); if (u.protocol === 'https:' && u.hostname.endsWith('krunker.io')) win.loadURL(text); } catch { /* ignore invalid URLs */ }
+      try {
+        const u = new URL(text);
+        if (u.protocol === 'https:' && u.hostname.endsWith('krunker.io')) win.loadURL(text);
+        else electronLog.warn('[KCC] Join-from-clipboard: clipboard is not a krunker.io https URL');
+      } catch { electronLog.warn('[KCC] Join-from-clipboard: clipboard is not a valid URL'); }
       event.preventDefault();
     } else if (matchesKeybind(input, binds.copyGameLink)) {
       clipboard.writeText(win.webContents.getURL());
@@ -630,7 +634,7 @@ async function launchApp(): Promise<void> {
   win.webContents.on('did-finish-load', () => {
     electronLog.log(`[KCC] Page loaded: ${win.webContents.getURL()}`);
     // Rescan swap directory so new/changed files are picked up on refresh
-    if (swapper) swapper.rescan().catch(() => {});
+    if (swapper) swapper.rescan().catch((err) => electronLog.warn('[KCC] Swapper rescan failed:', err));
 
     const cssInjections = [
       win.webContents.insertCSS(HIDE_ADS_CSS),
@@ -658,7 +662,7 @@ async function launchApp(): Promise<void> {
     const loadingCSS = getLoadingScreenCSS(uiConf?.loadingTheme || 'disabled', uiConf?.backgroundUrl || '', swapDir);
     if (loadingCSS) cssInjections.push(win.webContents.insertCSS(loadingCSS));
 
-    Promise.all(cssInjections).catch(() => {});
+    Promise.all(cssInjections).catch((err) => electronLog.warn('[KCC] CSS injection failed:', err));
 
     win.webContents.executeJavaScript(ESCAPE_POINTERLOCK_FIX_JS).catch((err) => electronLog.warn('[KCC] Pointerlock fix inject failed:', err));
     win.webContents.executeJavaScript(CONSENT_DISMISS_JS).catch((err) => electronLog.warn('[KCC] Consent dismiss inject failed:', err));
