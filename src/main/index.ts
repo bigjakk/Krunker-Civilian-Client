@@ -680,6 +680,16 @@ async function launchApp(): Promise<void> {
     'advanced', 'tabWindow', 'keystrokes', 'collapsedSections',
   ]);
 
+  // Settings categories included in export/import. Deliberately excludes:
+  //   accounts          — encrypted alt-account credentials (never exported)
+  //   window/tabWindow  — machine-specific window geometry
+  //   savedTabs         — transient last-open tabs
+  //   collapsedSections — transient settings-panel UI state
+  const EXPORT_CONFIG_KEYS = [
+    'performance', 'game', 'keystrokes', 'swapper', 'matchmaker',
+    'keybinds', 'userscripts', 'ui', 'discord', 'translator', 'advanced',
+  ] as const;
+
   ipcMain.handle('get-version', () => appVersion);
   ipcMain.handle('get-platform', () => platformInfo);
   ipcMain.handle('get-config', (_e, key: string) => {
@@ -695,6 +705,17 @@ async function launchApp(): Promise<void> {
   });
   let configWriteTimer: ReturnType<typeof setTimeout> | null = null;
   const pendingConfigWrites = new Map<string, unknown>();
+
+  function flushPendingConfigWrites(): void {
+    if (configWriteTimer) {
+      clearTimeout(configWriteTimer);
+      configWriteTimer = null;
+    }
+    for (const [k, v] of pendingConfigWrites) {
+      config.set(k as any, v);
+    }
+    pendingConfigWrites.clear();
+  }
 
   ipcMain.handle('set-config', (_e, key: string, value: unknown) => {
     if (!ALLOWED_CONFIG_KEYS.has(key)) return;
@@ -728,13 +749,7 @@ async function launchApp(): Promise<void> {
     }
     pendingConfigWrites.set(key, value);
     if (!configWriteTimer) {
-      configWriteTimer = setTimeout(() => {
-        for (const [k, v] of pendingConfigWrites) {
-          config.set(k as any, v);
-        }
-        pendingConfigWrites.clear();
-        configWriteTimer = null;
-      }, 300);
+      configWriteTimer = setTimeout(flushPendingConfigWrites, 300);
     }
   });
   ipcMain.handle('window-minimize', () => win.minimize());
@@ -922,6 +937,99 @@ async function launchApp(): Promise<void> {
     }
     app.relaunch();
     app.quit();
+  });
+
+  // ── Settings export/import ──
+  // Bundles client settings (allowlisted categories, never alt accounts) plus a
+  // snapshot of Krunker's own settings (the s_* localStorage keys, passed in from
+  // the renderer) into one JSON file. Import re-filters through the same allowlist.
+  ipcMain.handle('export-settings', async (_e, krunkerSettings: Record<string, string> | undefined) => {
+    flushPendingConfigWrites();
+
+    const clientSettings: Record<string, unknown> = {};
+    for (const key of EXPORT_CONFIG_KEYS) {
+      clientSettings[key] = config.get(key as keyof typeof config.store);
+    }
+    // Shallow-copy the two categories we trim so we never mutate the live store.
+    // Drop transient runtime fields that shouldn't travel between installs.
+    clientSettings.game = { ...(clientSettings.game as Record<string, unknown>) };
+    delete (clientSettings.game as Record<string, unknown>).lastServer;
+    clientSettings.ui = { ...(clientSettings.ui as Record<string, unknown>) };
+    delete (clientSettings.ui as Record<string, unknown>).lastSeenVersion;
+
+    const payload = {
+      app: 'Krunker-Civilian-Client',
+      type: 'settings-export',
+      formatVersion: 1,
+      appVersion,
+      exportedAt: new Date().toISOString(),
+      client: clientSettings,
+      krunker: krunkerSettings && typeof krunkerSettings === 'object' ? krunkerSettings : {},
+    };
+
+    const result = await dialog.showSaveDialog(win, {
+      title: 'Export Settings',
+      defaultPath: join(app.getPath('documents'), 'krunker-civilian-settings.json'),
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return { canceled: true };
+
+    try {
+      await fsp.writeFile(result.filePath, JSON.stringify(payload, null, 2), 'utf-8');
+      electronLog.log('[KCC] Settings exported to ' + result.filePath);
+      return { success: true, path: result.filePath };
+    } catch (err) {
+      electronLog.error('[KCC] Settings export failed:', err);
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle('import-settings', async () => {
+    const result = await dialog.showOpenDialog(win, {
+      title: 'Import Settings',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (result.canceled || result.filePaths.length === 0) return { canceled: true };
+
+    let parsed: any;
+    try {
+      const raw = await fsp.readFile(result.filePaths[0], 'utf-8');
+      parsed = JSON.parse(raw);
+    } catch (err) {
+      electronLog.error('[KCC] Settings import: read/parse failed:', err);
+      return { success: false, error: 'Could not read or parse the file.' };
+    }
+
+    if (!parsed || parsed.type !== 'settings-export' || typeof parsed.client !== 'object') {
+      return { success: false, error: 'Not a valid Krunker Civilian Client settings file.' };
+    }
+
+    // Stale debounced set-config writes could otherwise fire after we apply and
+    // clobber the import — flush them first so our config.set calls win.
+    flushPendingConfigWrites();
+
+    // Apply only allowlisted categories, merged over defaults so old/partial
+    // exports keep their missing fields. 'accounts' can never be set here — it's
+    // not in EXPORT_CONFIG_KEYS — so alt credentials are unaffected by import.
+    // The renderer restarts the client after this, which is what makes every
+    // imported setting (and derived state like tab mode / hideBunnies) take hold.
+    let applied = 0;
+    for (const key of EXPORT_CONFIG_KEYS) {
+      const incoming = parsed.client[key];
+      if (incoming && typeof incoming === 'object' && !Array.isArray(incoming)) {
+        config.set(key as any, { ...(DEFAULT_CONFIG as Record<string, any>)[key], ...incoming });
+        applied++;
+      }
+    }
+
+    const krunker = parsed.krunker && typeof parsed.krunker === 'object' ? parsed.krunker : {};
+    if (applied === 0 && Object.keys(krunker).length === 0) {
+      return { success: false, error: 'No recognized settings found in the file.' };
+    }
+    electronLog.log('[KCC] Settings imported (' + applied + ' client categories, ' + Object.keys(krunker).length + ' Krunker keys) from ' + result.filePaths[0]);
+
+    return { success: true, krunker };
   });
 
   // ── Alt manager IPC handlers (credentials encrypted via safeStorage) ──

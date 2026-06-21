@@ -7,7 +7,7 @@
 import { ipcRenderer } from 'electron';
 import type { Keybind } from '../main/config';
 import { DEFAULT_CONFIG } from '../main/config-defaults';
-import { escapeHtml } from './utils';
+import { escapeHtml, showToast } from './utils';
 import { savedConsole as _console } from './saved-console';
 import { openKeybindDialog, keybindDisplayString } from './keybind-dialog';
 import { showConfirm } from './confirm-dialog';
@@ -24,6 +24,39 @@ import {
 import { buildAccountsSection } from './alt-manager';
 import { getInstances, setScriptEnabled } from './userscripts';
 import type { UserscriptInstance } from './userscripts';
+
+// ── Krunker native settings (localStorage s_* keys) ──
+// Krunker persists its in-game settings as `s_<id>` localStorage entries. We only
+// ever read/write the s_* namespace so we never capture or overwrite auth tokens
+// or other non-setting keys.
+function collectKrunkerSettings(): Record<string, string> {
+  const out: Record<string, string> = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('s_')) {
+        const val = localStorage.getItem(key);
+        if (val !== null) out[key] = val;
+      }
+    }
+  } catch (err) {
+    _console.warn('[KCC] Could not read Krunker settings:', err);
+  }
+  return out;
+}
+
+function applyKrunkerSettings(settings: Record<string, string> | undefined): void {
+  if (!settings || typeof settings !== 'object') return;
+  try {
+    for (const [key, val] of Object.entries(settings)) {
+      if (key.startsWith('s_') && typeof val === 'string') {
+        localStorage.setItem(key, val);
+      }
+    }
+  } catch (err) {
+    _console.warn('[KCC] Could not apply Krunker settings:', err);
+  }
+}
 
 export function hookSettings(): void {
   const w = window as any;
@@ -152,6 +185,30 @@ function renderSettings(searchQuery?: string): void {
   actionGrid.className = 'kcc-action-grid';
 
   const actionButtons: Array<{ label: string; color: string; full?: boolean; action: () => void }> = [
+    { label: 'Export Settings', color: 'kcc-ab-cyan', action: () => {
+      const krunker = collectKrunkerSettings();
+      ipcRenderer.invoke('export-settings', krunker).then((res: any) => {
+        if (res && res.success) showToast('Settings exported');
+        else if (res && !res.canceled) showToast('Export failed: ' + (res.error || 'unknown error'));
+      });
+    }},
+    { label: 'Import Settings', color: 'kcc-ab-purple', action: () => {
+      showConfirm({
+        title: 'Import Settings',
+        message: 'Import settings from a file? This overwrites your current client and Krunker settings (alt accounts are not affected) and restarts the client.',
+        confirmLabel: 'Import',
+      }).then((ok) => {
+        if (!ok) return;
+        ipcRenderer.invoke('import-settings').then((res: any) => {
+          if (res && res.success) {
+            applyKrunkerSettings(res.krunker);
+            ipcRenderer.invoke('restart-client');
+          } else if (res && !res.canceled) {
+            showToast('Import failed: ' + (res.error || 'unknown error'));
+          }
+        });
+      });
+    }},
     { label: 'Open Resource Swapper', color: 'kcc-ab-pink', action: () => ipcRenderer.invoke('open-swap-folder') },
     { label: 'Reset Resource Swapper', color: 'kcc-ab-pink', action: () => {
       showConfirm({
