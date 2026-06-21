@@ -10,6 +10,7 @@ import { DEFAULT_CONFIG } from '../main/config-defaults';
 import { escapeHtml } from './utils';
 import { savedConsole as _console } from './saved-console';
 import { openKeybindDialog, keybindDisplayString } from './keybind-dialog';
+import { showConfirm } from './confirm-dialog';
 import {
   createToggleRow, createSection, onSettingChanged,
   resetRefreshNotification, setCollapsedState,
@@ -153,21 +154,27 @@ function renderSettings(searchQuery?: string): void {
   const actionButtons: Array<{ label: string; color: string; full?: boolean; action: () => void }> = [
     { label: 'Open Resource Swapper', color: 'kcc-ab-pink', action: () => ipcRenderer.invoke('open-swap-folder') },
     { label: 'Reset Resource Swapper', color: 'kcc-ab-pink', action: () => {
-      if (confirm('Reset resource swapper? This will delete all files in the swapper folder.')) {
-        ipcRenderer.invoke('reset-swapper');
-      }
+      showConfirm({
+        title: 'Reset Resource Swapper',
+        message: 'This deletes all files in the swapper folder and cannot be undone.',
+        confirmLabel: 'Reset', danger: true,
+      }).then((ok) => { if (ok) ipcRenderer.invoke('reset-swapper'); });
     }},
     { label: 'Open Electron Logs', color: 'kcc-ab-red', action: () => ipcRenderer.invoke('open-electron-log') },
     { label: 'Restart Client', color: 'kcc-ab-orange', full: true, action: () => ipcRenderer.invoke('restart-client') },
     { label: 'Reset Options', color: 'kcc-ab-red', action: () => {
-      if (confirm('Reset all settings to defaults? The client will restart.')) {
-        ipcRenderer.invoke('reset-options');
-      }
+      showConfirm({
+        title: 'Reset Options',
+        message: 'Reset all settings to their defaults? The client will restart.',
+        confirmLabel: 'Reset', danger: true,
+      }).then((ok) => { if (ok) ipcRenderer.invoke('reset-options'); });
     }},
     { label: 'Delete All Data', color: 'kcc-ab-red', action: () => {
-      if (confirm('Delete all data (config, logs)? Scripts are preserved. The client will restart.')) {
-        ipcRenderer.invoke('delete-all-data');
-      }
+      showConfirm({
+        title: 'Delete All Data',
+        message: 'Delete all data (config and logs)? Your scripts are preserved. The client will restart.',
+        confirmLabel: 'Delete', danger: true,
+      }).then((ok) => { if (ok) ipcRenderer.invoke('delete-all-data'); });
     }},
   ];
 

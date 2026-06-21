@@ -5,6 +5,7 @@
 import { ipcRenderer } from 'electron';
 import { escapeHtml } from './utils';
 import { savedConsole as _console } from './saved-console';
+import { showConfirm } from './confirm-dialog';
 
 function switchToAccount(account: { username: string; password: string }): void {
   const w = window as any;
@@ -227,9 +228,11 @@ export function initAltManagerButton(): void {
           menuWindow.querySelectorAll('.kcc-alt-del').forEach((el) => {
             el.addEventListener('click', () => {
               const idx = parseInt((el as HTMLElement).dataset.idx || '0', 10);
-              if (confirm('Delete account "' + (accs[idx]?.label || '') + '"?')) {
-                altRemove(idx).then(() => renderAccountList());
-              }
+              showConfirm({
+                title: 'Delete Account',
+                message: 'Delete the saved account "' + (accs[idx]?.label || '') + '"?',
+                confirmLabel: 'Delete', danger: true,
+              }).then((ok) => { if (ok) altRemove(idx).then(() => renderAccountList()); });
             });
           });
         });
