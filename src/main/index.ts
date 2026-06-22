@@ -928,13 +928,27 @@ async function launchApp(): Promise<void> {
     app.quit();
   });
   ipcMain.handle('delete-all-data', async () => {
-    config.clear();
-    const userData = app.getPath('userData');
+    // Stop the page so Krunker can't re-persist anything mid-wipe.
+    try { win.webContents.stop(); } catch { /* already gone */ }
+    // Clear browsing data: the persistent Krunker partition holds the login token
+    // and kro_setngss_* settings (localStorage), cookies, and cache. config.clear()
+    // alone never touched these, which is why logins/settings used to survive.
     try {
-      await fsp.rm(join(userData, 'logs'), { recursive: true, force: true });
+      await ses.clearStorageData();
+      await ses.clearCache();
+      await session.defaultSession.clearStorageData();
+      await session.defaultSession.clearCache();
     } catch (err) {
-      electronLog.warn('[KCC] Partial data deletion failed (non-fatal):', err);
+      electronLog.warn('[KCC] Clearing browsing data failed (non-fatal):', err);
     }
+    config.clear();
+    try {
+      await fsp.rm(join(app.getPath('userData'), 'logs'), { recursive: true, force: true });
+    } catch (err) {
+      electronLog.warn('[KCC] Log deletion failed (non-fatal):', err);
+    }
+    // Userscripts and swapper files live under userData/Krunker Civilian Client/
+    // and are intentionally left untouched.
     app.relaunch();
     app.quit();
   });

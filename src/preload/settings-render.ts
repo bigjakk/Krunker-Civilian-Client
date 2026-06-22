@@ -236,7 +236,7 @@ function renderSettings(searchQuery?: string): void {
     { label: 'Delete All Data', color: 'kcc-ab-red', action: () => {
       showConfirm({
         title: 'Delete All Data',
-        message: 'Delete all data (config and logs)? Your scripts are preserved. The client will restart.',
+        message: 'Clears your config, logs, and all Krunker site data — including your logins and in-game settings. Your userscripts and swapper files are kept. The client will restart.',
         confirmLabel: 'Delete', danger: true,
       }).then((ok) => { if (ok) ipcRenderer.invoke('delete-all-data'); });
     }},
