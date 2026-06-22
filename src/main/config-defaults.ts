@@ -15,6 +15,10 @@ export interface SavedAccount {
   label: string;
   username: string;
   password: string;
+  // Account avatar image URL, captured from Krunker's rendered header (.ph-avatar)
+  // after logging into the account — the custom picture for premium accounts, or
+  // Krunker's default avatar for non-premium ones. Public asset URL, never a credential.
+  avatarUrl?: string;
 }
 
 export interface AppConfig {

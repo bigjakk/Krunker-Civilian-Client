@@ -482,10 +482,15 @@ async function launchApp(): Promise<void> {
     }
   }
 
-  // ── Keybind capture lock (suppresses shortcuts while the keybind dialog is open) ──
+  // ── Keybind capture lock (suppresses shortcuts while a modal dialog is open) ──
+  // Refcounted so nested modals (e.g. the delete confirm opened over the alt
+  // manager) don't unlock shortcuts when the inner one closes while the outer
+  // is still open. Every opener sends true on open and false on close.
+  let keybindCaptureCount = 0;
   let keybindCapturing = false;
   ipcMain.on('keybind-capture', (_e, capturing: boolean) => {
-    keybindCapturing = capturing;
+    keybindCaptureCount = Math.max(0, keybindCaptureCount + (capturing ? 1 : -1));
+    keybindCapturing = keybindCaptureCount > 0;
   });
 
   // ── Configurable keybinds via before-input-event ──
@@ -1062,8 +1067,34 @@ async function launchApp(): Promise<void> {
 
   ipcMain.handle('alt-list', () => {
     const accounts = config.get('accounts') || [];
-    // Return only labels to the renderer — never send encrypted credentials
-    return accounts.map((a: SavedAccount) => ({ label: a.label }));
+    // Labels + the public avatar URL only — never the encrypted credentials.
+    return accounts.map((a: SavedAccount) => ({ label: a.label, avatarUrl: a.avatarUrl || null }));
+  });
+
+  // Link the currently logged-in Krunker account (username + the avatar URL Krunker
+  // rendered, both read by the renderer) to a saved account by matching the decrypted
+  // username here in main. Lets us show each account's avatar without exposing
+  // usernames to the renderer or hitting Krunker's (captcha-walled) profile API.
+  ipcMain.handle('alt-link-current', (_e, username: string, avatarUrl: string) => {
+    if (!username || !avatarUrl) return false;
+    // Only accept https Krunker asset URLs — never arbitrary or data: URLs.
+    try {
+      const u = new URL(avatarUrl);
+      if (u.protocol !== 'https:' || !u.hostname.endsWith('krunker.io')) return false;
+    } catch { return false; }
+    const accounts = config.get('accounts') || [];
+    const target = username.toLowerCase();
+    let changed = false;
+    for (const acc of accounts) {
+      try {
+        if (decryptString(acc.username).toLowerCase() === target && acc.avatarUrl !== avatarUrl) {
+          acc.avatarUrl = avatarUrl;
+          changed = true;
+        }
+      } catch { /* skip accounts that fail to decrypt */ }
+    }
+    if (changed) config.set('accounts', accounts);
+    return changed;
   });
 
   ipcMain.handle('alt-save', (_e, data: { label: string; username: string; password: string }) => {

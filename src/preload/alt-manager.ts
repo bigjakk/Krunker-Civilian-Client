@@ -7,6 +7,9 @@ import { escapeHtml } from './utils';
 import { savedConsole as _console } from './saved-console';
 import { showConfirm } from './confirm-dialog';
 
+// Tracks the open in-game Alt Manager modal so the header button can toggle it.
+let altModalClose: (() => void) | null = null;
+
 function switchToAccount(account: { username: string; password: string }): void {
   const w = window as any;
   if (typeof w.loginOrRegister !== 'function') {
@@ -44,8 +47,48 @@ function switchToAccount(account: { username: string; password: string }): void 
 // ── Shared alt-manager data operations ──
 // Both the settings-panel section and the in-game popup drive the same IPC
 // handlers; keeping the calls here means the contract lives in one place.
-function altList(): Promise<{ label: string }[]> {
-  return ipcRenderer.invoke('alt-list').then((list: { label: string }[] | null) => list || []);
+type AltAccount = { label: string; avatarUrl: string | null };
+
+function altList(): Promise<AltAccount[]> {
+  return ipcRenderer.invoke('alt-list').then((list: AltAccount[] | null) => list || []);
+}
+
+// Tell main which saved account is currently logged in so it can store that
+// account's avatar for next time. We read the username plus the avatar Krunker
+// itself rendered in the header — the custom picture for premium accounts, or
+// Krunker's default avatar for non-premium ones — and main matches the decrypted
+// username. Only the current login is read, never other accounts' details.
+function linkCurrentAccount(): Promise<unknown> {
+  let username = '';
+  try {
+    username = localStorage.getItem('krunker_username') || '';
+  } catch { /* localStorage unavailable */ }
+  const avatar = document.querySelector('.ph-avatar') as HTMLImageElement | null;
+  const avatarUrl = avatar?.src || '';
+  if (!username || !avatarUrl) return Promise.resolve(null);
+  return ipcRenderer.invoke('alt-link-current', username, avatarUrl).catch(() => null);
+}
+
+// Avatar <img> when we have the account's captured URL, else an initial-letter
+// circle. wireAvatarFallback swaps the img back to initials if it fails to load.
+function avatarMarkup(label: string, avatarUrl: string | null): string {
+  const initial = escapeHtml((label[0] || '?').toUpperCase());
+  if (avatarUrl) {
+    return '<img class="kcc-acc-avatar kcc-acc-avatar-img" data-initial="' + initial +
+      '" src="' + escapeHtml(avatarUrl) + '">';
+  }
+  return '<div class="kcc-acc-avatar">' + initial + '</div>';
+}
+
+function wireAvatarFallback(root: ParentNode): void {
+  root.querySelectorAll('img.kcc-acc-avatar-img').forEach((img) => {
+    img.addEventListener('error', () => {
+      const div = document.createElement('div');
+      div.className = 'kcc-acc-avatar';
+      div.textContent = (img as HTMLElement).getAttribute('data-initial') || '?';
+      img.replaceWith(div);
+    }, { once: true });
+  });
 }
 
 function altSave(label: string, username: string, password: string): Promise<unknown> {
@@ -67,13 +110,13 @@ function altSwitch(index: number): Promise<void> {
 export function buildAccountsSection(body: HTMLElement): void {
   // Labels only — fetched via alt-list (never the generic config getter, which
   // no longer exposes the 'accounts' key). Indices line up with the stored array.
-  const accounts: { label: string }[] = [];
+  const accounts: AltAccount[] = [];
 
   const addBtn = document.createElement('div');
   addBtn.className = 'setting settName safety-0 has-button';
   addBtn.innerHTML =
     '<span class="setting-title">Add Account</span>' +
-    '<button class="kcc-acc-save" style="margin-left:auto;padding:4px 14px;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-family:inherit;background:var(--kcc-accent);color:#fff;">+ Add</button>' +
+    '<button class="kcc-acc-add-toggle" style="margin-left:auto;padding:4px 14px;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-family:inherit;background:var(--kcc-accent);color:#fff;">+ Add</button>' +
     '<div class="setting-desc-new">Save a Krunker account for quick switching</div>';
   body.appendChild(addBtn);
 
@@ -85,8 +128,8 @@ export function buildAccountsSection(body: HTMLElement): void {
     '<input type="text" placeholder="Krunker Username" class="kcc-acc-user">' +
     '<input type="password" placeholder="Krunker Password" class="kcc-acc-pass">' +
     '<div class="kcc-acc-form-buttons">' +
-      '<button class="kcc-acc-save">Save</button>' +
       '<button class="kcc-acc-cancel">Cancel</button>' +
+      '<button class="kcc-acc-save">Save</button>' +
     '</div>';
   body.appendChild(form);
 
@@ -120,26 +163,33 @@ export function buildAccountsSection(body: HTMLElement): void {
       const row = document.createElement('div');
       row.className = 'kcc-acc-item';
       row.innerHTML =
-        '<div class="kcc-acc-item-info">' +
-          '<span class="kcc-acc-item-label">' + escapeHtml(acc.label) + '</span>' +
-        '</div>' +
+        avatarMarkup(acc.label, acc.avatarUrl) +
+        '<span class="kcc-acc-item-label">' + escapeHtml(acc.label) + '</span>' +
         '<div class="kcc-acc-item-actions">' +
           '<button class="kcc-acc-switch">Switch</button>' +
           '<button class="kcc-acc-delete">Delete</button>' +
         '</div>';
+      wireAvatarFallback(row);
       row.querySelector('.kcc-acc-switch')!.addEventListener('click', () => {
         altSwitch(i);
       });
       row.querySelector('.kcc-acc-delete')!.addEventListener('click', () => {
-        altRemove(i).then(() => {
-          accounts.splice(i, 1);
-          renderList();
+        showConfirm({
+          title: 'Delete Account',
+          message: 'Delete the saved account "' + (acc.label || '') + '"?',
+          confirmLabel: 'Delete', danger: true,
+        }).then((ok) => {
+          if (!ok) return;
+          altRemove(i).then(() => {
+            accounts.splice(i, 1);
+            renderList();
+          });
         });
       });
       listEl.appendChild(row);
     });
   }
-  altList().then((list) => {
+  linkCurrentAccount().then(altList).then((list) => {
     accounts.push(...list);
     renderList();
   });
@@ -150,7 +200,7 @@ export function buildAccountsSection(body: HTMLElement): void {
     const pass = passIn.value;
     if (!label || !user || !pass) return;
     altSave(label, user, pass).then(() => {
-      accounts.push({ label });
+      accounts.push({ label, avatarUrl: null });
       labelIn.value = '';
       userIn.value = '';
       passIn.value = '';
@@ -168,105 +218,123 @@ export function initAltManagerButton(): void {
     altBtn.setAttribute('onmouseenter', 'playTick()');
 
     function showAltManager(): void {
-      const windowHolder = document.getElementById('windowHolder') as HTMLElement;
-      const menuWindow = document.getElementById('menuWindow') as HTMLElement;
-      const windowHeader = document.getElementById('windowHeader') as HTMLElement;
-      if (!windowHolder || !menuWindow || !windowHeader) return;
+      // Toggle: clicking the header button again closes the open modal.
+      if (altModalClose) { altModalClose(); return; }
 
-      if (windowHolder.style.display !== 'none' && windowHeader.innerText === 'Alt Manager') {
-        windowHolder.style.display = 'none';
-        return;
+      const backdrop = document.createElement('div');
+      backdrop.id = 'kccAltModal';
+      backdrop.className = 'kcc-alt-backdrop';
+      const modal = document.createElement('div');
+      modal.className = 'kcc-alt-modal';
+      backdrop.appendChild(modal);
+
+      function close(): void {
+        document.removeEventListener('keydown', onKey, true);
+        ipcRenderer.send('keybind-capture', false);
+        backdrop.remove();
+        altModalClose = null;
+      }
+      function onKey(e: KeyboardEvent): void {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); }
       }
 
-      windowHolder.className = 'popupWin';
-      windowHolder.style.display = 'block';
-      menuWindow.classList.value = 'dark';
-      menuWindow.style.cssText = 'width:800px;max-height:calc(100% - 330px);overflow-y:auto;top:50%;transform:translate(-50%,-50%);';
-      windowHeader.innerText = 'Alt Manager';
+      function headerHtml(title: string, withBack: boolean): string {
+        return '<div class="kcc-alt-header">' +
+          '<div class="kcc-alt-header-left">' +
+            (withBack ? '<div class="kcc-alt-back" title="Back">‹</div>' : '') +
+            '<h2>' + title + '</h2>' +
+          '</div>' +
+          '<div class="kcc-alt-close" title="Close">✕</div>' +
+        '</div>';
+      }
 
-      function renderAccountList(): void {
-        altList().then((accs) => {
-          let html =
-            '<div style="font-size:30px;text-align:center;margin:3px;font-weight:700;color:#fff;">Alt Manager</div>' +
-            '<hr style="color:rgba(28,28,28,.5);">' +
-            '<div class="button buttonPI lgn" id="kccAltAddBtn" style="text-align:center;width:98%;margin:3px;padding-top:5px;padding-bottom:13px;">Add Account</div>' +
-            '<div class="amHolder" style="display:flex;flex-direction:column;justify-content:center;">';
-
+      function renderList(): void {
+        linkCurrentAccount().then(altList).then((accs) => {
+          let rows = '';
           if (!accs || accs.length === 0) {
-            html += '<div style="color:rgba(255,255,255,0.4);text-align:center;padding:20px 0;font-size:18px;">No saved accounts</div>';
+            rows = '<div class="kcc-acc-empty">No saved accounts</div>';
           } else {
             accs.forEach((acc, i) => {
-              html +=
-                '<div class="amAccName" style="display:flex;justify-content:flex-end;align-items:center;padding:4px 0;">' +
-                  '<span style="margin-right:auto;color:#fff;font-size:18px;">' + escapeHtml(acc.label) + '</span>' +
-                  '<div class="button buttonG lgn kcc-alt-login" data-idx="' + i + '" style="width:70px;margin-right:0;padding-top:3px;padding-bottom:15px;transform:scale(0.75);">' +
-                    '<span class="material-icons" style="vertical-align:bottom;color:#fff;font-size:30px;margin-bottom:-1px;">login</span>' +
-                  '</div>' +
-                  '<div class="verticalSeparator" style="height:35px;background:rgba(28,28,28,.3);"></div>' +
-                  '<div class="button buttonR lgn kcc-alt-del" data-idx="' + i + '" style="width:70px;margin-right:0;padding-top:3px;padding-bottom:15px;transform:scale(0.75);">' +
-                    '<span class="material-icons" style="vertical-align:bottom;color:#fff;font-size:30px;margin-bottom:-1px;">delete</span>' +
+              rows +=
+                '<div class="kcc-acc-item">' +
+                  avatarMarkup(acc.label, acc.avatarUrl) +
+                  '<span class="kcc-acc-item-label">' + escapeHtml(acc.label) + '</span>' +
+                  '<div class="kcc-acc-item-actions">' +
+                    '<button class="kcc-acc-switch" data-idx="' + i + '">Switch</button>' +
+                    '<button class="kcc-acc-delete" data-idx="' + i + '">Delete</button>' +
                   '</div>' +
                 '</div>';
             });
           }
-          html += '</div>';
-          menuWindow.innerHTML = html;
+          modal.innerHTML = headerHtml('Alt Manager', false) +
+            '<div class="kcc-alt-body">' +
+              '<button class="kcc-acc-add-btn">+ Add Account</button>' +
+              rows +
+            '</div>';
+          wireAvatarFallback(modal);
 
-          const addBtn = document.getElementById('kccAltAddBtn');
-          if (addBtn) addBtn.addEventListener('click', showAddForm);
-
-          menuWindow.querySelectorAll('.kcc-alt-login').forEach((el) => {
+          (modal.querySelector('.kcc-alt-close') as HTMLElement).addEventListener('click', close);
+          (modal.querySelector('.kcc-acc-add-btn') as HTMLElement).addEventListener('click', renderForm);
+          modal.querySelectorAll('.kcc-acc-switch').forEach((el) => {
             el.addEventListener('click', () => {
               const idx = parseInt((el as HTMLElement).dataset.idx || '0', 10);
-              if (accs[idx]) {
-                windowHolder.style.display = 'none';
-                altSwitch(idx);
-              }
+              if (accs[idx]) { close(); altSwitch(idx); }
             });
           });
-
-          menuWindow.querySelectorAll('.kcc-alt-del').forEach((el) => {
+          modal.querySelectorAll('.kcc-acc-delete').forEach((el) => {
             el.addEventListener('click', () => {
               const idx = parseInt((el as HTMLElement).dataset.idx || '0', 10);
               showConfirm({
                 title: 'Delete Account',
                 message: 'Delete the saved account "' + (accs[idx]?.label || '') + '"?',
                 confirmLabel: 'Delete', danger: true,
-              }).then((ok) => { if (ok) altRemove(idx).then(() => renderAccountList()); });
+              }).then((ok) => { if (ok) altRemove(idx).then(() => renderList()); });
             });
           });
         });
       }
 
-      function showAddForm(): void {
-        menuWindow.innerHTML =
-          '<div class="setBodH" style="padding:20px;">' +
-            '<div style="font-size:25px;text-align:center;margin-bottom:15px;color:#fff;">Add Account</div>' +
-            '<input class="accountInput" id="kccAltLabel" type="text" placeholder="Label (e.g. Main, Alt1)" style="width:100%;margin-bottom:8px;">' +
-            '<input class="accountInput" id="kccAltUser" type="text" placeholder="Krunker Username" style="width:100%;margin-bottom:8px;">' +
-            '<input class="accountInput" id="kccAltPass" type="password" placeholder="Krunker Password" style="width:100%;margin-bottom:15px;">' +
-            '<div style="display:flex;gap:8px;">' +
-              '<div class="button buttonG lgn" id="kccAltSaveBtn" style="flex:1;text-align:center;padding-top:5px;padding-bottom:13px;">Add Account</div>' +
-              '<div class="button buttonR lgn" id="kccAltBackBtn" style="width:120px;text-align:center;padding-top:5px;padding-bottom:13px;">Back</div>' +
+      function renderForm(): void {
+        modal.innerHTML = headerHtml('Add Account', true) +
+          '<div class="kcc-alt-body">' +
+            '<div class="kcc-acc-form">' +
+              '<input type="text" class="kcc-acc-label" placeholder="Label (e.g. Main, Alt1)">' +
+              '<input type="text" class="kcc-acc-user" placeholder="Krunker Username">' +
+              '<input type="password" class="kcc-acc-pass" placeholder="Krunker Password">' +
+              '<div class="kcc-acc-form-buttons">' +
+                '<button class="kcc-acc-cancel">Cancel</button>' +
+                '<button class="kcc-acc-save">Add Account</button>' +
+              '</div>' +
             '</div>' +
           '</div>';
 
+        (modal.querySelector('.kcc-alt-close') as HTMLElement).addEventListener('click', close);
+        (modal.querySelector('.kcc-alt-back') as HTMLElement).addEventListener('click', renderList);
+        (modal.querySelector('.kcc-acc-cancel') as HTMLElement).addEventListener('click', renderList);
+
+        const labelIn = modal.querySelector('.kcc-acc-label') as HTMLInputElement;
+        const userIn = modal.querySelector('.kcc-acc-user') as HTMLInputElement;
+        const passIn = modal.querySelector('.kcc-acc-pass') as HTMLInputElement;
         // Stop Krunker's global keydown handler from eating keystrokes in our inputs
-        menuWindow.querySelectorAll('input.accountInput').forEach((input) => {
+        modal.querySelectorAll('input').forEach((input) => {
           input.addEventListener('keydown', (e) => e.stopPropagation());
         });
 
-        document.getElementById('kccAltBackBtn')!.addEventListener('click', renderAccountList);
-        document.getElementById('kccAltSaveBtn')!.addEventListener('click', () => {
-          const label = (document.getElementById('kccAltLabel') as HTMLInputElement).value.trim();
-          const user = (document.getElementById('kccAltUser') as HTMLInputElement).value.trim();
-          const pass = (document.getElementById('kccAltPass') as HTMLInputElement).value;
+        (modal.querySelector('.kcc-acc-save') as HTMLElement).addEventListener('click', () => {
+          const label = labelIn.value.trim();
+          const user = userIn.value.trim();
+          const pass = passIn.value;
           if (!label || !user || !pass) return;
-          altSave(label, user, pass).then(() => renderAccountList()).catch((err) => _console.error('[KCC-Alt] Failed to save account:', err));
+          altSave(label, user, pass).then(() => renderList()).catch((err) => _console.error('[KCC-Alt] Failed to save account:', err));
         });
       }
 
-      renderAccountList();
+      document.addEventListener('keydown', onKey, true);
+      backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+      document.body.appendChild(backdrop);
+      ipcRenderer.send('keybind-capture', true);
+      altModalClose = close;
+      renderList();
     }
 
     altBtn.addEventListener('click', (e) => {

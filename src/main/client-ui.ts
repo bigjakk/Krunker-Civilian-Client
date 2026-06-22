@@ -708,63 +708,97 @@ export const TRANSLATOR_CSS = `
 
 // ── Alt Manager CSS ──
 export const ALT_MANAGER_CSS = `
-.kcc-acc-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-.kcc-acc-form input {
-  background: var(--kcc-surface-input); border: 1px solid var(--kcc-border); border-radius: 4px;
-  color: #fff; padding: 6px 10px; font-size: 13px; outline: none; font-family: inherit;
-}
-.kcc-acc-form input:focus { border-color: var(--kcc-accent); }
-.kcc-acc-form input::placeholder { color: rgba(255,255,255,0.3); }
-.kcc-acc-form-buttons { display: flex; gap: 8px; }
-.kcc-acc-form-buttons button {
-  padding: 6px 16px; border: none; border-radius: 4px; cursor: pointer;
-  font-size: 13px; font-family: inherit;
-}
-.kcc-acc-form-buttons .kcc-acc-save {
-  background: var(--kcc-accent); color: #fff;
-}
-.kcc-acc-form-buttons .kcc-acc-save:hover { filter: brightness(1.2); }
-.kcc-acc-form-buttons .kcc-acc-cancel {
-  background: var(--kcc-surface-hover); color: #fff;
-}
-.kcc-acc-form-buttons .kcc-acc-cancel:hover { background: var(--kcc-surface-hover-strong); }
+/* ── Shared account row (settings panel + in-game popup) ── */
 .kcc-acc-item {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 12px; background: var(--kcc-surface-card); border-radius: 6px; margin-bottom: 6px;
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 2px; border-top: 1px solid rgba(255,255,255,0.06);
 }
-.kcc-acc-item-info { display: flex; align-items: center; gap: 8px; }
-.kcc-acc-item-label { color: #fff; font-size: 14px; font-weight: 500; }
-.kcc-acc-item-role {
-  font-size: 11px; padding: 2px 6px; border-radius: 3px;
-  background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6);
+.kcc-acc-avatar {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(66,165,245,0.15); border: 1px solid rgba(66,165,245,0.3);
+  color: #6ea8fe; font-weight: 600; font-size: 14px; overflow: hidden;
 }
-.kcc-acc-item-actions { display: flex; gap: 6px; }
-.kcc-acc-item-actions button {
-  padding: 4px 12px; border: none; border-radius: 4px; cursor: pointer;
-  font-size: 12px; font-family: inherit;
+img.kcc-acc-avatar { object-fit: cover; }
+.kcc-acc-item-label {
+  flex: 1; min-width: 0; color: #fff; font-size: 14px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.kcc-acc-switch { background: var(--kcc-accent); color: #fff; }
-.kcc-acc-switch:hover { filter: brightness(1.2); }
-.kcc-acc-delete { background: rgba(255,80,80,0.2); color: #ff5050; }
-.kcc-acc-delete:hover { background: rgba(255,80,80,0.35); }
-.kcc-acc-empty { color: rgba(255,255,255,0.4); font-size: 13px; text-align: center; padding: 16px 0; }
-.kcc-alt-overlay-backdrop {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 99998;
+.kcc-acc-item-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.kcc-acc-switch, .kcc-acc-delete {
+  font-size: 12px; font-weight: 600; padding: 7px 13px; border-radius: 7px;
+  cursor: pointer; font-family: inherit; transition: all 120ms ease;
+}
+.kcc-acc-switch { border: 1px solid #42a5f5; background: rgba(66,165,245,0.15); color: #fff; }
+.kcc-acc-switch:hover { background: rgba(66,165,245,0.28); border-color: #6ea8fe; }
+.kcc-acc-delete { border: 1px solid rgba(239,83,80,0.4); background: rgba(255,255,255,0.03); color: #ff7b73; }
+.kcc-acc-delete:hover { background: rgba(239,83,80,0.18); border-color: #ff7b73; }
+.kcc-acc-empty { color: rgba(255,255,255,0.4); font-size: 13px; text-align: center; padding: 18px 0; }
+
+/* ── Add Account form (themed inputs) ── */
+.kcc-acc-form { display: flex; flex-direction: column; gap: 9px; margin: 10px 0 4px; }
+.kcc-acc-form input {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #fff;
+  font-size: 13px; font-family: inherit; outline: none; transition: border-color 120ms ease;
+}
+.kcc-acc-form input:focus { border-color: #42a5f5; }
+.kcc-acc-form input::placeholder { color: rgba(255,255,255,0.3); }
+.kcc-acc-form-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+.kcc-acc-form-buttons button {
+  font-size: 13px; font-weight: 600; padding: 9px 18px; border-radius: 8px;
+  cursor: pointer; font-family: inherit; transition: all 120ms ease;
+}
+.kcc-acc-save { border: 1px solid #42a5f5; background: rgba(66,165,245,0.15); color: #fff; }
+.kcc-acc-save:hover { background: rgba(66,165,245,0.28); border-color: #6ea8fe; }
+.kcc-acc-cancel { border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.85); }
+.kcc-acc-cancel:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.2); }
+
+/* Full-width "+ Add Account" button (in-game popup) */
+.kcc-acc-add-btn {
+  width: 100%; font-size: 13px; font-weight: 600; padding: 11px; border-radius: 8px; cursor: pointer;
+  border: 1px dashed rgba(66,165,245,0.5); background: rgba(66,165,245,0.08); color: #6ea8fe;
+  font-family: inherit; transition: all 120ms ease;
+}
+.kcc-acc-add-btn:hover { background: rgba(66,165,245,0.15); border-color: #6ea8fe; }
+
+/* ── In-game Alt Manager modal (themed, matches changelog/confirm) ── */
+.kcc-alt-backdrop {
+  position: fixed; inset: 0; z-index: 99990;
   background: var(--kcc-overlay-bg);
-  backdrop-filter: blur(var(--kcc-overlay-blur));
-  -webkit-backdrop-filter: blur(var(--kcc-overlay-blur));
+  backdrop-filter: blur(var(--kcc-overlay-blur)); -webkit-backdrop-filter: blur(var(--kcc-overlay-blur));
+  display: flex; align-items: center; justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  animation: kcc-alt-fade 180ms ease-out;
 }
-.kcc-alt-overlay {
-  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  background: var(--kcc-modal-bg);
-  border: var(--kcc-modal-border);
-  border-radius: var(--kcc-modal-radius);
-  padding: 20px; min-width: 280px; max-width: 360px; z-index: 99999;
-  box-shadow: var(--kcc-modal-shadow);
+.kcc-alt-modal {
+  position: relative; background: var(--kcc-modal-bg); border: var(--kcc-modal-border);
+  border-radius: var(--kcc-modal-radius); box-shadow: var(--kcc-modal-shadow);
+  width: min(440px, 92vw); max-height: 80vh; overflow: hidden;
+  display: flex; flex-direction: column; animation: kcc-alt-rise 220ms cubic-bezier(0.16,1,0.3,1);
 }
-.kcc-alt-overlay h3 {
-  margin: 0 0 12px; color: #fff; font-size: 16px; font-weight: 600;
+.kcc-alt-modal::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, #42a5f5, #6ea8fe 50%, #42a5f5);
 }
+.kcc-alt-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px 14px; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.kcc-alt-header h2 { margin: 0; color: #fff; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+.kcc-alt-header-left { display: flex; align-items: center; gap: 8px; }
+.kcc-alt-back, .kcc-alt-close {
+  cursor: pointer; color: rgba(255,255,255,0.5); width: 28px; height: 28px; font-size: 18px;
+  display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 120ms ease;
+}
+.kcc-alt-back:hover, .kcc-alt-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.kcc-alt-body { padding: 14px 22px 20px; overflow-y: auto; }
+.kcc-alt-body::-webkit-scrollbar { width: 8px; }
+.kcc-alt-body::-webkit-scrollbar-track { background: transparent; }
+.kcc-alt-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+.kcc-alt-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+@keyframes kcc-alt-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes kcc-alt-rise { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 `;
 
 // ── HP enemy counter CSS ──
