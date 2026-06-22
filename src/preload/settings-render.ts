@@ -25,16 +25,23 @@ import { buildAccountsSection } from './alt-manager';
 import { getInstances, setScriptEnabled } from './userscripts';
 import type { UserscriptInstance } from './userscripts';
 
-// ── Krunker native settings (localStorage s_* keys) ──
-// Krunker persists its in-game settings as `s_<id>` localStorage entries. We only
-// ever read/write the s_* namespace so we never capture or overwrite auth tokens
-// or other non-setting keys.
+// ── Krunker native settings (localStorage) ──
+// Krunker persists its in-game settings in localStorage: the settings menu uses
+// the `kro_setngss_` prefix (FOV, sensitivity, crosshair, colors, etc.) and a few
+// extras (e.g. ranked region prefs) use `s_`. We capture only these setting
+// namespaces — never auth tokens (`__FRVR_*`, `krunker_username`) or other keys.
+const KRUNKER_SETTING_PREFIXES = ['kro_setngss_', 's_'];
+
+function isKrunkerSettingKey(key: string): boolean {
+  return KRUNKER_SETTING_PREFIXES.some((p) => key.startsWith(p));
+}
+
 function collectKrunkerSettings(): Record<string, string> {
   const out: Record<string, string> = {};
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith('s_')) {
+      if (key && isKrunkerSettingKey(key)) {
         const val = localStorage.getItem(key);
         if (val !== null) out[key] = val;
       }
@@ -49,7 +56,7 @@ function applyKrunkerSettings(settings: Record<string, string> | undefined): voi
   if (!settings || typeof settings !== 'object') return;
   try {
     for (const [key, val] of Object.entries(settings)) {
-      if (key.startsWith('s_') && typeof val === 'string') {
+      if (isKrunkerSettingKey(key) && typeof val === 'string') {
         localStorage.setItem(key, val);
       }
     }
