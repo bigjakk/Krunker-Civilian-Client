@@ -120,7 +120,7 @@ const FALSE_POSITIVE_LANGS = new Set([
 
 let suppressionCounts = new Map<string, number>();
 const SUPPRESS_THRESHOLD = 3;
-const MIN_LATIN_WORDS = 3;
+const MIN_LATIN_WORDS = 2; // Latin-only text with fewer words is skipped (i.e. single words); see shouldTranslate
 const SHORT_TEXT_THRESHOLD = 15;
 
 // ── Concurrency control ──
@@ -208,9 +208,9 @@ function shouldTranslate(text: string): boolean {
   // Non-Latin characters = almost certainly needs translation
   if (!isLatinOnly(cleaned)) return true;
 
-  // Latin-only: require minimum word count (short English slang triggers false positives)
+  // Latin-only single words are too false-positive-prone (English slang) to send;
+  // 2+ words go through so short foreign taunts get caught. Accents always pass.
   if (words.length < MIN_LATIN_WORDS) {
-    // Allow if accented characters suggest non-English
     if (!/[À-ÿ]/.test(cleaned)) return false;
   }
 
