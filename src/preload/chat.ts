@@ -13,13 +13,18 @@ const TEAM_MODES = new Set([
 
 let chatList: HTMLElement | null = null;
 let observer: MutationObserver | null = null;
+let resizeObserver: ResizeObserver | null = null;
 let historyMax = 0;
 let betterChatEnabled = false;
 let reInsertGuard = false;
 let scrollPaused = false;
+let savedScrollTop = 0; // position to hold while paused (user scrolled up)
+let lastWheelTime = 0; // when the user last wheeled over the chat
+let pointerDownInChat = false; // user is dragging the chat scrollbar
 let _con: SavedConsole | null = null;
 
 const SCROLL_BOTTOM_THRESHOLD = 30; // px from bottom to consider "at bottom"
+const USER_SCROLL_WINDOW = 200; // ms after a wheel that 'scroll' counts as user-driven
 
 function isChatMessage(node: Node): node is HTMLElement {
     return node.nodeType === 1 && (node as HTMLElement).id?.startsWith('chatMsg_');
@@ -44,6 +49,7 @@ function handleMutations(mutations: MutationRecord[]): void {
         if (removed.length > 0) {
             reInsertGuard = true;
             observer.disconnect();
+            const heightBefore = chatList.scrollHeight;
             const firstLive = chatList.firstChild;
             for (const node of removed) {
                 chatList.insertBefore(node, firstLive);
@@ -51,6 +57,9 @@ function handleMutations(mutations: MutationRecord[]): void {
             while (chatList.children.length > historyMax) {
                 chatList.removeChild(chatList.firstChild!);
             }
+            // Re-inserting happens above the viewport, so shift the saved anchor
+            // by the net height change to keep the user pinned to the same line.
+            if (scrollPaused) savedScrollTop += chatList.scrollHeight - heightBefore;
             observer.observe(chatList, { childList: true });
             reInsertGuard = false;
         }
@@ -86,9 +95,12 @@ function handleMutations(mutations: MutationRecord[]): void {
         }
     }
 
-    // Auto-scroll to bottom unless the user has scrolled up
-    if (chatList && !scrollPaused) {
-        chatList.scrollTop = chatList.scrollHeight;
+    // Krunker force-scrolls #chatList to the bottom on every new message. When
+    // the user has scrolled up, undo that and hold their position; otherwise
+    // follow the latest message. (This runs before the resulting scroll event,
+    // so the restored position is what updatePauseState sees.)
+    if (chatList) {
+        chatList.scrollTop = scrollPaused ? savedScrollTop : chatList.scrollHeight;
     }
 }
 
@@ -96,8 +108,16 @@ function isNearBottom(el: HTMLElement): boolean {
     return el.scrollHeight - el.scrollTop - el.clientHeight <= SCROLL_BOTTOM_THRESHOLD;
 }
 
+function isUserScrolling(): boolean {
+    return pointerDownInChat || (Date.now() - lastWheelTime <= USER_SCROLL_WINDOW);
+}
+
 function updatePauseState(): void {
     if (!chatList) return;
+    // Only user-driven scrolls toggle the freeze. Programmatic pins, Krunker's
+    // force-scroll-to-bottom, and the menu→game reflow all fire 'scroll' too —
+    // treating those as "the user scrolled up" caused resume→reflow→re-pause.
+    if (!isUserScrolling()) return;
     const atBottom = isNearBottom(chatList);
     if (scrollPaused && atBottom) {
         scrollPaused = false;
@@ -106,6 +126,24 @@ function updatePauseState(): void {
         scrollPaused = true;
         chatList.classList.add('kcc-chat-paused');
     }
+    // Remember where the user parked so we can restore it after Krunker yanks
+    // the list to the bottom on the next message.
+    if (scrollPaused) savedScrollTop = chatList.scrollTop;
+}
+
+function pinToBottom(): void {
+    if (chatList && !scrollPaused) chatList.scrollTop = chatList.scrollHeight;
+}
+
+// Snap back to the latest message and clear the paused state. Called when the
+// player clicks back into the game (pointer lock re-acquired) so the chat shows
+// current messages immediately instead of staying frozen until the next one.
+// The ResizeObserver re-pins once the chat shrinks to its in-game size.
+function resumeChatScroll(): void {
+    if (!chatList) return;
+    scrollPaused = false;
+    chatList.classList.remove('kcc-chat-paused');
+    pinToBottom();
 }
 
 function tryAttach(): boolean {
@@ -115,7 +153,20 @@ function tryAttach(): boolean {
     observer = new MutationObserver(handleMutations);
     observer.observe(chatList, { childList: true });
 
+    // The in-game chat is shorter than the menu/input-open chat. When clicking
+    // back into the game shrinks it (which raises the scroll bottom), re-pin to
+    // the latest message — unless the user has scrolled up.
+    resizeObserver = new ResizeObserver(pinToBottom);
+    resizeObserver.observe(chatList);
+
     chatList.addEventListener('scroll', updatePauseState, { passive: true });
+    chatList.addEventListener('wheel', () => { lastWheelTime = Date.now(); }, { passive: true });
+    chatList.addEventListener('pointerdown', () => { pointerDownInChat = true; }, { passive: true });
+    window.addEventListener('pointerup', () => { pointerDownInChat = false; }, { passive: true });
+    // Clicking back into the game re-acquires pointer lock — resume following.
+    document.addEventListener('pointerlockchange', () => {
+        if (document.pointerLockElement) resumeChatScroll();
+    });
 
     _con?.log('[KCC-Chat] Observer attached to #chatList');
     return true;
