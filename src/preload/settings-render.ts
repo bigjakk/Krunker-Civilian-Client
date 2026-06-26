@@ -70,6 +70,11 @@ function applyKrunkerSettings(settings: Record<string, string> | undefined): voi
 // existing DOM in place rather than rebuilding the whole tree on every keystroke.
 let rendered: { container: HTMLElement; panels: HTMLElement[]; setActiveCat: (key: string) => void; activeKey: string } | null = null;
 
+// Last category the user viewed — remembered across opening/closing the settings
+// window within a session. Kept in memory only, so it resets on app relaunch (and
+// page reload), which is the intended behaviour.
+let lastActiveCategory: string | null = null;
+
 export function hookSettings(): void {
   const w = window as any;
   const settingsWindow = w.windows[0];
@@ -348,6 +353,7 @@ function renderSettings(searchQuery?: string): void {
     const setActiveCat = (key: string): void => {
       items.forEach((it) => it.classList.toggle('kcc-active', it.dataset.cat === key));
       panels.forEach((pnl) => { pnl.style.display = pnl.dataset.cat === key ? '' : 'none'; });
+      lastActiveCategory = key;
       if (rendered) rendered.activeKey = key;
     };
 
@@ -373,13 +379,17 @@ function renderSettings(searchQuery?: string): void {
       cat.build(panel);
     });
 
-    rendered = { container, panels, setActiveCat, activeKey: cats[0].key };
+    // Restore the last-viewed category (this session); fall back to the first.
+    const initialKey = lastActiveCategory && cats.some((c) => c.key === lastActiveCategory)
+      ? lastActiveCategory
+      : cats[0].key;
+    rendered = { container, panels, setActiveCat, activeKey: initialKey };
 
     if (searchQuery) {
       applySearchFilter(container, holder, searchQuery, panels);
     } else {
       activeSearch = null;
-      setActiveCat(cats[0].key);
+      setActiveCat(initialKey);
     }
 
     holder.appendChild(container);
