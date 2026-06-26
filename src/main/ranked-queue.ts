@@ -24,129 +24,213 @@ const RANKED_REGIONS: Record<string, string> = {
 };
 
 const QUEUE_CSS = `
+:root {
+  --accent: #46b6ff;
+  --accent-hover: #6cc6ff;
+  --accent-soft: rgba(70,182,255,0.14);
+  --on-accent: #06243a;
+  --bg: #141414;
+  --card: #1a1a1a;
+  --input: rgba(255,255,255,0.05);
+  --hover: rgba(255,255,255,0.1);
+  --t1: rgba(255,255,255,0.92);
+  --t2: rgba(255,255,255,0.6);
+  --t3: rgba(255,255,255,0.4);
+  --bd: rgba(255,255,255,0.08);
+  --bd2: rgba(255,255,255,0.14);
+  --focus: rgba(255,255,255,0.35);
+}
 * { user-select: none; margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: "Trebuchet MS", sans-serif;
-  background: #0d0d0d;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Trebuchet MS', sans-serif;
+  background: var(--bg);
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #e0e0e0;
+  color: var(--t1);
   overflow: hidden;
+  padding: 20px;
 }
-.queuer-container {
-  position: relative;
-  background: #1a1a1a;
-  padding: 40px 52px;
-  max-width: 1000px;
-  width: 90vw;
-  border: 2px solid #2a2a2a;
-  border-top: 3px solid #06b6d4;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.7);
-  border-radius: 4px;
+.queuer-card {
+  width: 100%;
+  max-width: 720px;
+  background: var(--card);
+  border: 1px solid var(--bd);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
 }
-.main-content { display: flex; align-items: center; gap: 56px; }
-.left-section { flex: 1; display: flex; flex-direction: column; gap: 24px; }
-.status-area {
-  display: flex; align-items: center; gap: 14px;
-  position: relative; padding-left: 18px;
+
+/* header band */
+.queue-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--bd);
+  background: linear-gradient(180deg, #1f2733, #1a1a1a);
 }
-.status-area::before {
-  content: ""; position: absolute; left: 0;
-  width: 8px; height: 8px; background: #666;
-  border-radius: 50%; transition: background 0.3s ease;
+.queue-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--on-accent);
 }
-.status-area.active::before {
-  background: #06b6d4;
-  box-shadow: 0 0 12px rgba(6, 182, 212, 0.6);
+.queue-mark svg { width: 20px; height: 20px; display: block; }
+.queue-head-text { flex: 1; }
+.queue-title { font-size: 15px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.queue-sub { font-size: 11px; color: var(--t3); margin-top: 1px; }
+.queue-status { display: flex; align-items: center; gap: 8px; padding-left: 15px; position: relative; }
+.queue-status::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  background: var(--t3);
+  border-radius: 50%;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
 }
+.queue-status.active::before { background: var(--accent); box-shadow: 0 0 10px rgba(70,182,255,0.6); }
 #queueStatus {
-  font-size: 14px; font-weight: 600; color: #666;
-  text-transform: uppercase; letter-spacing: 1px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   transition: color 0.3s ease;
 }
-#queueStatus.active { color: #06b6d4; }
+#queueStatus.active { color: var(--accent); }
+
+/* body */
+.queue-body { display: flex; align-items: center; gap: 40px; padding: 28px 32px; }
+.queue-left { flex: 1; display: flex; flex-direction: column; gap: 20px; }
 .timer-display {
-  font-size: 52px; font-weight: 700; color: #fff;
-  font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
-  padding: 12px 16px; background: #222;
-  border-left: 3px solid #06b6d4; border-radius: 2px;
+  font-size: 48px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+  padding: 12px 18px;
+  background: var(--input);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
 }
-.region-controls { display: flex; gap: 12px; }
-.region-option { position: relative; }
+.region-controls { display: flex; gap: 10px; }
 .region-option input { display: none; }
 .region-option label {
-  display: block; padding: 12px 24px; background: #222;
-  border: 2px solid #2d2d2d; border-radius: 4px;
-  color: #888; font-size: 16px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.5px;
-  cursor: pointer; transition: all 0.2s ease;
+  display: block;
+  padding: 11px 22px;
+  background: var(--input);
+  border: 1px solid var(--bd2);
+  border-radius: 8px;
+  color: var(--t2);
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.region-option label:hover { background: #2a2a2a; border-color: #3a3a3a; }
-.region-option input:checked + label {
-  background: rgba(6, 182, 212, 0.1);
-  border-color: #06b6d4; color: #06b6d4;
-}
-.divider { width: 1px; height: 120px; background: #2a2a2a; }
-.right-section { display: flex; flex-direction: column; gap: 14px; }
+.region-option label:hover { background: var(--hover); border-color: var(--focus); color: var(--t1); }
+.region-option input:checked + label { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.divider { width: 1px; align-self: stretch; background: var(--bd); }
+.queue-right { display: flex; flex-direction: column; gap: 12px; }
 .btn {
-  padding: 16px 42px; border: 2px solid transparent;
-  font-size: 20px; font-weight: 600; cursor: pointer;
-  transition: all 0.2s ease; font-family: "Trebuchet MS", sans-serif;
-  text-transform: uppercase; letter-spacing: 1px; border-radius: 4px;
+  padding: 15px 38px;
+  border: 1px solid transparent;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 8px;
 }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-secondary { background: #222; color: #999; border-color: #2a2a2a; }
-.btn-secondary:hover:not(:disabled) { background: #2a2a2a; border-color: #3a3a3a; }
-.btn-primary { background: #06b6d4; color: #fff; border-color: #06b6d4; }
-.btn-primary:hover:not(:disabled) { background: #0ea5ca; border-color: #0ea5ca; }
+.btn-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
 .btn-primary:active:not(:disabled) { transform: scale(0.98); }
-.btn-primary.in-queue { background: #222; border-color: #06b6d4; color: #06b6d4; }
-.btn-primary.in-queue:hover:not(:disabled) { background: rgba(6, 182, 212, 0.1); }
+.btn-primary.in-queue { background: var(--input); border-color: var(--accent); color: var(--accent); }
+.btn-primary.in-queue:hover:not(:disabled) { background: var(--accent-soft); }
+
+/* match-found popup */
 .overlay {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.9); display: flex;
-  align-items: center; justify-content: center;
-  opacity: 0; visibility: hidden; transition: all 0.3s ease; z-index: 1000;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+  z-index: 1000;
 }
 .overlay.active { opacity: 1; visibility: visible; }
 .popup {
-  background: #1a1a1a; border: 2px solid #2a2a2a;
-  border-top: 3px solid #06b6d4; max-width: 560px; width: 90vw;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8);
-  text-align: center; transform: scale(0.95);
-  transition: transform 0.3s ease; border-radius: 4px;
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--bd);
+  border-radius: 14px;
+  max-width: 480px;
+  width: 90vw;
+  padding: 28px 32px 32px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.7);
+  text-align: center;
+  transform: scale(0.96);
+  transition: transform 0.25s ease;
 }
 .overlay.active .popup { transform: scale(1); }
-.popup h2 {
-  margin-top: 12px; font-size: 32px; font-weight: 700;
-  color: #06b6d4; text-transform: uppercase; letter-spacing: 1.5px;
-}
-.popup-content { margin: 20px 0; }
-.popup-content p {
-  font-size: 15px; color: #888; margin-bottom: 12px;
-  text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
-}
+.popup h2 { font-size: 24px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
+.popup-content { margin-top: 18px; }
 .region-found {
-  font-size: 18px; font-weight: 700; color: #fff;
-  text-transform: uppercase; letter-spacing: 1px;
-  display: inline-block; padding: 12px 24px;
-  background: rgba(6, 182, 212, 0.15);
-  border: 2px solid #06b6d4; border-radius: 4px;
-}
-.countdown-large {
-  font-size: 48px; font-weight: 700; color: #06b6d4;
-  margin: 16px 0; font-variant-numeric: tabular-nums; line-height: 1;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: inline-block;
+  padding: 10px 20px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
 }
 #matchFoundMessage {
-  margin-top: 12px; font-size: 20px; color: #fff;
-  text-align: center; width: 400px; margin-left: auto; margin-right: auto;
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--t2);
+  line-height: 1.5;
+  max-width: 340px;
+  margin-left: auto;
+  margin-right: auto;
 }
+.countdown-large { font-size: 44px; font-weight: 700; color: var(--accent); margin-top: 16px; font-variant-numeric: tabular-nums; line-height: 1; }
 #closeButton {
-  position: absolute; right: 0; top: 0;
-  margin: 10px 20px 0 0; font-size: 20px; cursor: pointer;
+  position: absolute;
+  right: 16px;
+  top: 14px;
+  font-size: 15px;
+  color: var(--t3);
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
 }
+#closeButton:hover { background: var(--hover); color: var(--t1); }
 `;
 
 function buildMapsJson(): string {
@@ -454,30 +538,35 @@ function buildQueueHtml(token: string, region: string, allRegions: boolean, audi
 <style>${QUEUE_CSS}</style>
 </head>
 <body>
-<div class="queuer-container">
-  <div class="main-content">
-    <div class="left-section">
-      <div class="status-area" id="statusArea">
-        <span id="queueStatus">Ready</span>
-      </div>
+<div class="queuer-card">
+  <div class="queue-header">
+    <div class="queue-mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V5l-8-3z"/></svg></div>
+    <div class="queue-head-text">
+      <div class="queue-title">Civilian Client</div>
+      <div class="queue-sub">Ranked queue</div>
+    </div>
+    <div class="queue-status" id="statusArea"><span id="queueStatus">Ready</span></div>
+  </div>
+  <div class="queue-body">
+    <div class="queue-left">
       <div class="timer-display" id="queueTimerDisplay">00:00:00</div>
       <div class="region-controls" id="regionCheckboxes">
         ${buildRegionCheckboxes()}
       </div>
     </div>
     <div class="divider"></div>
-    <div class="right-section">
+    <div class="queue-right">
       <button type="button" class="btn btn-primary" id="queueButton">Start Queue</button>
     </div>
   </div>
 </div>
 <div class="overlay" id="matchPopupOverlay">
   <div class="popup">
+    <div id="closeButton">✕</div>
     <h2>Match Found</h2>
     <div class="popup-content">
-      <div id="closeButton">X</div>
       <div class="region-found" id="foundRegion">Region: </div>
-      <div id="matchFoundMessage">open the client and rejoin the game from the ranked menu</div>
+      <div id="matchFoundMessage">Open the client and rejoin the game from the ranked menu.</div>
       <div class="countdown-large" id="countDownTimer">00:00:60</div>
     </div>
   </div>
@@ -499,11 +588,11 @@ export function openRankedQueue(
     }
 
     const win = new BrowserWindow({
-        width: 850,
-        height: 350,
+        width: 780,
+        height: 400,
         resizable: false,
         autoHideMenuBar: true,
-        backgroundColor: '#0d0d0d',
+        backgroundColor: '#141414',
         title: 'Ranked Queue',
         webPreferences: {
             nodeIntegration: false,
