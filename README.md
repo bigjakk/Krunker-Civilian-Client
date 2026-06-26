@@ -29,32 +29,33 @@ Was AI used in the creation of this client? Yes, if you came across this client 
 - tabbed hub/social pages with drag-and-drop reorder
 - better chat — merged team/all chat with `[T]`/`[M]` prefixes
 - chat history preservation (Krunker prunes old messages, this prevents it)
-- real-time chat translator (Google Translate, 15+ languages)
+- real-time chat translator (Google Translate, 15 languages)
 - userscript support (Tampermonkey-style metadata, per-script settings)
 - battle pass claim all button
 - alt account manager with encrypted credential storage
 - Discord RPC (gamemode, map, class, spectator status)
 - raw input / unadjusted movement (Windows)
 - show numeric ping in player list
-- double ping display (Krunker shows half the real value)
+- direct server ping option (real TCP round-trip to the game server, not Krunker's estimate)
 - hardpoint enemy counter HUD
+- keystrokes overlay for streaming (on-screen keyboard + mouse)
 - changelog popup on update
 - configurable keybinds with visual rebinding dialog
 - configurable ANGLE backend (D3D11, OpenGL, D3D11on12)
-- advanced Chromium flag settings (GPU rasterization, low latency, QUIC, and more
+- advanced Chromium flag settings (GPU rasterization, low latency, QUIC, and more)
 - auto-updater
 - maintained & open source (GPL-3.0)
 
 ## Hotkeys
 
-All hotkeys are rebindable in settings.
+The game hotkeys are rebindable in settings. The tab shortcuts (`Ctrl+T`/`W`/`Tab`/`Shift+Tab`/`1-9`) are fixed. Chat auto-freezes when you scroll up and resumes when you scroll back to the bottom — no key needed.
 
 | Key | Action |
 |-----|--------|
 | `F4` | New match (triggers matchmaker if enabled) |
 | `F5` | Reload page |
 | `F6` | Open matchmaker |
-| `F10` | Pause chat (freeze auto-scroll) |
+| `F9` | Screenshot (copy to clipboard) |
 | `F11` | Toggle fullscreen |
 | `F12` | DevTools |
 | `Ctrl+L` | Copy game link |
@@ -92,5 +93,5 @@ For details on the patch and build instructions, see [Electron-Websocket-Fix](ht
 
 ## Credits
 
-- [Crankshaft](https://github.com/KraXen72/crankshaft) by KraXen72 - Original inspiration. Settings Layout, Matchmaker
+- [Crankshaft](https://github.com/KraXen72/crankshaft) by KraXen72 - Original inspiration. Matchmaker, keystrokes overlay
 - [Glorp](https://github.com/slavcp/glorp) by slav - Numerous features for the newer chromium verisions. External Ranked Queue
