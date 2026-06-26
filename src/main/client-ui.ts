@@ -24,6 +24,8 @@ export const THEME_CSS = `
   --kcc-border-focus: rgba(255,255,255,0.35);
 
   /* ── Accents ── */
+  --kcc-accent: #46b6ff;
+  --kcc-accent-soft: rgba(70,182,255,0.14);
   --kcc-green: #4CAF50;
   --kcc-green-hover: #66bb6a;
   --kcc-red: #ef5350;
@@ -56,243 +58,304 @@ export const THEME_CSS = `
 // ── Injected CSS for client settings in Krunker's settings panel ──
 export const CLIENT_SETTINGS_CSS = `
 ${THEME_CSS}
-/* ── Crankshaft-style settings (Krunker-native classes) ── */
+/* -- Self-contained client settings design system (kcc-* namespace) -- */
+/* Deliberately avoids Krunker's own control classes so a Krunker restyle cannot
+   leak into our settings. */
 
-.kcc-settings .settName,
-.kcc-settings .settName .setting-title {
-	color: rgba(255,255,255,.6) !important;
-}
-
-.kcc-settings .settName {
-	display: grid;
-	grid-auto-columns: 1fr;
-	grid-template-columns: 0fr 1fr 0fr;
-	grid-template-areas:
-	"icon title input"
-	"desc desc desc";
-	grid-template-rows: 0fr min-content;
-	align-items: center;
-}
-.kcc-settings .settName.multisel {
-	grid-template-rows: min-content 1fr;
-	grid-template-columns: 0fr 1fr min-content;
-	grid-template-areas:
-	"icon title button"
-	"input input input";
-}
-.kcc-settings .settName.multisel .kcc-clear-btn {
-	grid-area: button;
-	justify-self: end;
-	cursor: pointer;
-	font-size: 0.9rem;
-	line-height: 1;
-	padding: 5px 12px;
-	border-radius: 5px;
-	color: #969696;
-	background-color: rgba(99, 99, 99, 0.16);
-	border: 2px solid rgba(78, 78, 78, 0.81);
-	white-space: nowrap;
-	user-select: none;
-}
-.kcc-settings .settName.multisel .kcc-clear-btn:hover {
-	color: #fff;
-	border-color: rgba(120, 120, 120, 0.9);
-}
-.kcc-settings .settName.has-button {
-	grid-template-areas:
-	"icon title button input"
-	"desc desc desc desc";
-	grid-template-columns: 0fr 1fr min-content 0fr;
-}
-.kcc-settings .settName.has-button .settingsBtn {
-	grid-area: button;
-	margin: 0 .5rem;
+.kcc-settings {
+  color: var(--kcc-text-secondary);
+  font-size: 14px;
 }
 
-.kcc-settings .settName.kcc-button-holder {
-	grid-template-columns: 1fr;
-	grid-auto-columns: min-content;
-	column-gap: 0.25rem;
-	grid-template-areas: unset;
-	grid-template-rows: 0fr;
-	grid-auto-flow: column;
+/* -- Section groups (Phase 1 accordion) -- */
+.kcc-group { margin: 0 0 4px; }
+.kcc-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--kcc-text-primary);
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--kcc-border-default);
 }
-.kcc-settings .kcc-button-holder .buttons-title, .material-icons { color: inherit; }
-.kcc-settings .kcc-button-holder .settingsBtn,
-.kcc-settings .settName.has-button .settingsBtn {
-	width: max-content;
+.kcc-group-head:hover { color: #fff; }
+.kcc-group-arrow {
+  font-size: 20px;
+  color: var(--kcc-text-muted);
+  transition: transform 0.15s;
+}
+.kcc-group-head.kcc-collapsed .kcc-group-arrow { transform: rotate(-90deg); }
+.kcc-group-body { display: block; padding: 2px 0 8px; }
+.kcc-group-body.kcc-group-collapsed { display: none; }
+
+/* -- Row -- */
+.kcc-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 6px 12px 11px;
+  border-left: 2px solid transparent;
+  border-bottom: 1px solid var(--kcc-border-subtle);
+}
+.kcc-row:last-child { border-bottom: none; }
+.kcc-row-main { flex: 1; min-width: 0; }
+.kcc-row-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--kcc-text-primary);
+}
+.kcc-row-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--kcc-text-muted);
+  margin-top: 3px;
+  max-width: 56ch;
+  word-wrap: break-word;
+}
+.kcc-row-desc a { color: var(--kcc-blue); cursor: pointer; }
+.kcc-row-control {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kcc-row-block { flex-direction: column; align-items: stretch; }
+.kcc-row-block .kcc-row-control { margin-top: 6px; }
+.kcc-row-info { color: var(--kcc-text-muted); }
+
+/* flagged-row left edge (mirrors the strongest tag) */
+.kcc-row.kcc-flag-reload  { border-left-color: var(--kcc-blue); }
+.kcc-row.kcc-flag-restart { border-left-color: var(--kcc-orange); }
+.kcc-row.kcc-flag-warn    { border-left-color: var(--kcc-yellow); }
+.kcc-row.kcc-flag-exp     { border-left-color: #ff8a3d; }
+.kcc-row.kcc-flag-danger  { border-left-color: var(--kcc-red); }
+
+/* -- Tags -- */
+.kcc-tag {
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.kcc-tag-reload  { background: rgba(66,165,245,0.16); color: var(--kcc-blue); }
+.kcc-tag-restart { background: rgba(255,152,0,0.16);  color: var(--kcc-orange); }
+.kcc-tag-warn    { background: rgba(255,193,7,0.16);  color: var(--kcc-yellow); }
+.kcc-tag-exp     { background: rgba(255,138,61,0.16); color: #ff9a5a; }
+.kcc-tag-danger  { background: rgba(239,83,80,0.16);  color: var(--kcc-red); }
+
+/* -- Toggle -- */
+.kcc-toggle {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 23px;
+  flex: none;
+}
+.kcc-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.kcc-toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 23px;
+  background: var(--kcc-toggle-off);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.kcc-toggle-track::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+}
+.kcc-toggle input:checked + .kcc-toggle-track { background: var(--kcc-green); }
+.kcc-toggle input:checked + .kcc-toggle-track::before { left: 22px; }
+.kcc-toggle input:disabled + .kcc-toggle-track { opacity: 0.5; pointer-events: none; }
+
+/* -- Select + text input -- */
+.kcc-select, .kcc-input {
+  background: var(--kcc-surface-input);
+  border: 1px solid var(--kcc-border-default);
+  border-radius: 6px;
+  color: var(--kcc-text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.kcc-select { cursor: pointer; min-width: 150px; }
+.kcc-input { min-width: 240px; }
+.kcc-select:hover, .kcc-input:hover { border-color: var(--kcc-border-medium); }
+.kcc-select:focus, .kcc-input:focus { border-color: var(--kcc-border-focus); }
+.kcc-select option { background: var(--kcc-surface-raised); color: var(--kcc-text-primary); }
+.kcc-input::placeholder { color: var(--kcc-text-faint); }
+
+/* -- Number (range + value) -- */
+.kcc-num { display: flex; align-items: center; gap: 12px; }
+.kcc-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 120px;
+  height: 4px;
+  border-radius: 3px;
+  background: var(--kcc-surface-hover);
+  outline: none;
+  cursor: pointer;
+}
+.kcc-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--kcc-blue);
+  cursor: pointer;
+}
+.kcc-num-val {
+  width: 58px;
+  text-align: center;
+  background: var(--kcc-surface-input);
+  border: 1px solid var(--kcc-border-default);
+  border-radius: 6px;
+  color: var(--kcc-text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 4px;
+  outline: none;
+}
+.kcc-num-val:focus { border-color: var(--kcc-border-focus); }
+
+/* -- Keybind chip -- */
+.kcc-keyIcon {
+  display: inline-block;
+  min-width: 36px;
+  text-align: center;
+  background: var(--kcc-surface-input);
+  border: 1px solid var(--kcc-border-medium);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--kcc-text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.kcc-keyIcon:hover { border-color: var(--kcc-border-focus); color: var(--kcc-text-primary); }
+
+/* -- Button -- */
+.kcc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--kcc-surface-input);
+  border: 1px solid var(--kcc-border-medium);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  color: var(--kcc-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.kcc-btn:hover { background: var(--kcc-surface-hover); border-color: var(--kcc-border-focus); color: var(--kcc-text-primary); }
+.kcc-btn:active { transform: scale(0.97); }
+.kcc-btn .material-icons { font-size: 16px; }
+
+/* -- Multi-select grid -- */
+.kcc-multisel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.kcc-clear-btn {
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 5px 12px;
+  border-radius: 5px;
+  color: var(--kcc-text-muted);
+  background: var(--kcc-surface-input);
+  border: 1px solid var(--kcc-border-medium);
+  white-space: nowrap;
+  user-select: none;
+}
+.kcc-clear-btn:hover { color: #fff; border-color: var(--kcc-border-focus); }
+.kcc-multisel {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 6px;
+  width: 100%;
+}
+.kcc-multisel-has-icons { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+.kcc-opt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  background: var(--kcc-surface-card);
+  border: 1px solid var(--kcc-border-default);
+  border-radius: 7px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.kcc-opt:hover { background: var(--kcc-surface-hover); }
+.kcc-opt input { display: none; }
+.kcc-opt-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex: none;
+}
+.kcc-opt-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--kcc-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kcc-opt-check {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--kcc-border-focus);
+  position: relative;
+}
+.kcc-opt input:checked ~ .kcc-opt-name { color: var(--kcc-text-primary); }
+.kcc-opt input:checked ~ .kcc-opt-check { background: var(--kcc-green); border-color: var(--kcc-green); }
+.kcc-opt input:checked ~ .kcc-opt-check::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 4px;
+  height: 9px;
+  border: solid #0c2f12;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 
-/* type: num */
-.kcc-settings .settName.num .setting-input-wrapper {
-	display: flex;
-}
-.kcc-settings .settName.num .setting-input-wrapper .slidecontainer {
-	margin-top: -8px;
-}
-
-/* type: multisel */
-.kcc-multisel-parent {
-	display: grid;
-	grid-template-columns: repeat(5, 1fr);
-	grid-auto-rows: 1fr;
-	gap: .25rem;
-	background: #232323;
-	border-radius: 10px;
-	margin-top: 0.8rem;
-}
-.kcc-multisel-parent label.hostOpt {
-	width: 100%;
-	margin: 0;
-	box-sizing: border-box;
-}
-
-/* maps multisel: responsive columns sized to the icon + name (no wasted width).
-   Icon sizing/stacking is applied inline in the preload (createCheckboxGrid) —
-   Krunker's hostOpt context defeats injected stylesheet rules. */
-.kcc-multisel-parent.kcc-multisel-has-icons {
-	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-}
-
-.kcc-settings .settName.multisel label {
-	font-size: 1.1rem;
-}
-.kcc-settings .settName.multisel input {
-	margin-left: .25rem;
-}
-
-/* general settings */
-.kcc-settings .settName .setting-title {
-	grid-area: title;
-}
-
-.kcc-settings .settName .s-update:disabled,
-.kcc-settings .settName .s-update:disabled+.slider.round {
-	opacity: 0.5;
-	pointer-events: none;
-}
-
-.kcc-settings .setting .switch {
-	box-sizing: border-box;
-}
-
-.kcc-settings .setting .desc-icon {
-	grid-area: icon;
-	cursor: pointer;
-	font-size: 1rem;
-	width: 2.2rem;
-	height: 2.2rem;
-	line-height: 2.2rem;
-	border-radius: 5px !important;
-	color: #969696;
-	background-color: rgba(99, 99, 99, 0.16);
-	border: 2px solid rgba(78, 78, 78, 0.81);
-	margin-right: 10px;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-}
-
-.kcc-settings .setting .desc-icon.instant {
-	background-color: rgba(1, 89, 220, 0.16);
-	border: 2px solid rgba(3, 133, 255, 0.81);
-}
-
-.kcc-settings .setting .desc-icon.instant svg path {
-	color: #0385ff;
-	fill: currentColor;
-}
-
-.kcc-settings .setting.settName .inputGrey2,
-.kcc-settings .setting.settName .switch,
-.kcc-settings .setting.settName .kcc-multisel-parent,
-.kcc-settings .setting.settName .setting-input-wrapper,
-.kcc-settings .setting.settName .keyIcon {
-	grid-area: input;
-}
-
-.kcc-settings .setting.safety-1 .desc-icon,
-.kcc-settings .setting .desc-icon.refresh-icon,
-.kcc-settings .setting .desc-icon.restart-icon {
-	background-color: rgba(99, 99, 99, 0.16);
-	border: 2px solid rgba(78, 78, 78, 0.81);
-}
-
-.kcc-settings .setting.safety-1 .desc-icon svg path,
-.kcc-settings .setting .desc-icon.refresh-icon svg path,
-.kcc-settings .setting .desc-icon.restart-icon svg path {
-	color: #969696;
-	fill: currentColor;
-}
-
-.kcc-settings .setting.safety-2 .desc-icon {
-	background-color: rgba(220, 180, 1, 0.16);
-	border: 2px solid rgba(241, 186, 6, 0.81);
-}
-
-.kcc-settings .setting.safety-2 .desc-icon svg path {
-	color: #ffd903;
-	fill: currentColor;
-}
-
-.kcc-settings .setting.safety-3 .desc-icon {
-	background-color: rgba(220, 118, 1, 0.16);
-	border: 2px solid rgba(241, 131, 6, 0.81);
-}
-
-.kcc-settings .setting.safety-3 .desc-icon svg path {
-	color: #ff9203;
-	fill: currentColor;
-}
-
-.kcc-settings .setting.safety-4 .desc-icon {
-	background-color: rgba(220, 17, 1, 0.16);
-	border: 2px solid rgba(239, 6, 6, 0.81);
-}
-
-.kcc-settings .setting.safety-4 .desc-icon svg path {
-	color: #ff0303;
-	fill: currentColor;
-}
-
-.desc-icon {
-	position: relative;
-}
-
-.setting-desc-new {
-	display: block;
-	width: fit-content;
-	max-width: 50ch;
-	line-height: 30px;
-	font-size: 15px;
-	letter-spacing: 0.5px;
-	word-wrap: break-word;
-	color: rgba(255, 255, 255, 0.4) !important;
-	overflow: hidden;
-	max-height: 500px;
-	margin-top: 6px;
-	grid-area: desc;
-}
-
-.setting-desc-new a {
-	font-size: inherit !important;
-	font-family: inherit !important;
-}
-
-.setting-category-collapsed {
-	display: none;
-}
-
-/* keybind display */
-.keyIcon.kcc-keyIcon:hover {
-	transform: scale(1.25);
-	cursor: pointer;
-}
-
-.keyIcon.kcc-keyIcon {
-	display: inline-block;
-	transition: 0s;
-}
 
 /* ── KCC action button grid ── */
 .kcc-action-grid {
@@ -734,6 +797,12 @@ img.kcc-acc-avatar { object-fit: cover; }
 .kcc-acc-delete { border: 1px solid rgba(239,83,80,0.4); background: rgba(255,255,255,0.03); color: #ff7b73; }
 .kcc-acc-delete:hover { background: rgba(239,83,80,0.18); border-color: #ff7b73; }
 .kcc-acc-empty { color: rgba(255,255,255,0.4); font-size: 13px; text-align: center; padding: 18px 0; }
+.kcc-acc-add-toggle {
+  padding: 6px 16px; border: none; border-radius: 6px; cursor: pointer;
+  font-size: 12px; font-weight: 600; font-family: inherit;
+  background: var(--kcc-accent); color: #06243a;
+}
+.kcc-acc-add-toggle:hover { background: var(--kcc-accent-hover, #6cc6ff); }
 
 /* ── Add Account form (themed inputs) ── */
 .kcc-acc-form { display: flex; flex-direction: column; gap: 9px; margin: 10px 0 4px; }

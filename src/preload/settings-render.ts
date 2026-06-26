@@ -12,7 +12,8 @@ import { savedConsole as _console } from './saved-console';
 import { openKeybindDialog, keybindDisplayString } from './keybind-dialog';
 import { showConfirm } from './confirm-dialog';
 import {
-  createToggleRow, createSection, onSettingChanged,
+  createToggleRow, createSection, createButtonRow, createInfoRow,
+  createRowShell, createSelect, onSettingChanged,
   resetRefreshNotification, setCollapsedState,
 } from './settings-controls';
 import {
@@ -132,14 +133,14 @@ export function hookSettings(): void {
 // ── Search filter + "no settings" cleanup ──
 function applySearchFilter(container: HTMLElement, holder: HTMLElement, searchQuery: string): void {
   const query = searchQuery.toLowerCase();
-  const sections = Array.from(container.children).filter(el => el.querySelector('.setHed'));
+  const sections = Array.from(container.children).filter(el => el.querySelector('.kcc-group-head'));
   sections.forEach(sectionEl => {
-    const sectionTitle = sectionEl.querySelector('.setHed')?.textContent?.toLowerCase() || '';
-    const body = sectionEl.querySelector('.setBodH');
+    const sectionTitle = sectionEl.querySelector('.kcc-group-head')?.textContent?.toLowerCase() || '';
+    const body = sectionEl.querySelector('.kcc-group-body');
     if (!body) { (sectionEl as HTMLElement).style.display = 'none'; return; }
 
     if (sectionTitle.includes(query)) {
-      body.classList.remove('setting-category-collapsed');
+      body.classList.remove('kcc-group-collapsed');
       return;
     }
 
@@ -157,7 +158,7 @@ function applySearchFilter(container: HTMLElement, holder: HTMLElement, searchQu
     if (visibleCount === 0) {
       (sectionEl as HTMLElement).style.display = 'none';
     } else {
-      body.classList.remove('setting-category-collapsed');
+      body.classList.remove('kcc-group-collapsed');
     }
   });
 
@@ -337,50 +338,31 @@ function renderUserscriptsSection(body: HTMLElement): void {
       onChange: (v) => { us.enabled = v; ipcRenderer.invoke('set-config', 'userscripts', us); },
     }));
 
-    const usFolderRow = document.createElement('div');
-    usFolderRow.className = 'setting settName safety-0 has-button';
-    usFolderRow.innerHTML =
-      '<span class="setting-title">Scripts Folder</span>' +
-      '<div class="setting-desc-new">Place .js userscript files here</div>';
-    const usFolderBtn = document.createElement('div');
-    usFolderBtn.className = 'settingsBtn';
-    usFolderBtn.title = 'Open Folder';
-    usFolderBtn.innerHTML = '<span class="material-icons">folder</span> Scripts';
-    usFolderBtn.addEventListener('click', () => ipcRenderer.invoke('userscripts-open-folder'));
-    usFolderRow.appendChild(usFolderBtn);
-    body.appendChild(usFolderRow);
+    body.appendChild(createButtonRow({
+      label: 'Scripts Folder',
+      desc: 'Place .js userscript files here',
+      buttons: [{ icon: 'folder', label: 'Scripts', title: 'Open Folder', onClick: () => ipcRenderer.invoke('userscripts-open-folder') }],
+    }).row);
 
     const scriptInstances = getInstances();
     if (scriptInstances.length === 0) {
-      const emptyRow = document.createElement('div');
-      emptyRow.className = 'setting settName safety-0';
-      emptyRow.innerHTML =
-        '<div class="setting-desc-new">No userscripts found. Place .js files in the scripts folder and reload.</div>';
-      body.appendChild(emptyRow);
+      body.appendChild(createInfoRow('No userscripts found. Place .js files in the scripts folder and reload.'));
       return;
     }
 
     for (const inst of scriptInstances) {
-      const scriptRow = document.createElement('div');
-      scriptRow.className = 'setting settName safety-0 bool';
-
-      const displayName = escapeHtml(inst.meta.name || inst.filename);
       const metaParts: string[] = [];
       if (inst.meta.author) metaParts.push('by ' + escapeHtml(inst.meta.author));
       if (inst.meta.version) metaParts.push('v' + escapeHtml(inst.meta.version));
       const metaLine = metaParts.length > 0 ? '<span class="kcc-us-meta">' + metaParts.join(' &middot; ') + '</span>' : '';
-      const descText = escapeHtml(inst.meta.desc || '');
+      const descHtml = escapeHtml(inst.meta.desc || '') + (metaLine ? '<br>' + metaLine : '');
 
-      scriptRow.innerHTML =
-        '<span class="setting-title">' + displayName + '</span>' +
-        '<label class="switch">' +
-          '<input type="checkbox" class="s-update"' + (inst.enabled ? ' checked' : '') + '>' +
-          '<div class="slider round"></div>' +
-        '</label>' +
-        '<div class="setting-desc-new">' + descText + (metaLine ? '<br>' + metaLine : '') + '</div>';
+      const { row: scriptRow, control } = createRowShell(inst.meta.name || inst.filename, descHtml);
+      control.innerHTML =
+        '<label class="kcc-toggle"><input type="checkbox"' + (inst.enabled ? ' checked' : '') + '><span class="kcc-toggle-track"></span></label>';
       body.appendChild(scriptRow);
 
-      const cb = scriptRow.querySelector('input[type="checkbox"]') as HTMLInputElement;
+      const cb = control.querySelector('input[type="checkbox"]') as HTMLInputElement;
       const settingsContainer = document.createElement('div');
       settingsContainer.className = 'kcc-us-settings';
       body.appendChild(settingsContainer);
@@ -407,22 +389,13 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
   if (!inst.settings) return;
 
   for (const [, setting] of Object.entries(inst.settings)) {
-    const typeClass = setting.type === 'bool' ? 'bool' : setting.type === 'sel' ? 'sel' : setting.type === 'num' ? 'num' : setting.type === 'keybind' ? 'keybind' : '';
-    const row = document.createElement('div');
-    row.className = 'setting settName safety-0' + (typeClass ? ' ' + typeClass : '');
-    row.innerHTML =
-      '<span class="setting-title">' + escapeHtml(setting.title) + '</span>' +
-      (setting.desc ? '<div class="setting-desc-new">' + escapeHtml(setting.desc) + '</div>' : '');
+    const { row, control } = createRowShell(setting.title, setting.desc ? escapeHtml(setting.desc) : '');
 
     switch (setting.type) {
       case 'bool': {
-        const label = document.createElement('label');
-        label.className = 'switch';
-        label.innerHTML =
-          '<input type="checkbox" class="s-update"' + (setting.value ? ' checked' : '') + '>' +
-          '<div class="slider round"></div>';
-        row.appendChild(label);
-        const input = label.querySelector('input') as HTMLInputElement;
+        control.innerHTML =
+          '<label class="kcc-toggle"><input type="checkbox"' + (setting.value ? ' checked' : '') + '><span class="kcc-toggle-track"></span></label>';
+        const input = control.querySelector('input') as HTMLInputElement;
         input.addEventListener('change', () => {
           setting.value = input.checked;
           if (typeof setting.changed === 'function') setting.changed(setting.value);
@@ -433,12 +406,12 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
       case 'num': {
         const input = document.createElement('input');
         input.type = 'number';
-        input.className = 'rb-input s-update sliderVal';
+        input.className = 'kcc-num-val';
         input.value = String(setting.value);
         if (setting.min !== undefined) input.min = String(setting.min);
         if (setting.max !== undefined) input.max = String(setting.max);
         if (setting.step !== undefined) input.step = String(setting.step);
-        row.appendChild(input);
+        control.appendChild(input);
         input.addEventListener('change', () => {
           setting.value = parseFloat(input.value) || 0;
           if (typeof setting.changed === 'function') setting.changed(setting.value);
@@ -447,18 +420,8 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
         break;
       }
       case 'sel': {
-        const select = document.createElement('select');
-        select.className = 's-update inputGrey2';
-        if (setting.opts) {
-          for (const opt of setting.opts) {
-            const option = document.createElement('option');
-            option.value = String(opt);
-            option.textContent = String(opt);
-            if (String(opt) === String(setting.value)) option.selected = true;
-            select.appendChild(option);
-          }
-        }
-        row.appendChild(select);
+        const select = createSelect((setting.opts || []).map((o) => ({ value: String(o), label: String(o) })), String(setting.value));
+        control.appendChild(select);
         select.addEventListener('change', () => {
           setting.value = select.value;
           if (typeof setting.changed === 'function') setting.changed(setting.value);
@@ -471,7 +434,7 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
         input.type = 'color';
         input.className = 'kcc-color-input';
         input.value = String(setting.value) || '#ffffff';
-        row.appendChild(input);
+        control.appendChild(input);
         input.addEventListener('input', () => {
           setting.value = input.value;
           if (typeof setting.changed === 'function') setting.changed(setting.value);
@@ -482,7 +445,7 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
       case 'keybind': {
         const bind = setting.value as Keybind;
         const keyEl = document.createElement('span');
-        keyEl.className = 'keyIcon kcc-keyIcon';
+        keyEl.className = 'kcc-keyIcon';
         keyEl.textContent = keybindDisplayString(bind);
         keyEl.addEventListener('click', () => {
           openKeybindDialog(setting.title).then((newBind) => {
@@ -492,7 +455,7 @@ function renderScriptSettings(inst: UserscriptInstance, container: HTMLElement):
             saveScriptSetting(inst);
           });
         });
-        row.appendChild(keyEl);
+        control.appendChild(keyEl);
         break;
       }
     }

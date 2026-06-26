@@ -9,7 +9,8 @@ import { DEFAULT_CONFIG } from '../main/config-defaults';
 import { setDeathAnimBlock, setMenuTimer, setWatermark } from './utils';
 import {
   createKeybindRow, createSimpleKeyRow, createToggleRow, createSelectRow,
-  createNumberRow, createCheckboxGrid, onSettingChanged, refreshIcon,
+  createNumberRow, createCheckboxGrid, createButtonRow, createTextRow,
+  createInfoRow, createRowShell, createSelect, makeButton, onSettingChanged,
 } from './settings-controls';
 import { setClassicSocial, startHidePopups, stopHidePopups } from './menu-tweaks';
 import { initHPCounter, destroyHPCounter } from './competitive';
@@ -85,19 +86,13 @@ export function buildGeneralSection(
     onChange: (v) => { ui.showChangelog = v; saveUI(); },
   }));
 
-  const changelogBtnRow = document.createElement('div');
-  changelogBtnRow.className = 'setting settName safety-0 has-button';
-  changelogBtnRow.innerHTML =
-    '<span class="setting-title">Changelog</span>' +
-    '<div class="setting-desc-new">View release notes for the current version</div>';
-  const changelogBtn = document.createElement('div');
-  changelogBtn.className = 'settingsBtn';
-  changelogBtn.innerHTML = '<span class="material-icons">article</span> Show';
-  changelogBtn.addEventListener('click', () => {
-    ipcRenderer.invoke('get-version').then((ver: string) => showChangelogNow(ver));
-  });
-  changelogBtnRow.appendChild(changelogBtn);
-  body.appendChild(changelogBtnRow);
+  body.appendChild(createButtonRow({
+    label: 'Changelog',
+    desc: 'View release notes for the current version',
+    buttons: [{ icon: 'article', label: 'Show', onClick: () => {
+      ipcRenderer.invoke('get-version').then((ver: string) => showChangelogNow(ver));
+    } }],
+  }).row);
 
   body.appendChild(createKeybindRow('Toggle Fullscreen', 'Fullscreen the game window (default F11)', bag.binds.fullscreenToggle, (b) => {
     bag.binds.fullscreenToggle = b;
@@ -116,18 +111,11 @@ export function buildGeneralSection(
     onChange: (v) => { game.screenshotSave = v; ipcRenderer.invoke('set-config', 'game', game); },
   }));
 
-  const ssFolderRow = document.createElement('div');
-  ssFolderRow.className = 'setting settName safety-0 has-button';
-  ssFolderRow.innerHTML =
-    '<span class="setting-title">Screenshots Folder</span>' +
-    '<div class="setting-desc-new">Where saved screenshots are written</div>';
-  const ssFolderBtn = document.createElement('div');
-  ssFolderBtn.className = 'settingsBtn';
-  ssFolderBtn.title = 'Open Folder';
-  ssFolderBtn.innerHTML = '<span class="material-icons">folder</span> Screenshots';
-  ssFolderBtn.addEventListener('click', () => ipcRenderer.invoke('open-screenshots-folder'));
-  ssFolderRow.appendChild(ssFolderBtn);
-  body.appendChild(ssFolderRow);
+  body.appendChild(createButtonRow({
+    label: 'Screenshots Folder',
+    desc: 'Where saved screenshots are written',
+    buttons: [{ icon: 'folder', label: 'Screenshots', title: 'Open Folder', onClick: () => ipcRenderer.invoke('open-screenshots-folder') }],
+  }).row);
 }
 
 export function buildGameSection(
@@ -278,12 +266,9 @@ export function buildKeystrokesRows(body: HTMLElement): void {
   body.appendChild(aux2Row);
 
   const KEYSTROKES_CREDIT_URL = 'https://gist.github.com/KraXen72/2ea1332440b0c66b83ca9b73afc38269';
-  const creditRow = document.createElement('div');
-  creditRow.className = 'setting settName safety-0';
-  creditRow.innerHTML =
-    '<span class="setting-title" style="font-weight:normal;opacity:0.75;font-size:0.9em;">' +
-      'Keyboard overlay adapted from <a class="kcc-credit-link" style="color:#4cb3ff;cursor:pointer;text-decoration:underline;">KraXen72\'s Keystrokes userscript</a> for the Crankshaft Krunker client.' +
-    '</span>';
+  const creditRow = createInfoRow(
+    'Keyboard overlay adapted from <a class="kcc-credit-link">KraXen72\'s Keystrokes userscript</a> for the Crankshaft Krunker client.',
+  );
   const creditLink = creditRow.querySelector('.kcc-credit-link') as HTMLElement;
   creditLink.addEventListener('click', (e) => {
     e.preventDefault();
@@ -359,18 +344,11 @@ export function buildSwapperSection(body: HTMLElement, swapperConf: any): void {
     },
   }));
 
-  const folderRow = document.createElement('div');
-  folderRow.className = 'setting settName safety-0 has-button';
-  folderRow.innerHTML =
-    '<span class="setting-title">Swapper Folder</span>' +
-    '<div class="setting-desc-new">Place replacement assets here (textures/, sound/, models/)</div>';
-  const swapFolderBtn = document.createElement('div');
-  swapFolderBtn.className = 'settingsBtn';
-  swapFolderBtn.title = 'Open Folder';
-  swapFolderBtn.innerHTML = '<span class="material-icons">folder</span> Swapper';
-  swapFolderBtn.addEventListener('click', () => ipcRenderer.invoke('open-swap-folder'));
-  folderRow.appendChild(swapFolderBtn);
-  body.appendChild(folderRow);
+  body.appendChild(createButtonRow({
+    label: 'Swapper Folder',
+    desc: 'Place replacement assets here (textures/, sound/, models/)',
+    buttons: [{ icon: 'folder', label: 'Swapper', title: 'Open Folder', onClick: () => ipcRenderer.invoke('open-swap-folder') }],
+  }).row);
 }
 
 export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void {
@@ -381,22 +359,11 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
   }
 
   // ── CSS Theme selector (populated from swap/themes/) ──
-  const themeRow = document.createElement('div');
-  themeRow.className = 'setting settName safety-0 sel has-button';
-  themeRow.innerHTML =
-    '<span class="setting-title">CSS Theme</span>' +
-    '<div class="setting-desc-new">Load a custom CSS theme from swap/themes/</div>';
-  const themeSelect = document.createElement('select');
-  themeSelect.className = 's-update inputGrey2';
-  themeSelect.innerHTML = '<option value="disabled">Loading...</option>';
-  themeRow.appendChild(themeSelect);
-  const themeFolderBtn = document.createElement('div');
-  themeFolderBtn.className = 'settingsBtn';
-  themeFolderBtn.title = 'Open Themes Folder';
-  themeFolderBtn.innerHTML = '<span class="material-icons">folder</span>';
-  themeFolderBtn.addEventListener('click', () => ipcRenderer.invoke('open-themes-folder'));
-  themeRow.appendChild(themeFolderBtn);
-  body.appendChild(themeRow);
+  const themeRowR = createRowShell('CSS Theme', 'Load a custom CSS theme from swap/themes/');
+  const themeSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
+  themeRowR.control.appendChild(themeSelect);
+  themeRowR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Themes Folder', onClick: () => ipcRenderer.invoke('open-themes-folder') }));
+  body.appendChild(themeRowR.row);
 
   ipcRenderer.invoke('list-themes').then((themes: Array<{ id: string; label: string }>) => {
     themeSelect.innerHTML = '';
@@ -416,22 +383,11 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
   });
 
   // ── Loading Screen Background ──
-  const bgRow = document.createElement('div');
-  bgRow.className = 'setting settName safety-0 sel has-button';
-  bgRow.innerHTML =
-    '<span class="setting-title">Loading Background</span>' +
-    '<div class="setting-desc-new">Custom background image for the loading screen (swap/backgrounds/)</div>';
-  const bgSelect = document.createElement('select');
-  bgSelect.className = 's-update inputGrey2';
-  bgSelect.innerHTML = '<option value="disabled">Loading...</option>';
-  bgRow.appendChild(bgSelect);
-  const bgFolderBtn = document.createElement('div');
-  bgFolderBtn.className = 'settingsBtn';
-  bgFolderBtn.title = 'Open Backgrounds Folder';
-  bgFolderBtn.innerHTML = '<span class="material-icons">folder</span>';
-  bgFolderBtn.addEventListener('click', () => ipcRenderer.invoke('open-backgrounds-folder'));
-  bgRow.appendChild(bgFolderBtn);
-  body.appendChild(bgRow);
+  const bgRowR = createRowShell('Loading Background', 'Custom background image for the loading screen (swap/backgrounds/)');
+  const bgSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
+  bgRowR.control.appendChild(bgSelect);
+  bgRowR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Backgrounds Folder', onClick: () => ipcRenderer.invoke('open-backgrounds-folder') }));
+  body.appendChild(bgRowR.row);
 
   ipcRenderer.invoke('list-loading-themes').then((themes: Array<{ id: string; label: string }>) => {
     bgSelect.innerHTML = '';
@@ -451,25 +407,14 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
   });
 
   // ── Background URL (overrides loading theme selection) ──
-  const urlRow = document.createElement('div');
-  urlRow.className = 'setting settName safety-0';
-  urlRow.innerHTML =
-    refreshIcon('refresh-icon') +
-    '<span class="setting-title">Background URL</span>' +
-    '<div class="setting-desc-new">Direct image URL for loading screen (overrides dropdown above)</div>';
-  const urlInput = document.createElement('input');
-  urlInput.type = 'text';
-  urlInput.className = 'inputGrey2';
-  urlInput.placeholder = 'https://example.com/image.png';
-  urlInput.value = ui.backgroundUrl || '';
-  urlInput.style.width = '300px';
-  urlInput.addEventListener('change', () => {
-    ui.backgroundUrl = urlInput.value.trim();
-    saveUI();
-    onSettingChanged('refresh');
-  });
-  urlRow.appendChild(urlInput);
-  body.appendChild(urlRow);
+  body.appendChild(createTextRow({
+    label: 'Background URL',
+    desc: 'Direct image URL for loading screen (overrides dropdown above)',
+    value: ui.backgroundUrl || '',
+    placeholder: 'https://example.com/image.png',
+    refreshOnly: true,
+    onChange: (v) => { ui.backgroundUrl = v; saveUI(); },
+  }).row);
 }
 
 export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: SettingsBag): void {
@@ -556,45 +501,25 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
   }));
 
   // ── Ranked Match Sound (URL or local file path; empty = default) ──
-  const soundRow = document.createElement('div');
-  soundRow.className = 'setting settName safety-0 has-button';
-  soundRow.innerHTML =
-    '<span class="setting-title">Ranked Match Sound</span>' +
-    '<div class="setting-desc-new">Custom sound played when a ranked match is found. Accepts a URL or a local file path; leave blank for default.</div>';
-  const soundInput = document.createElement('input');
-  soundInput.type = 'text';
-  soundInput.className = 'inputGrey2';
-  soundInput.placeholder = 'https://example.com/sound.mp3  or  C:\\path\\to\\file.mp3';
-  soundInput.value = mm.rankedMatchSound || '';
-  soundInput.style.width = '300px';
-  soundInput.addEventListener('change', () => {
-    mm.rankedMatchSound = soundInput.value.trim();
-    saveMM();
+  const soundR = createTextRow({
+    label: 'Ranked Match Sound',
+    desc: 'Custom sound played when a ranked match is found. Accepts a URL or a local file path; leave blank for default.',
+    value: mm.rankedMatchSound || '',
+    placeholder: 'https://example.com/sound.mp3  or  C:\\path\\to\\file.mp3',
+    onChange: (v) => { mm.rankedMatchSound = v; saveMM(); },
   });
-  soundRow.appendChild(soundInput);
-  const soundBtnWrap = document.createElement('div');
-  soundBtnWrap.style.cssText = 'grid-area: button; display: inline-flex; gap: 0.25rem; margin: 0 .5rem;';
-  const soundBrowseBtn = document.createElement('div');
-  soundBrowseBtn.className = 'settingsBtn';
-  soundBrowseBtn.title = 'Browse for Audio File';
-  soundBrowseBtn.style.margin = '0';
-  soundBrowseBtn.innerHTML = '<span class="material-icons">folder_open</span>';
-  soundBrowseBtn.addEventListener('click', async () => {
+  const soundInput = soundR.input;
+  const soundControl = soundR.row.querySelector('.kcc-row-control') as HTMLElement;
+  soundControl.appendChild(makeButton({ icon: 'folder_open', title: 'Browse for Audio File', onClick: async () => {
     const path: string = await ipcRenderer.invoke('pick-audio-file');
     if (path) {
       soundInput.value = path;
       mm.rankedMatchSound = path;
       saveMM();
     }
-  });
-  soundBtnWrap.appendChild(soundBrowseBtn);
+  } }));
   let previewAudio: HTMLAudioElement | null = null;
-  const soundPlayBtn = document.createElement('div');
-  soundPlayBtn.className = 'settingsBtn';
-  soundPlayBtn.title = 'Preview Sound';
-  soundPlayBtn.style.margin = '0';
-  soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
-  soundPlayBtn.addEventListener('click', async () => {
+  const soundPlayBtn = makeButton({ icon: 'play_arrow', title: 'Preview Sound', onClick: async () => {
     if (previewAudio) { previewAudio.pause(); previewAudio = null; soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>'; return; }
     const url: string = await ipcRenderer.invoke('resolve-ranked-sound', soundInput.value.trim());
     previewAudio = new Audio(url);
@@ -602,10 +527,9 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
     previewAudio.onended = () => { previewAudio = null; soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>'; };
     previewAudio.onerror = () => { previewAudio = null; soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>'; };
     previewAudio.play().catch(() => { previewAudio = null; soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>'; });
-  });
-  soundBtnWrap.appendChild(soundPlayBtn);
-  soundRow.appendChild(soundBtnWrap);
-  body.appendChild(soundRow);
+  } });
+  soundControl.appendChild(soundPlayBtn);
+  body.appendChild(soundR.row);
 }
 
 export function buildDiscordSection(body: HTMLElement, discordConf: any): void {
@@ -745,24 +669,13 @@ export function buildChatSection(body: HTMLElement, gameConf: any, translatorCon
   }));
 
   // Custom skip words — messages made entirely of these (plus built-in skip terms) won't be translated.
-  const skipRow = document.createElement('div');
-  skipRow.className = 'setting settName safety-0';
-  skipRow.innerHTML =
-    '<span class="setting-title">Custom Skip Words</span>' +
-    '<div class="setting-desc-new">Comma-separated words to ignore (e.g. your nickname, friends\' names). Applies instantly.</div>';
-  const skipInput = document.createElement('input');
-  skipInput.type = 'text';
-  skipInput.className = 'inputGrey2';
-  skipInput.placeholder = 'jakk, bigj, etc.';
-  skipInput.value = tl.customSkipWords || '';
-  skipInput.style.width = '300px';
-  skipInput.addEventListener('change', () => {
-    tl.customSkipWords = skipInput.value;
-    saveTL();
-    updateTranslatorConfig({ customSkipWords: skipInput.value });
-  });
-  skipRow.appendChild(skipInput);
-  body.appendChild(skipRow);
+  body.appendChild(createTextRow({
+    label: 'Custom Skip Words',
+    desc: 'Comma-separated words to ignore (e.g. your nickname, friends\' names). Applies instantly.',
+    value: tl.customSkipWords || '',
+    placeholder: 'jakk, bigj, etc.',
+    onChange: (v) => { tl.customSkipWords = v; saveTL(); updateTranslatorConfig({ customSkipWords: v }); },
+  }).row);
 }
 
 export function buildAdvancedSection(

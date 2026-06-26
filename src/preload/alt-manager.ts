@@ -6,6 +6,7 @@ import { ipcRenderer } from 'electron';
 import { escapeHtml } from './utils';
 import { savedConsole as _console } from './saved-console';
 import { showConfirm } from './confirm-dialog';
+import { createRowShell } from './settings-controls';
 
 // Tracks the open in-game Alt Manager modal so the header button can toggle it.
 let altModalClose: (() => void) | null = null;
@@ -112,12 +113,11 @@ export function buildAccountsSection(body: HTMLElement): void {
   // no longer exposes the 'accounts' key). Indices line up with the stored array.
   const accounts: AltAccount[] = [];
 
-  const addBtn = document.createElement('div');
-  addBtn.className = 'setting settName safety-0 has-button';
-  addBtn.innerHTML =
-    '<span class="setting-title">Add Account</span>' +
-    '<button class="kcc-acc-add-toggle" style="margin-left:auto;padding:4px 14px;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-family:inherit;background:var(--kcc-accent);color:#fff;">+ Add</button>' +
-    '<div class="setting-desc-new">Save a Krunker account for quick switching</div>';
+  const { row: addBtn, control: addControl } = createRowShell('Add Account', 'Save a Krunker account for quick switching');
+  const addToggleBtn = document.createElement('button');
+  addToggleBtn.className = 'kcc-acc-add-toggle';
+  addToggleBtn.textContent = '+ Add';
+  addControl.appendChild(addToggleBtn);
   body.appendChild(addBtn);
 
   const form = document.createElement('div');
@@ -142,7 +142,7 @@ export function buildAccountsSection(body: HTMLElement): void {
     input.addEventListener('keydown', (e) => e.stopPropagation());
   });
 
-  addBtn.querySelector('button')!.addEventListener('click', () => {
+  addToggleBtn.addEventListener('click', () => {
     form.style.display = form.style.display === 'none' ? '' : 'none';
   });
 
