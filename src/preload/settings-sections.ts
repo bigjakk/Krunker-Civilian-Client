@@ -6,7 +6,7 @@
 import { ipcRenderer } from 'electron';
 import type { Keybind } from '../main/config';
 import { DEFAULT_CONFIG } from '../main/config-defaults';
-import { setDeathAnimBlock, setMenuTimer, setWatermark } from './utils';
+import { setDeathAnimBlock, setMenuTimer, setWatermark, showToast } from './utils';
 import {
   createKeybindRow, createSimpleKeyRow, createToggleRow, createSelectRow,
   createNumberRow, createCheckboxGrid, createButtonRow, createTextRow,
@@ -503,7 +503,7 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
   // ── Ranked Match Sound (URL or local file path; empty = default) ──
   const soundR = createTextRow({
     label: 'Ranked Match Sound',
-    desc: 'Custom sound played when a ranked match is found. Accepts a URL or a local file path; leave blank for default.',
+    desc: 'Plays when a ranked match is found. Use a direct audio file link ending in .mp3, .ogg, or .wav — page links (Pixabay, YouTube, etc.) will not work. The easiest way is to download the file and pick it with the browse button. Leave blank for the default.',
     value: mm.rankedMatchSound || '',
     placeholder: 'https://example.com/sound.mp3  or  C:\\path\\to\\file.mp3',
     onChange: (v) => { mm.rankedMatchSound = v; saveMM(); },
@@ -519,14 +519,19 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
     }
   } }));
   let previewAudio: HTMLAudioElement | null = null;
+  const resetPlayBtn = (failed?: boolean): void => {
+    previewAudio = null;
+    soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+    if (failed) showToast('Couldn\'t load that sound. Use a direct audio file link (.mp3/.ogg/.wav) or download it and pick the file — page links won\'t work.');
+  };
   const soundPlayBtn = makeButton({ icon: 'play_arrow', title: 'Preview Sound', onClick: async () => {
-    if (previewAudio) { previewAudio.pause(); previewAudio = null; soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>'; return; }
+    if (previewAudio) { previewAudio.pause(); resetPlayBtn(); return; }
     const url: string = await ipcRenderer.invoke('resolve-ranked-sound', soundInput.value.trim());
     previewAudio = new Audio(url);
     soundPlayBtn.innerHTML = '<span class="material-icons">stop</span>';
-    previewAudio.onended = () => { previewAudio = null; soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>'; };
-    previewAudio.onerror = () => { previewAudio = null; soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>'; };
-    previewAudio.play().catch(() => { previewAudio = null; soundPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>'; });
+    previewAudio.onended = () => resetPlayBtn();
+    previewAudio.onerror = () => resetPlayBtn(true);
+    previewAudio.play().catch(() => resetPlayBtn(true));
   } });
   soundControl.appendChild(soundPlayBtn);
   body.appendChild(soundR.row);
