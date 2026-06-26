@@ -119,8 +119,13 @@ export function hookSettings(): void {
 
   settingsWindow.changeTab = (...args: unknown[]) => {
     const result = origChangeTab(...args);
+    const tabChanged = settingsWindow.tabIndex !== selectedTab;
     selectedTab = settingsWindow.tabIndex;
-    safeRender();
+    // Only (re)render on an actual tab switch — re-clicking the already-active Client
+    // tab would otherwise rebuild the panel and look like a refresh. Still restore if
+    // Krunker wiped our injected content.
+    const needsRestore = isClientTab() && !document.querySelector('#settHolder .kcc-settings');
+    if (tabChanged || needsRestore) safeRender();
     return result;
   };
 
