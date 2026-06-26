@@ -24,9 +24,9 @@ export const THEME_CSS = `
   --kcc-border-focus: rgba(255,255,255,0.35);
 
   /* ── Accents ── */
-  --kcc-accent: #46b6ff;
-  --kcc-accent-hover: #6cc6ff;
-  --kcc-accent-soft: rgba(70,182,255,0.14);
+  --kcc-accent: #2b82f6;
+  --kcc-accent-hover: #4f97ff;
+  --kcc-accent-soft: rgba(43,130,246,0.16);
   --kcc-green: #4CAF50;
   --kcc-green-hover: #66bb6a;
   --kcc-red: #ef5350;
@@ -85,7 +85,7 @@ ${THEME_CSS}
   align-items: center;
   justify-content: center;
   background: var(--kcc-accent);
-  color: #06243a;
+  color: #fff;
 }
 .kcc-header-mark .material-icons { font-size: 20px; }
 .kcc-header-name {
@@ -233,7 +233,7 @@ ${THEME_CSS}
   background: #fff;
   transition: left 0.15s;
 }
-.kcc-toggle input:checked + .kcc-toggle-track { background: var(--kcc-green); }
+.kcc-toggle input:checked + .kcc-toggle-track { background: var(--kcc-accent); }
 .kcc-toggle input:checked + .kcc-toggle-track::before { left: 22px; }
 .kcc-toggle input:disabled + .kcc-toggle-track { opacity: 0.5; pointer-events: none; }
 
@@ -393,7 +393,7 @@ ${THEME_CSS}
   position: relative;
 }
 .kcc-opt input:checked ~ .kcc-opt-name { color: var(--kcc-text-primary); }
-.kcc-opt input:checked ~ .kcc-opt-check { background: var(--kcc-green); border-color: var(--kcc-green); }
+.kcc-opt input:checked ~ .kcc-opt-check { background: var(--kcc-accent); border-color: var(--kcc-accent); }
 .kcc-opt input:checked ~ .kcc-opt-check::after {
   content: "";
   position: absolute;
@@ -401,7 +401,7 @@ ${THEME_CSS}
   top: 1px;
   width: 4px;
   height: 9px;
-  border: solid #0c2f12;
+  border: solid #fff;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
@@ -850,9 +850,9 @@ img.kcc-acc-avatar { object-fit: cover; }
 .kcc-acc-add-toggle {
   padding: 6px 16px; border: none; border-radius: 6px; cursor: pointer;
   font-size: 12px; font-weight: 600; font-family: inherit;
-  background: var(--kcc-accent); color: #06243a;
+  background: var(--kcc-accent); color: #fff;
 }
-.kcc-acc-add-toggle:hover { background: var(--kcc-accent-hover, #6cc6ff); }
+.kcc-acc-add-toggle:hover { background: var(--kcc-accent-hover, #4f97ff); }
 
 /* ── Add Account form (themed inputs) ── */
 .kcc-acc-form { display: flex; flex-direction: column; gap: 9px; margin: 10px 0 4px; }

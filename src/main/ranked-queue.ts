@@ -25,10 +25,10 @@ const RANKED_REGIONS: Record<string, string> = {
 
 const QUEUE_CSS = `
 :root {
-  --accent: #46b6ff;
-  --accent-hover: #6cc6ff;
-  --accent-soft: rgba(70,182,255,0.14);
-  --on-accent: #06243a;
+  --accent: #2b82f6;
+  --accent-hover: #4f97ff;
+  --accent-soft: rgba(43,130,246,0.16);
+  --on-accent: #fff;
   --bg: #141414;
   --card: #1a1a1a;
   --input: rgba(255,255,255,0.05);
@@ -97,7 +97,7 @@ body {
   border-radius: 50%;
   transition: background 0.3s ease, box-shadow 0.3s ease;
 }
-.queue-status.active::before { background: var(--accent); box-shadow: 0 0 10px rgba(70,182,255,0.6); }
+.queue-status.active::before { background: var(--accent); box-shadow: 0 0 10px rgba(43,130,246,0.6); }
 #queueStatus {
   font-size: 12px;
   font-weight: 600;
