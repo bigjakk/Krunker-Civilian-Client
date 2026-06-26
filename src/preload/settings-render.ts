@@ -66,6 +66,10 @@ function applyKrunkerSettings(settings: Record<string, string> | undefined): voi
   }
 }
 
+// Handle to the currently rendered settings UI so the search box can filter the
+// existing DOM in place rather than rebuilding the whole tree on every keystroke.
+let rendered: { container: HTMLElement; panels: HTMLElement[]; setActiveCat: (key: string) => void; activeKey: string } | null = null;
+
 export function hookSettings(): void {
   const w = window as any;
   const settingsWindow = w.windows[0];
@@ -77,7 +81,9 @@ export function hookSettings(): void {
   }
 
   function safeRender(): void {
-    if (isClientTab()) renderSettings();
+    if (!isClientTab()) return;
+    const query = (document.getElementById('settSearch') as HTMLInputElement | null)?.value?.trim() ?? '';
+    renderSettings(query.length > 0 ? query : undefined);
   }
 
   const origShowWindow = w.showWindow.bind(w);
@@ -117,12 +123,20 @@ export function hookSettings(): void {
     const result = origSearchList(...args);
     const searchInput = document.getElementById('settSearch') as HTMLInputElement | null;
     const query = searchInput?.value?.trim() ?? '';
+    // Filter the already-built DOM in place when it's present — rebuilding here would
+    // re-run every section's IPC plus the theme/background folder scans on every
+    // keystroke. Only (re)build when our container is missing (first search, or a tab
+    // switch wiped it).
+    const haveDom = rendered !== null && document.body.contains(rendered.container);
     if (query.length > 0) {
-      renderSettings(query);
+      if (haveDom) updateSearch(query);
+      else renderSettings(query);
+    } else if (isClientTab()) {
+      if (haveDom) updateSearch('');
+      else renderSettings();
     } else {
-      const existing = document.querySelector('#settHolder .kcc-settings');
-      if (existing && !isClientTab()) existing.remove();
-      else if (isClientTab()) renderSettings();
+      document.querySelector('#settHolder .kcc-settings')?.remove();
+      rendered = null;
     }
     return result;
   };
@@ -164,6 +178,30 @@ function applySearchFilter(container: HTMLElement, holder: HTMLElement, searchQu
         (child as HTMLElement).remove();
       }
     });
+  }
+}
+
+// Update the search filter against the already-rendered DOM (no rebuild). Called on
+// every keystroke once the settings tree exists; falls back to a build only when the
+// container is gone (see the searchList hook).
+function updateSearch(query: string): void {
+  if (!rendered) return;
+  // Krunker's native searchList may hide non-matching #settHolder children — make
+  // sure our container stays visible since we filter inside it ourselves.
+  rendered.container.style.display = '';
+  if (query.length > 0) {
+    const holder = document.getElementById('settHolder');
+    if (holder) applySearchFilter(rendered.container, holder, query, rendered.panels);
+  } else {
+    // Exit search: drop the per-row/per-panel display overrides and restore the
+    // single active category.
+    activeSearch = null;
+    rendered.container.classList.remove('kcc-searching');
+    rendered.panels.forEach((panel) => {
+      panel.style.display = '';
+      panel.querySelectorAll('.kcc-row').forEach((el) => { (el as HTMLElement).style.display = ''; });
+    });
+    rendered.setActiveCat(rendered.activeKey);
   }
 }
 
@@ -310,6 +348,7 @@ function renderSettings(searchQuery?: string): void {
     const setActiveCat = (key: string): void => {
       items.forEach((it) => it.classList.toggle('kcc-active', it.dataset.cat === key));
       panels.forEach((pnl) => { pnl.style.display = pnl.dataset.cat === key ? '' : 'none'; });
+      if (rendered) rendered.activeKey = key;
     };
 
     cats.forEach((cat) => {
@@ -333,6 +372,8 @@ function renderSettings(searchQuery?: string): void {
 
       cat.build(panel);
     });
+
+    rendered = { container, panels, setActiveCat, activeKey: cats[0].key };
 
     if (searchQuery) {
       applySearchFilter(container, holder, searchQuery, panels);
