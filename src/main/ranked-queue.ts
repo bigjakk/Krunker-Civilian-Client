@@ -529,7 +529,15 @@ loadSettings();
 `;
 }
 
-function buildQueueHtml(token: string, region: string, allRegions: boolean, audioUrl: string): string {
+function buildQueueHtml(token: string, region: string, allRegions: boolean, audioUrl: string, showHeader: boolean): string {
+    const header = showHeader ? `  <div class="queue-header">
+    <div class="queue-mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V5l-8-3z"/></svg></div>
+    <div class="queue-head-text">
+      <div class="queue-title">Civilian Client</div>
+      <div class="queue-sub">Ranked queue</div>
+    </div>
+  </div>
+` : '';
     return `<!DOCTYPE html>
 <html lang="en-US">
 <head>
@@ -539,16 +547,9 @@ function buildQueueHtml(token: string, region: string, allRegions: boolean, audi
 </head>
 <body>
 <div class="queuer-card">
-  <div class="queue-header">
-    <div class="queue-mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V5l-8-3z"/></svg></div>
-    <div class="queue-head-text">
-      <div class="queue-title">Civilian Client</div>
-      <div class="queue-sub">Ranked queue</div>
-    </div>
-    <div class="queue-status" id="statusArea"><span id="queueStatus">Ready</span></div>
-  </div>
-  <div class="queue-body">
+${header}  <div class="queue-body">
     <div class="queue-left">
+      <div class="queue-status" id="statusArea"><span id="queueStatus">Ready</span></div>
       <div class="timer-display" id="queueTimerDisplay">00:00:00</div>
       <div class="region-controls" id="regionCheckboxes">
         ${buildRegionCheckboxes()}
@@ -581,6 +582,7 @@ export function openRankedQueue(
     region: string,
     allRegions: boolean,
     audioUrl: string,
+    showHeader: boolean,
 ): void {
     if (queueWindow && !queueWindow.isDestroyed()) {
         queueWindow.focus();
@@ -589,7 +591,7 @@ export function openRankedQueue(
 
     const win = new BrowserWindow({
         width: 780,
-        height: 400,
+        height: showHeader ? 400 : 330,
         resizable: false,
         autoHideMenuBar: true,
         backgroundColor: '#141414',
@@ -605,6 +607,6 @@ export function openRankedQueue(
     queueWindow = win;
     win.on('closed', () => { queueWindow = null; });
 
-    const html = buildQueueHtml(token, region, allRegions, audioUrl);
+    const html = buildQueueHtml(token, region, allRegions, audioUrl, showHeader);
     win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 }

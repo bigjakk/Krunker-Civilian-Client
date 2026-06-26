@@ -309,9 +309,12 @@ function renderSettings(searchQuery?: string): void {
       isWindows,
     };
 
-    // ── Header band ──
+    // ── Header band (shown only when the KCC watermark setting is on; rendered
+    // either way so the watermark toggle can show/hide it live) ──
+    const showBrand = uiConfRaw?.watermark ?? DEFAULT_CONFIG.ui.watermark;
     const header = document.createElement('div');
     header.className = 'kcc-header';
+    if (!showBrand) header.style.display = 'none';
     header.innerHTML =
       '<div class="kcc-header-mark"><span class="material-icons">shield</span></div>' +
       '<div class="kcc-header-text">' +

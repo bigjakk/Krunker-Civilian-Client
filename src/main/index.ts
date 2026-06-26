@@ -825,7 +825,8 @@ async function launchApp(): Promise<void> {
   ipcMain.on('open-ranked-queue', (_e, token: string, region: string, allRegions: boolean) => {
     const mm = config.get('matchmaker');
     const audioUrl = resolveRankedAudioUrl(mm?.rankedMatchSound || '');
-    openRankedQueue(token, region, allRegions, audioUrl);
+    const showHeader = config.get('ui')?.watermark ?? true;
+    openRankedQueue(token, region, allRegions, audioUrl, showHeader);
   });
 
   ipcMain.handle('pick-audio-file', async () => {

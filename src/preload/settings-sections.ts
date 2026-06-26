@@ -197,9 +197,13 @@ export function buildGameSection(
 
   body.appendChild(createToggleRow({
     label: 'KCC Watermark',
-    desc: 'Show the KCC version watermark in-game and on the menu',
+    desc: 'Show the KCC version watermark in-game and on the menu, and the brand header in this menu and the ranked queue',
     checked: ui.watermark ?? true, instant: true,
-    onChange: (v) => { ui.watermark = v; saveUI(); setWatermark(v); },
+    onChange: (v) => {
+      ui.watermark = v; saveUI(); setWatermark(v);
+      const brandHeader = document.querySelector('.kcc-settings .kcc-header') as HTMLElement | null;
+      if (brandHeader) brandHeader.style.display = v ? '' : 'none';
+    },
   }));
 
   if (ui.deathscreenAnimation) setDeathAnimBlock(true);
