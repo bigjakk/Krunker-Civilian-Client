@@ -858,7 +858,7 @@ img.kcc-acc-avatar { object-fit: cover; }
   font-size: 12px; font-weight: 600; font-family: inherit;
   background: var(--kcc-accent); color: #fff;
 }
-.kcc-acc-add-toggle:hover { background: var(--kcc-accent-hover, #4f97ff); }
+.kcc-acc-add-toggle:hover { background: var(--kcc-accent-hover); }
 
 /* ── Add Account form (themed inputs) ── */
 .kcc-acc-form { display: flex; flex-direction: column; gap: 9px; margin: 10px 0 4px; }
