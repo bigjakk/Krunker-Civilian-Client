@@ -289,121 +289,126 @@ function renderSettings(searchQuery?: string): void {
 
   resetRefreshNotification();
 
+  const container = document.createElement('div');
+  container.className = 'kcc-settings';
+
+  // Synchronous fetch + build so the whole panel rebuilds in one tick — an async
+  // gap here lets the browser paint the (Krunker-cleared) empty holder = a flash.
+  let data: { config: any; platform: any; version: string };
+  try {
+    data = ipcRenderer.sendSync('get-settings-data-sync', ['swapper', 'matchmaker', 'keybinds', 'advanced', 'game', 'ui', 'discord', 'translator', 'performance']);
+  } catch (err: any) {
+    _console.error('[KCC] Settings render error:', err);
+    return;
+  }
+  const allConf = data.config;
+  const platformInfo = data.platform;
+  const version = data.version;
+  const gameConf = allConf.game;
+  const uiConfRaw = allConf.ui;
+  const isWindows = platformInfo && platformInfo.isWindows;
+  const binds = { ...DEFAULT_CONFIG.keybinds, ...allConf.keybinds };
+  const bag: SettingsBag = {
+    binds,
+    saveBinds: () => ipcRenderer.invoke('set-config', 'keybinds', binds),
+    isWindows,
+  };
+
+  // ── Header band (shown only when the KCC watermark setting is on; rendered
+  // either way so the watermark toggle can show/hide it live) ──
+  const showBrand = uiConfRaw?.watermark ?? DEFAULT_CONFIG.ui.watermark;
+  const header = document.createElement('div');
+  header.className = 'kcc-header';
+  if (!showBrand) header.style.display = 'none';
+  header.innerHTML =
+    '<div class="kcc-header-mark"><span class="material-icons">shield</span></div>' +
+    '<div class="kcc-header-text">' +
+      '<div class="kcc-header-name">Civilian Client</div>' +
+      '<div class="kcc-header-ver">v' + escapeHtml(version || '') + '</div>' +
+    '</div>';
+  container.appendChild(header);
+
+  // ── Shell: category rail + content pane ──
+  const shell = document.createElement('div');
+  shell.className = 'kcc-shell';
+  const rail = document.createElement('div');
+  rail.className = 'kcc-rail';
+  const pane = document.createElement('div');
+  pane.className = 'kcc-pane';
+  shell.appendChild(rail);
+  shell.appendChild(pane);
+  container.appendChild(shell);
+
+  const cats: CatDef[] = [
+    { key: 'General', label: 'General', icon: 'tune', build: (b) => buildGeneralSection(b, gameConf, uiConfRaw, bag) },
+    { key: 'Game', label: 'Game', icon: 'sports_esports', build: (b) => buildGameSection(b, gameConf, uiConfRaw, bag) },
+    { key: 'Performance', label: 'Performance', icon: 'speed', build: (b) => buildPerformanceSection(b, allConf.performance, isWindows) },
+    { key: 'Swapper', label: 'Swapper', icon: 'swap_horiz', build: (b) => buildSwapperSection(b, allConf.swapper) },
+    { key: 'Appearance', label: 'Appearance', icon: 'palette', build: (b) => buildAppearanceSection(b, uiConfRaw) },
+    { key: 'Matchmaker', label: 'Matchmaker', icon: 'travel_explore', build: (b) => buildMatchmakerSection(b, allConf.matchmaker, bag) },
+    { key: 'Chat', label: 'Chat', icon: 'chat', build: (b) => buildChatSection(b, gameConf, allConf.translator) },
+    { key: 'Discord', label: 'Discord', icon: 'forum', build: (b) => buildDiscordSection(b, allConf.discord) },
+    { key: 'Accounts', label: 'Accounts', icon: 'people', build: (b) => buildAccountsSection(b, reapplySearch) },
+    { key: 'Keystrokes', label: 'Keystrokes', icon: 'keyboard', build: (b) => buildKeystrokesRows(b) },
+    { key: 'Userscripts', label: 'Userscripts', icon: 'code', build: (b) => renderUserscriptsSection(b) },
+    { key: 'Advanced', label: 'Advanced', icon: 'settings', build: (b) => buildAdvancedSection(b, allConf.advanced, isWindows) },
+    { key: 'Manage', label: 'Backup & Reset', icon: 'restart_alt', build: (b) => buildManageSection(b) },
+  ];
+
+  const panels: HTMLElement[] = [];
+  const items: HTMLElement[] = [];
+
+  const setActiveCat = (key: string): void => {
+    items.forEach((it) => it.classList.toggle('kcc-active', it.dataset.cat === key));
+    panels.forEach((pnl) => { pnl.style.display = pnl.dataset.cat === key ? '' : 'none'; });
+    lastActiveCategory = key;
+    if (rendered) rendered.activeKey = key;
+  };
+
+  cats.forEach((cat) => {
+    const item = document.createElement('div');
+    item.className = 'kcc-rail-item';
+    item.dataset.cat = cat.key;
+    item.innerHTML = '<span class="material-icons">' + cat.icon + '</span><span class="kcc-rail-label">' + escapeHtml(cat.label) + '</span>';
+    item.addEventListener('click', () => setActiveCat(cat.key));
+    rail.appendChild(item);
+    items.push(item);
+
+    const panel = document.createElement('div');
+    panel.className = 'kcc-cat';
+    panel.dataset.cat = cat.key;
+    const head = document.createElement('div');
+    head.className = 'kcc-cat-head';
+    head.textContent = cat.label;
+    panel.appendChild(head);
+    pane.appendChild(panel);
+    panels.push(panel);
+
+    cat.build(panel);
+  });
+
+  // Restore the last-viewed category (this session); fall back to the first.
+  const initialKey = lastActiveCategory && cats.some((c) => c.key === lastActiveCategory)
+    ? lastActiveCategory
+    : cats[0].key;
+  rendered = { container, panels, setActiveCat, activeKey: initialKey };
+
+  if (searchQuery) {
+    applySearchFilter(container, holder, searchQuery, panels);
+  } else {
+    activeSearch = null;
+    setActiveCat(initialKey);
+  }
+
+  // Swap the freshly built panel in only now — deferring the clear until the build
+  // is done keeps the previous content painted, avoiding the flash on tab clicks.
   if (searchQuery) {
     const existing = holder.querySelector('.kcc-settings');
     if (existing) existing.remove();
   } else {
     while (holder.firstChild) holder.removeChild(holder.firstChild);
   }
-
-  const container = document.createElement('div');
-  container.className = 'kcc-settings';
-
-  Promise.all([
-    ipcRenderer.invoke('get-all-config', ['swapper', 'matchmaker', 'keybinds', 'advanced', 'game', 'ui', 'discord', 'translator', 'performance']),
-    ipcRenderer.invoke('get-platform'),
-    ipcRenderer.invoke('get-version'),
-  ]).then(([allConf, platformInfo, version]: [any, any, string]) => {
-    const gameConf = allConf.game;
-    const uiConfRaw = allConf.ui;
-    const isWindows = platformInfo && platformInfo.isWindows;
-    const binds = { ...DEFAULT_CONFIG.keybinds, ...allConf.keybinds };
-    const bag: SettingsBag = {
-      binds,
-      saveBinds: () => ipcRenderer.invoke('set-config', 'keybinds', binds),
-      isWindows,
-    };
-
-    // ── Header band (shown only when the KCC watermark setting is on; rendered
-    // either way so the watermark toggle can show/hide it live) ──
-    const showBrand = uiConfRaw?.watermark ?? DEFAULT_CONFIG.ui.watermark;
-    const header = document.createElement('div');
-    header.className = 'kcc-header';
-    if (!showBrand) header.style.display = 'none';
-    header.innerHTML =
-      '<div class="kcc-header-mark"><span class="material-icons">shield</span></div>' +
-      '<div class="kcc-header-text">' +
-        '<div class="kcc-header-name">Civilian Client</div>' +
-        '<div class="kcc-header-ver">v' + escapeHtml(version || '') + '</div>' +
-      '</div>';
-    container.appendChild(header);
-
-    // ── Shell: category rail + content pane ──
-    const shell = document.createElement('div');
-    shell.className = 'kcc-shell';
-    const rail = document.createElement('div');
-    rail.className = 'kcc-rail';
-    const pane = document.createElement('div');
-    pane.className = 'kcc-pane';
-    shell.appendChild(rail);
-    shell.appendChild(pane);
-    container.appendChild(shell);
-
-    const cats: CatDef[] = [
-      { key: 'General', label: 'General', icon: 'tune', build: (b) => buildGeneralSection(b, gameConf, uiConfRaw, bag) },
-      { key: 'Game', label: 'Game', icon: 'sports_esports', build: (b) => buildGameSection(b, gameConf, uiConfRaw, bag) },
-      { key: 'Performance', label: 'Performance', icon: 'speed', build: (b) => buildPerformanceSection(b, allConf.performance, isWindows) },
-      { key: 'Swapper', label: 'Swapper', icon: 'swap_horiz', build: (b) => buildSwapperSection(b, allConf.swapper) },
-      { key: 'Appearance', label: 'Appearance', icon: 'palette', build: (b) => buildAppearanceSection(b, uiConfRaw) },
-      { key: 'Matchmaker', label: 'Matchmaker', icon: 'travel_explore', build: (b) => buildMatchmakerSection(b, allConf.matchmaker, bag) },
-      { key: 'Chat', label: 'Chat', icon: 'chat', build: (b) => buildChatSection(b, gameConf, allConf.translator) },
-      { key: 'Discord', label: 'Discord', icon: 'forum', build: (b) => buildDiscordSection(b, allConf.discord) },
-      { key: 'Accounts', label: 'Accounts', icon: 'people', build: (b) => buildAccountsSection(b, reapplySearch) },
-      { key: 'Keystrokes', label: 'Keystrokes', icon: 'keyboard', build: (b) => buildKeystrokesRows(b) },
-      { key: 'Userscripts', label: 'Userscripts', icon: 'code', build: (b) => renderUserscriptsSection(b) },
-      { key: 'Advanced', label: 'Advanced', icon: 'settings', build: (b) => buildAdvancedSection(b, allConf.advanced, isWindows) },
-      { key: 'Manage', label: 'Backup & Reset', icon: 'restart_alt', build: (b) => buildManageSection(b) },
-    ];
-
-    const panels: HTMLElement[] = [];
-    const items: HTMLElement[] = [];
-
-    const setActiveCat = (key: string): void => {
-      items.forEach((it) => it.classList.toggle('kcc-active', it.dataset.cat === key));
-      panels.forEach((pnl) => { pnl.style.display = pnl.dataset.cat === key ? '' : 'none'; });
-      lastActiveCategory = key;
-      if (rendered) rendered.activeKey = key;
-    };
-
-    cats.forEach((cat) => {
-      const item = document.createElement('div');
-      item.className = 'kcc-rail-item';
-      item.dataset.cat = cat.key;
-      item.innerHTML = '<span class="material-icons">' + cat.icon + '</span><span class="kcc-rail-label">' + escapeHtml(cat.label) + '</span>';
-      item.addEventListener('click', () => setActiveCat(cat.key));
-      rail.appendChild(item);
-      items.push(item);
-
-      const panel = document.createElement('div');
-      panel.className = 'kcc-cat';
-      panel.dataset.cat = cat.key;
-      const head = document.createElement('div');
-      head.className = 'kcc-cat-head';
-      head.textContent = cat.label;
-      panel.appendChild(head);
-      pane.appendChild(panel);
-      panels.push(panel);
-
-      cat.build(panel);
-    });
-
-    // Restore the last-viewed category (this session); fall back to the first.
-    const initialKey = lastActiveCategory && cats.some((c) => c.key === lastActiveCategory)
-      ? lastActiveCategory
-      : cats[0].key;
-    rendered = { container, panels, setActiveCat, activeKey: initialKey };
-
-    if (searchQuery) {
-      applySearchFilter(container, holder, searchQuery, panels);
-    } else {
-      activeSearch = null;
-      setActiveCat(initialKey);
-    }
-
-    holder.appendChild(container);
-  }).catch((err: any) => {
-    _console.error('[KCC] Settings render error:', err);
-  });
+  holder.appendChild(container);
 }
 
 // ── Userscripts settings section ──

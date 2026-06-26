@@ -707,6 +707,15 @@ async function launchApp(): Promise<void> {
     }
     return result;
   });
+  // Synchronous variant used by the settings render so the panel can rebuild in a
+  // single tick (no async gap → no flash when Krunker clears #settHolder on tab switch).
+  ipcMain.on('get-settings-data-sync', (e, keys: string[]) => {
+    const cfg: Record<string, unknown> = {};
+    for (const key of keys) {
+      if (ALLOWED_CONFIG_KEYS.has(key)) cfg[key] = config.get(key as keyof typeof config.store);
+    }
+    e.returnValue = { config: cfg, platform: platformInfo, version: appVersion };
+  });
   let configWriteTimer: ReturnType<typeof setTimeout> | null = null;
   const pendingConfigWrites = new Map<string, unknown>();
 
