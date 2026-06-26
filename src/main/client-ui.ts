@@ -64,6 +64,8 @@ ${THEME_CSS}
    leak into our settings. */
 
 .kcc-settings {
+  /* Krunker's UI font so the menu reads as native (matches the matchmaker feed). */
+  font-family: 'GameFont', sans-serif;
   color: var(--kcc-text-secondary);
   font-size: 14px;
 }
@@ -159,14 +161,18 @@ ${THEME_CSS}
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  font-size: 14px;
+  /* !important so Krunker's own settings text rules can't override the size. */
+  font-size: 20px !important;
+  font-weight: 700 !important;
   color: var(--kcc-text-primary);
 }
 .kcc-row-desc {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--kcc-text-muted);
-  margin-top: 3px;
+  font-size: 15px !important;
+  letter-spacing: 0.5px;
+  line-height: 1.6;
+  /* dimmer than --kcc-text-muted, matching the old crankshaft description shade */
+  color: rgba(255, 255, 255, 0.4) !important;
+  margin-top: 4px;
   max-width: 56ch;
   word-wrap: break-word;
 }
