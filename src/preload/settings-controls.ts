@@ -1,13 +1,11 @@
 // ── Settings UI toolkit ──
 // Reusable building blocks for the injected Client settings tab: the row shell,
 // safety/apply-level tags, the "needs refresh/restart" notification, the row
-// factories (toggle/select/number/keybind/checkbox-grid/button/text/info), and
-// collapsible sections. All markup is self-contained under the `kcc-` namespace —
-// it deliberately avoids Krunker's own control classes so a Krunker restyle can't
-// leak into our settings. Consumers (settings-sections.ts + settings-render.ts)
-// import and call these.
+// factories (toggle/select/number/keybind/checkbox-grid/button/text/info). All
+// markup is self-contained under the `kcc-` namespace — it deliberately avoids
+// Krunker's own control classes so a Krunker restyle can't leak into our settings.
+// Consumers (settings-sections.ts + settings-render.ts) import and call these.
 
-import { ipcRenderer } from 'electron';
 import type { Keybind } from '../main/config';
 import { escapeHtml } from './utils';
 import { openKeybindDialog, keybindDisplayString } from './keybind-dialog';
@@ -340,10 +338,12 @@ export function createCheckboxGrid(opts: {
   for (const item of opts.items) {
     const label = document.createElement('label');
     label.className = 'kcc-opt';
+    // input first so `input:checked ~ .kcc-opt-name/.kcc-opt-check` can style the
+    // label (the input is visually hidden, so DOM order doesn't affect layout).
     label.innerHTML =
       (item.icon ? '<img class="kcc-opt-icon" alt="" src="' + item.icon + '">' : '') +
-      '<span class="kcc-opt-name">' + escapeHtml(item.label) + '</span>' +
       '<input type="checkbox"' + (opts.selected.includes(item.value) ? ' checked' : '') + '>' +
+      '<span class="kcc-opt-name">' + escapeHtml(item.label) + '</span>' +
       '<span class="kcc-opt-check"></span>';
     const iconImg = label.querySelector('.kcc-opt-icon') as HTMLImageElement | null;
     if (iconImg) iconImg.onerror = () => { iconImg.style.visibility = 'hidden'; };
@@ -374,42 +374,4 @@ export function createCheckboxGrid(opts: {
 
   row.appendChild(grid);
   return row;
-}
-
-// ── Collapsible sections ──
-// Persisted collapsed-state map; populated at render time, mutated on click.
-let collapsedState: Record<string, boolean> = {};
-let collapsedSaveTimer: ReturnType<typeof setTimeout> | null = null;
-
-/** Seed the collapsed-state map from persisted config (called by renderSettings). */
-export function setCollapsedState(state: Record<string, boolean>): void {
-  collapsedState = state;
-}
-
-function persistCollapsedState(): void {
-  if (collapsedSaveTimer) clearTimeout(collapsedSaveTimer);
-  collapsedSaveTimer = setTimeout(() => {
-    ipcRenderer.invoke('set-config', 'collapsedSections', collapsedState);
-    collapsedSaveTimer = null;
-  }, 200);
-}
-
-export function createSection(title: string, defaultCollapsed?: boolean): { section: HTMLElement; body: HTMLElement } {
-  const collapsed = collapsedState[title] ?? defaultCollapsed ?? false;
-  const section = document.createElement('div');
-  section.className = 'kcc-group';
-  const header = document.createElement('div');
-  header.className = 'kcc-group-head' + (collapsed ? ' kcc-collapsed' : '');
-  header.innerHTML = '<span class="material-icons kcc-group-arrow">expand_more</span>' + escapeHtml(title);
-  const body = document.createElement('div');
-  body.className = 'kcc-group-body' + (collapsed ? ' kcc-group-collapsed' : '');
-  header.addEventListener('click', () => {
-    const isCollapsed = body.classList.toggle('kcc-group-collapsed');
-    header.classList.toggle('kcc-collapsed', isCollapsed);
-    collapsedState[title] = isCollapsed;
-    persistCollapsedState();
-  });
-  section.appendChild(header);
-  section.appendChild(body);
-  return { section, body };
 }

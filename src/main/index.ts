@@ -682,14 +682,13 @@ async function launchApp(): Promise<void> {
   const ALLOWED_CONFIG_KEYS = new Set<string>([
     'window', 'performance', 'game', 'swapper', 'matchmaker',
     'keybinds', 'userscripts', 'ui', 'discord', 'translator',
-    'advanced', 'tabWindow', 'keystrokes', 'collapsedSections',
+    'advanced', 'tabWindow', 'keystrokes',
   ]);
 
   // Settings categories included in export/import. Deliberately excludes:
   //   accounts          — encrypted alt-account credentials (never exported)
   //   window/tabWindow  — machine-specific window geometry
   //   savedTabs         — transient last-open tabs
-  //   collapsedSections — transient settings-panel UI state
   const EXPORT_CONFIG_KEYS = [
     'performance', 'game', 'keystrokes', 'swapper', 'matchmaker',
     'keybinds', 'userscripts', 'ui', 'discord', 'translator', 'advanced',

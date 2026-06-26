@@ -108,7 +108,7 @@ function altSwitch(index: number): Promise<void> {
 }
 
 // ── Settings-panel section ──
-export function buildAccountsSection(body: HTMLElement): void {
+export function buildAccountsSection(body: HTMLElement, onPopulated?: () => void): void {
   // Labels only — fetched via alt-list (never the generic config getter, which
   // no longer exposes the 'accounts' key). Indices line up with the stored array.
   const accounts: AltAccount[] = [];
@@ -157,6 +157,7 @@ export function buildAccountsSection(body: HTMLElement): void {
     listEl.innerHTML = '';
     if (accounts.length === 0) {
       listEl.innerHTML = '<div class="kcc-acc-empty">No saved accounts</div>';
+      onPopulated?.();
       return;
     }
     accounts.forEach((acc, i) => {
@@ -188,6 +189,7 @@ export function buildAccountsSection(body: HTMLElement): void {
       });
       listEl.appendChild(row);
     });
+    onPopulated?.();
   }
   linkCurrentAccount().then(altList).then((list) => {
     accounts.push(...list);

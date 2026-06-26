@@ -1,8 +1,8 @@
 // ── Settings render orchestration ──
-// Hooks Krunker's settings window, renders the Client tab (action buttons +
-// collapsible sections built via settings-sections), the search filter, and the
-// userscripts section. hookSettings() is the entry point, called once the
-// settings window is available.
+// Hooks Krunker's settings window and renders the Client tab as a sidebar: a header
+// band, a category rail + content pane (sections built via settings-sections),
+// cross-category search, and the userscripts section. hookSettings() is the entry
+// point, called once the settings window is available.
 
 import { ipcRenderer } from 'electron';
 import type { Keybind } from '../main/config';
@@ -12,9 +12,9 @@ import { savedConsole as _console } from './saved-console';
 import { openKeybindDialog, keybindDisplayString } from './keybind-dialog';
 import { showConfirm } from './confirm-dialog';
 import {
-  createToggleRow, createSection, createButtonRow, createInfoRow,
+  createToggleRow, createButtonRow, createInfoRow,
   createRowShell, createSelect, onSettingChanged,
-  resetRefreshNotification, setCollapsedState,
+  resetRefreshNotification,
 } from './settings-controls';
 import {
   type SettingsBag,
@@ -130,41 +130,36 @@ export function hookSettings(): void {
   safeRender();
 }
 
-// ── Search filter + "no settings" cleanup ──
-function applySearchFilter(container: HTMLElement, holder: HTMLElement, searchQuery: string): void {
-  const query = searchQuery.toLowerCase();
-  const sections = Array.from(container.children).filter(el => el.querySelector('.kcc-group-head'));
-  sections.forEach(sectionEl => {
-    const sectionTitle = sectionEl.querySelector('.kcc-group-head')?.textContent?.toLowerCase() || '';
-    const body = sectionEl.querySelector('.kcc-group-body');
-    if (!body) { (sectionEl as HTMLElement).style.display = 'none'; return; }
+// ── Search filter (cross-category) ──
+// In search mode the rail is hidden (CSS) and every category panel is stacked with
+// its heading; rows that don't match the query are hidden, and panels with no
+// matches are hidden entirely. The active filter is retained so categories that
+// populate asynchronously (Userscripts, saved Accounts) can re-apply it once their
+// rows land — otherwise they'd stay hidden after the initial sync pass.
+let activeSearch: { query: string; panels: HTMLElement[] } | null = null;
 
-    if (sectionTitle.includes(query)) {
-      body.classList.remove('kcc-group-collapsed');
-      return;
-    }
-
-    let visibleCount = 0;
-    Array.from(body.children).forEach(child => {
-      const el = child as HTMLElement;
-      const text = el.textContent?.toLowerCase() || '';
-      if (text.includes(query)) {
-        el.style.display = '';
-        visibleCount++;
-      } else {
-        el.style.display = 'none';
-      }
+/** Re-run the active search filter (no-op when not searching). Async sections call
+ *  this after appending their rows. */
+function reapplySearch(): void {
+  if (!activeSearch) return;
+  const { query, panels } = activeSearch;
+  panels.forEach((panel) => {
+    let visible = 0;
+    panel.querySelectorAll('.kcc-row').forEach((el) => {
+      const match = (el.textContent || '').toLowerCase().includes(query);
+      (el as HTMLElement).style.display = match ? '' : 'none';
+      if (match) visible++;
     });
-    if (visibleCount === 0) {
-      (sectionEl as HTMLElement).style.display = 'none';
-    } else {
-      body.classList.remove('kcc-group-collapsed');
-    }
+    panel.style.display = visible > 0 ? '' : 'none';
   });
+}
 
-  const hasVisible = sections.find(el => (el as HTMLElement).style.display !== 'none');
-  if (hasVisible) {
-    Array.from(holder.children).forEach(child => {
+function applySearchFilter(container: HTMLElement, holder: HTMLElement, searchQuery: string, panels: HTMLElement[]): void {
+  container.classList.add('kcc-searching');
+  activeSearch = { query: searchQuery.toLowerCase(), panels };
+  reapplySearch();
+  if (panels.some((p) => p.style.display !== 'none')) {
+    Array.from(holder.children).forEach((child) => {
       if ((child as HTMLElement).textContent?.toLowerCase().includes('no settings')) {
         (child as HTMLElement).remove();
       }
@@ -172,25 +167,10 @@ function applySearchFilter(container: HTMLElement, holder: HTMLElement, searchQu
   }
 }
 
-function renderSettings(searchQuery?: string): void {
-  const holder = document.getElementById('settHolder');
-  if (!holder) return;
-
-  resetRefreshNotification();
-
-  if (searchQuery) {
-    const existing = holder.querySelector('.kcc-settings');
-    if (existing) existing.remove();
-  } else {
-    while (holder.firstChild) holder.removeChild(holder.firstChild);
-  }
-
-  const container = document.createElement('div');
-  container.className = 'kcc-settings';
-
-  // ── Action button grid ──
-  const actionGrid = document.createElement('div');
-  actionGrid.className = 'kcc-action-grid';
+// ── Backup & reset actions ──
+function buildManageSection(body: HTMLElement): void {
+  const grid = document.createElement('div');
+  grid.className = 'kcc-action-grid';
 
   const actionButtons: Array<{ label: string; color: string; full?: boolean; action: () => void }> = [
     { label: 'Export Settings', color: 'kcc-ab-cyan', action: () => {
@@ -248,77 +228,118 @@ function renderSettings(searchQuery?: string): void {
     btn.className = 'kcc-action-btn ' + ab.color + (ab.full ? ' full' : '');
     btn.textContent = ab.label;
     btn.addEventListener('click', ab.action);
-    actionGrid.appendChild(btn);
+    grid.appendChild(btn);
   }
-  container.appendChild(actionGrid);
+  body.appendChild(grid);
+}
 
-  // Load all configs in a single IPC call + platform info.
-  // Section shells are created inside the .then() so the persisted collapsed
-  // state is loaded before createSection consults it.
+interface CatDef { key: string; label: string; icon: string; build: (body: HTMLElement) => void; }
+
+function renderSettings(searchQuery?: string): void {
+  const holder = document.getElementById('settHolder');
+  if (!holder) return;
+
+  resetRefreshNotification();
+
+  if (searchQuery) {
+    const existing = holder.querySelector('.kcc-settings');
+    if (existing) existing.remove();
+  } else {
+    while (holder.firstChild) holder.removeChild(holder.firstChild);
+  }
+
+  const container = document.createElement('div');
+  container.className = 'kcc-settings';
+
   Promise.all([
-    ipcRenderer.invoke('get-all-config', ['swapper', 'matchmaker', 'keybinds', 'advanced', 'game', 'ui', 'discord', 'translator', 'performance', 'collapsedSections']),
+    ipcRenderer.invoke('get-all-config', ['swapper', 'matchmaker', 'keybinds', 'advanced', 'game', 'ui', 'discord', 'translator', 'performance']),
     ipcRenderer.invoke('get-platform'),
-  ]).then(([allConf, platformInfo]: [any, any]) => {
-    setCollapsedState((allConf.collapsedSections as Record<string, boolean>) || {});
-
-    // ── Create section shells (after collapsed state is loaded) ──
-    const genSec = createSection('General');
-    container.appendChild(genSec.section);
-    const gameSec = createSection('Game');
-    container.appendChild(gameSec.section);
-    const perfSec = createSection('Performance');
-    container.appendChild(perfSec.section);
-    const swapSec = createSection('Swapper');
-    container.appendChild(swapSec.section);
-    const appearSec = createSection('Appearance');
-    container.appendChild(appearSec.section);
-    const mmSec = createSection('Matchmaker');
-    container.appendChild(mmSec.section);
-    const chatSec = createSection('Chat');
-    container.appendChild(chatSec.section);
-    const discordSec = createSection('Discord');
-    container.appendChild(discordSec.section);
-    const accSec = createSection('Accounts', true);
-    container.appendChild(accSec.section);
-    const ksSec = createSection('Keystrokes', true);
-    container.appendChild(ksSec.section);
-    const advSec = createSection('Advanced');
-    container.appendChild(advSec.section);
-    const usSec = createSection('Userscripts');
-    container.appendChild(usSec.section);
-
-    const swapperConf = allConf.swapper;
-    const mmConf = allConf.matchmaker;
-    const keybindsConf = allConf.keybinds;
-    const advConf = allConf.advanced;
+    ipcRenderer.invoke('get-version'),
+  ]).then(([allConf, platformInfo, version]: [any, any, string]) => {
     const gameConf = allConf.game;
     const uiConfRaw = allConf.ui;
-    const discordConf = allConf.discord;
-    const translatorConf = allConf.translator;
-    const binds = { ...DEFAULT_CONFIG.keybinds, ...keybindsConf };
     const isWindows = platformInfo && platformInfo.isWindows;
-
+    const binds = { ...DEFAULT_CONFIG.keybinds, ...allConf.keybinds };
     const bag: SettingsBag = {
       binds,
       saveBinds: () => ipcRenderer.invoke('set-config', 'keybinds', binds),
       isWindows,
     };
 
-    // Populate each section
-    buildGeneralSection(genSec.body, gameConf, uiConfRaw, bag);
-    buildGameSection(gameSec.body, gameConf, uiConfRaw, bag);
-    buildPerformanceSection(perfSec.body, allConf.performance, isWindows);
-    buildSwapperSection(swapSec.body, swapperConf);
-    buildAppearanceSection(appearSec.body, uiConfRaw);
-    buildMatchmakerSection(mmSec.body, mmConf, bag);
-    buildChatSection(chatSec.body, gameConf, translatorConf);
-    buildDiscordSection(discordSec.body, discordConf);
-    buildAccountsSection(accSec.body);
-    buildKeystrokesRows(ksSec.body);
-    buildAdvancedSection(advSec.body, advConf, isWindows);
-    renderUserscriptsSection(usSec.body);
+    // ── Header band ──
+    const header = document.createElement('div');
+    header.className = 'kcc-header';
+    header.innerHTML =
+      '<div class="kcc-header-mark"><span class="material-icons">shield</span></div>' +
+      '<div class="kcc-header-text">' +
+        '<div class="kcc-header-name">Civilian Client</div>' +
+        '<div class="kcc-header-ver">v' + escapeHtml(version || '') + '</div>' +
+      '</div>';
+    container.appendChild(header);
 
-    if (searchQuery) applySearchFilter(container, holder, searchQuery);
+    // ── Shell: category rail + content pane ──
+    const shell = document.createElement('div');
+    shell.className = 'kcc-shell';
+    const rail = document.createElement('div');
+    rail.className = 'kcc-rail';
+    const pane = document.createElement('div');
+    pane.className = 'kcc-pane';
+    shell.appendChild(rail);
+    shell.appendChild(pane);
+    container.appendChild(shell);
+
+    const cats: CatDef[] = [
+      { key: 'General', label: 'General', icon: 'tune', build: (b) => buildGeneralSection(b, gameConf, uiConfRaw, bag) },
+      { key: 'Game', label: 'Game', icon: 'sports_esports', build: (b) => buildGameSection(b, gameConf, uiConfRaw, bag) },
+      { key: 'Performance', label: 'Performance', icon: 'speed', build: (b) => buildPerformanceSection(b, allConf.performance, isWindows) },
+      { key: 'Swapper', label: 'Swapper', icon: 'swap_horiz', build: (b) => buildSwapperSection(b, allConf.swapper) },
+      { key: 'Appearance', label: 'Appearance', icon: 'palette', build: (b) => buildAppearanceSection(b, uiConfRaw) },
+      { key: 'Matchmaker', label: 'Matchmaker', icon: 'travel_explore', build: (b) => buildMatchmakerSection(b, allConf.matchmaker, bag) },
+      { key: 'Chat', label: 'Chat', icon: 'chat', build: (b) => buildChatSection(b, gameConf, allConf.translator) },
+      { key: 'Discord', label: 'Discord', icon: 'forum', build: (b) => buildDiscordSection(b, allConf.discord) },
+      { key: 'Accounts', label: 'Accounts', icon: 'people', build: (b) => buildAccountsSection(b, reapplySearch) },
+      { key: 'Keystrokes', label: 'Keystrokes', icon: 'keyboard', build: (b) => buildKeystrokesRows(b) },
+      { key: 'Userscripts', label: 'Userscripts', icon: 'code', build: (b) => renderUserscriptsSection(b) },
+      { key: 'Advanced', label: 'Advanced', icon: 'settings', build: (b) => buildAdvancedSection(b, allConf.advanced, isWindows) },
+      { key: 'Manage', label: 'Backup & Reset', icon: 'restart_alt', build: (b) => buildManageSection(b) },
+    ];
+
+    const panels: HTMLElement[] = [];
+    const items: HTMLElement[] = [];
+
+    const setActiveCat = (key: string): void => {
+      items.forEach((it) => it.classList.toggle('kcc-active', it.dataset.cat === key));
+      panels.forEach((pnl) => { pnl.style.display = pnl.dataset.cat === key ? '' : 'none'; });
+    };
+
+    cats.forEach((cat) => {
+      const item = document.createElement('div');
+      item.className = 'kcc-rail-item';
+      item.dataset.cat = cat.key;
+      item.innerHTML = '<span class="material-icons">' + cat.icon + '</span><span class="kcc-rail-label">' + escapeHtml(cat.label) + '</span>';
+      item.addEventListener('click', () => setActiveCat(cat.key));
+      rail.appendChild(item);
+      items.push(item);
+
+      const panel = document.createElement('div');
+      panel.className = 'kcc-cat';
+      panel.dataset.cat = cat.key;
+      const head = document.createElement('div');
+      head.className = 'kcc-cat-head';
+      head.textContent = cat.label;
+      panel.appendChild(head);
+      pane.appendChild(panel);
+      panels.push(panel);
+
+      cat.build(panel);
+    });
+
+    if (searchQuery) {
+      applySearchFilter(container, holder, searchQuery, panels);
+    } else {
+      activeSearch = null;
+      setActiveCat(cats[0].key);
+    }
 
     holder.appendChild(container);
   }).catch((err: any) => {
@@ -347,6 +368,7 @@ function renderUserscriptsSection(body: HTMLElement): void {
     const scriptInstances = getInstances();
     if (scriptInstances.length === 0) {
       body.appendChild(createInfoRow('No userscripts found. Place .js files in the scripts folder and reload.'));
+      reapplySearch();
       return;
     }
 
@@ -382,6 +404,7 @@ function renderUserscriptsSection(body: HTMLElement): void {
         }
       });
     }
+    reapplySearch();
   });
 }
 
