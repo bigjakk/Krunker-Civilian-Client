@@ -252,6 +252,16 @@ function buildRegionCheckboxes(): string {
     }).join('\n');
 }
 
+// Serialize a value for safe embedding inside the inline <script>. JSON.stringify
+// alone doesn't escape `</script>`, so escape angle brackets — otherwise a crafted
+// setting value (e.g. a ranked-sound URL from an imported settings file) could break
+// out of the <script> element and run in the queue window.
+function jsLiteral(value: unknown): string {
+    return JSON.stringify(value)
+        .replace(/</g, '\\u003c')
+        .replace(/>/g, '\\u003e');
+}
+
 function buildQueueScript(token: string, region: string, allRegions: boolean, audioUrl: string): string {
     return `
 let isQueued = false;
@@ -265,10 +275,10 @@ let audioInitialized = false;
 const selectedMaps = new Set();
 
 const WS_URL = ${JSON.stringify(RANKED_QUEUE_WS)};
-const INIT_TOKEN = ${JSON.stringify(token)};
-const INIT_REGION = ${JSON.stringify(region)};
-const INIT_ALL_REGIONS = ${JSON.stringify(allRegions)};
-const AUDIO_URL = ${JSON.stringify(audioUrl)};
+const INIT_TOKEN = ${jsLiteral(token)};
+const INIT_REGION = ${jsLiteral(region)};
+const INIT_ALL_REGIONS = ${jsLiteral(allRegions)};
+const AUDIO_URL = ${jsLiteral(audioUrl)};
 const FALLBACK_AUDIO_URL = ${JSON.stringify(DEFAULT_RANKED_AUDIO_URL)};
 const maps = ${buildMapsJson()};
 const regions = ${buildRegionsJson()};
