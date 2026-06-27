@@ -199,7 +199,13 @@ function shouldTranslate(text: string): boolean {
   // Tokenize for skip-term checking
   const words = cleaned.replace(/[^a-zA-Z0-9\s]/g, '').toLowerCase().split(/\s+/).filter(w => w.length > 0);
   if (words.length === 0) return false;
-  if (words.every(w => SKIP_TERMS.has(w) || customSkipWords.has(w))) return false;
+
+  // Subtract the user's custom skip words (nicknames, friends' names) first — a name
+  // embedded in a line shouldn't drag the whole message through translation. What's left
+  // decides: nothing left, or only built-in slang left, means don't translate.
+  const meaningful = words.filter(w => !customSkipWords.has(w));
+  if (meaningful.length === 0) return false;
+  if (meaningful.every(w => SKIP_TERMS.has(w))) return false;
 
   // Auto-suppressed phrases
   const key = cleaned.toLowerCase();
@@ -210,7 +216,7 @@ function shouldTranslate(text: string): boolean {
 
   // Latin-only single words are too false-positive-prone (English slang) to send;
   // 2+ words go through so short foreign taunts get caught. Accents always pass.
-  if (words.length < MIN_LATIN_WORDS) {
+  if (meaningful.length < MIN_LATIN_WORDS) {
     if (!/[À-ÿ]/.test(cleaned)) return false;
   }
 
