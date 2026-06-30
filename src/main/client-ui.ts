@@ -995,8 +995,29 @@ export const WATERMARK_CSS = `
 }
 `;
 
+// ── Ban log search CSS (search box injected into Krunker's native KPD popup) ──
+export const BANLOG_SEARCH_CSS = `
+#kccBanlogSearch {
+  display: block;
+  box-sizing: border-box;
+  width: calc(100% - 24px);
+  margin: 6px auto 10px;
+  padding: 8px 12px;
+  font-size: 15px;
+  color: var(--kcc-text-primary);
+  background: var(--kcc-surface-input);
+  border: 1px solid var(--kcc-border-default);
+  border-radius: 8px;
+  outline: none;
+  pointer-events: all;
+}
+#kccBanlogSearch::placeholder { color: var(--kcc-text-muted); }
+#kccBanlogSearch:focus { border-color: var(--kcc-accent); background: var(--kcc-surface-hover); }
+#kpdCalls tr.kcc-banlog-hide { display: none !important; }
+`;
+
 /** Pre-concatenated CSS for single-call injection */
-export const ALL_CLIENT_CSS = `${CLIENT_SETTINGS_CSS}\n${MATCHMAKER_SETTINGS_CSS}\n${TRANSLATOR_CSS}\n${ALT_MANAGER_CSS}\n${HP_COUNTER_CSS}\n${BP_CLAIM_ALL_CSS}\n${RANK_TRACKER_CSS}\n${WATERMARK_CSS}`;
+export const ALL_CLIENT_CSS = `${CLIENT_SETTINGS_CSS}\n${MATCHMAKER_SETTINGS_CSS}\n${TRANSLATOR_CSS}\n${ALT_MANAGER_CSS}\n${HP_COUNTER_CSS}\n${BP_CLAIM_ALL_CSS}\n${RANK_TRACKER_CSS}\n${WATERMARK_CSS}\n${BANLOG_SEARCH_CSS}`;
 
 /** Hides leftover ad container divs after the network-level URL block cancels their payloads. */
 export const HIDE_ADS_CSS = `

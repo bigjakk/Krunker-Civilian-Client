@@ -14,6 +14,7 @@ import { DEFAULT_CONFIG } from '../main/config-defaults';
 import { savedConsole as _console, setVerbose } from './saved-console';
 import { initAltManagerButton } from './alt-manager';
 import { startHidePopups, setClassicSocial } from './menu-tweaks';
+import { initBanlogSearch } from './banlog-search';
 
 
 _console.log('[KCC] Preload script loaded');
@@ -385,6 +386,9 @@ ipcRenderer.on('main_did-finish-load', () => {
     }
     // ── In-game Accounts quick-switch button ──
     if (isGamePage) initAltManagerButton();
+
+    // ── Ban log search (search field in Krunker's native KPD popup) ──
+    if (isGamePage) initBanlogSearch();
 
   }).catch((err) => _console.error('[KCC] preload init failed:', err));
 
