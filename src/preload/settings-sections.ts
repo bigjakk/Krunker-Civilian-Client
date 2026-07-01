@@ -769,24 +769,21 @@ export function buildAdvancedSection(
     onChange: (v) => { adv.angleBackend = v; saveAdv(); },
   }));
 
-  const advToggles: Array<{ key: string; label: string; desc: string; safety: number }> = [
-    { key: 'removeUselessFeatures', label: 'Remove Useless Features', desc: 'Disables crash reporting, metrics, print preview, and other unused Chromium features', safety: 1 },
-    { key: 'gpuRasterizing', label: 'GPU Rasterization', desc: 'Force GPU rasterization and out-of-process rasterization', safety: 2 },
-    { key: 'helpfulFlags', label: 'Useful Flags', desc: 'Enables WebGL, JS harmony, V8 features, background throttle prevention, and autoplay bypass', safety: 3 },
-    { key: 'increaseLimits', label: 'Increase Limits', desc: 'Raises renderer process, WebGL context, and WebRTC CPU limits; ignores GPU blocklist', safety: 4 },
-    { key: 'lowLatency', label: 'Low Latency Flags', desc: 'Enables high-resolution timer, QUIC protocol, and high-performance GPU', safety: 4 },
-    { key: 'experimentalFlags', label: 'Experimental Flags', desc: 'Enables accelerated video decode, native GPU memory buffers, high DPI support, and disables pings/proxy', safety: 4 },
-  ];
-
   const flagsGroup = createGroup(body, 'Chromium Flags');
-  for (const t of advToggles) {
-    flagsGroup.appendChild(createToggleRow({
-      label: t.label, desc: t.desc,
-      checked: !!adv[t.key], restart: true,
-      safety: t.safety,
-      onChange: (v) => { adv[t.key] = v; saveAdv(); },
-    }));
-  }
+
+  flagsGroup.appendChild(createToggleRow({
+    label: 'Remove Useless Features',
+    desc: 'Disables crash dump reporting, Chromium logging, the renderer hang monitor, and other unused features',
+    checked: !!adv.removeUselessFeatures, restart: true, safety: 1,
+    onChange: (v) => { adv.removeUselessFeatures = v; saveAdv(); },
+  }));
+
+  flagsGroup.appendChild(createToggleRow({
+    label: 'Extra Performance Tweaks',
+    desc: 'Forces GPU rasterization past the driver blocklist, disables driver bug workarounds and the software fallback, prefers the high-performance GPU, and skips proxy resolution',
+    checked: !!adv.perfTweaks, restart: true, safety: 3,
+    onChange: (v) => { adv.perfTweaks = v; saveAdv(); },
+  }));
 
   const debugGroup = createGroup(body, 'Debugging');
 

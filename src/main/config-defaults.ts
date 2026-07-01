@@ -119,11 +119,7 @@ export interface AppConfig {
   };
   advanced: {
     removeUselessFeatures: boolean;
-    gpuRasterizing: boolean;
-    helpfulFlags: boolean;
-    increaseLimits: boolean;
-    lowLatency: boolean;
-    experimentalFlags: boolean;
+    perfTweaks: boolean;
     angleBackend: string;
     verboseLogging: boolean;
   };
@@ -238,11 +234,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   advanced: {
     removeUselessFeatures: true,
-    gpuRasterizing: false,
-    helpfulFlags: true,
-    increaseLimits: false,
-    lowLatency: false,
-    experimentalFlags: false,
+    perfTweaks: false,
     angleBackend: 'default',
     verboseLogging: false,
   },
