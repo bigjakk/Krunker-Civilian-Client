@@ -42,7 +42,7 @@ Was AI used in the creation of this client? Yes, if you came across this client 
 - changelog popup on update
 - configurable keybinds with visual rebinding dialog
 - configurable ANGLE backend (D3D11, OpenGL, D3D11on12)
-- advanced Chromium flag settings (GPU rasterization, low latency, QUIC, and more)
+- advanced Chromium flag tweaks (GPU rasterization, high-performance GPU, debloat, and more)
 - auto-updater
 - maintained & open source (GPL-3.0)
 

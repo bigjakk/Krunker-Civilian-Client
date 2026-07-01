@@ -319,13 +319,21 @@ export function buildKeystrokesRows(body: HTMLElement): void {
   }).catch(() => { loaded = true; });
 }
 
+// Merged Performance category: frame rate, system (priority + graphics backend),
+// the consolidated Chromium flag toggles, and debugging. Covers both the
+// `performance` and `advanced` config sections.
 export function buildPerformanceSection(
-  body: HTMLElement, perfConf: any, isWindows: boolean,
+  body: HTMLElement, perfConf: any, advConf: any, isWindows: boolean,
 ): void {
   const perf = { ...DEFAULT_CONFIG.performance, ...perfConf };
+  const adv = { ...DEFAULT_CONFIG.advanced, ...advConf };
 
   function savePerf(): void {
     ipcRenderer.invoke('set-config', 'performance', perf);
+  }
+
+  function saveAdv(): void {
+    ipcRenderer.invoke('set-config', 'advanced', adv);
   }
 
   const fpsGroup = createGroup(body, 'Frame Rate');
@@ -344,8 +352,9 @@ export function buildPerformanceSection(
     onChange: (v) => { perf.higherMaxFps = v; savePerf(); },
   }));
 
+  const sysGroup = createGroup(body, 'System');
+
   if (isWindows) {
-    const sysGroup = createGroup(body, 'System');
     sysGroup.appendChild(createSelectRow({
       label: 'Process Priority',
       desc: 'OS-level process priority for the client (Windows only)',
@@ -360,6 +369,55 @@ export function buildPerformanceSection(
       onChange: (v) => { perf.processPriority = v; savePerf(); },
     }));
   }
+
+  const angleOptions: Array<{ value: string; label: string }> = isWindows
+    ? [
+        { value: 'default', label: 'Default (D3D11)' },
+        { value: 'gl',      label: 'OpenGL' },
+        { value: 'd3d11',   label: 'Direct3D 11' },
+        { value: 'd3d11on12', label: 'D3D11on12' },
+      ]
+    : [
+        { value: 'default', label: 'Default' },
+        { value: 'gl',     label: 'OpenGL' },
+        { value: 'vulkan', label: 'Vulkan' },
+      ];
+
+  sysGroup.appendChild(createSelectRow({
+    label: 'ANGLE Backend',
+    desc: 'Graphics API used for WebGL rendering',
+    options: angleOptions,
+    value: adv.angleBackend, restart: true,
+    onChange: (v) => { adv.angleBackend = v; saveAdv(); },
+  }));
+
+  const flagsGroup = createGroup(body, 'Chromium Flags');
+
+  flagsGroup.appendChild(createToggleRow({
+    label: 'Remove Useless Features',
+    desc: 'Disables crash dump reporting, Chromium logging, the renderer hang monitor, and other unused features',
+    checked: !!adv.removeUselessFeatures, restart: true, safety: 1,
+    onChange: (v) => { adv.removeUselessFeatures = v; saveAdv(); },
+  }));
+
+  flagsGroup.appendChild(createToggleRow({
+    label: 'Extra Performance Tweaks',
+    desc: 'Forces GPU rasterization past the driver blocklist, disables driver bug workarounds and the software fallback, prefers the high-performance GPU, and skips proxy resolution (breaks VPN/proxy setups)',
+    checked: !!adv.perfTweaks, restart: true, safety: 3,
+    onChange: (v) => { adv.perfTweaks = v; saveAdv(); },
+  }));
+
+  const debugGroup = createGroup(body, 'Debugging');
+
+  debugGroup.appendChild(createToggleRow({
+    label: 'Verbose Logging',
+    desc: 'Forward all preload console output to the Electron log file',
+    checked: adv.verboseLogging, instant: true,
+    onChange: (v) => {
+      adv.verboseLogging = v; saveAdv();
+      setVerbose(v);
+    },
+  }));
 }
 
 export function buildSwapperSection(body: HTMLElement, swapperConf: any): void {
@@ -735,65 +793,4 @@ export function buildChatSection(body: HTMLElement, gameConf: any, translatorCon
     placeholder: 'jakk, bigj, etc.',
     onChange: (v) => { tl.customSkipWords = v; saveTL(); updateTranslatorConfig({ customSkipWords: v }); },
   }).row);
-}
-
-export function buildAdvancedSection(
-  body: HTMLElement, advConf: any, isWindows: boolean,
-): void {
-  const adv = { ...DEFAULT_CONFIG.advanced, ...advConf };
-
-  function saveAdv(): void {
-    ipcRenderer.invoke('set-config', 'advanced', adv);
-  }
-
-  const angleOptions: Array<{ value: string; label: string }> = isWindows
-    ? [
-        { value: 'default', label: 'Default (D3D11)' },
-        { value: 'gl',      label: 'OpenGL' },
-        { value: 'd3d11',   label: 'Direct3D 11' },
-        { value: 'd3d11on12', label: 'D3D11on12' },
-      ]
-    : [
-        { value: 'default', label: 'Default' },
-        { value: 'gl',     label: 'OpenGL' },
-        { value: 'vulkan', label: 'Vulkan' },
-      ];
-
-  const gfxGroup = createGroup(body, 'Graphics');
-
-  gfxGroup.appendChild(createSelectRow({
-    label: 'ANGLE Backend',
-    desc: 'Graphics API used for WebGL rendering',
-    options: angleOptions,
-    value: adv.angleBackend, restart: true,
-    onChange: (v) => { adv.angleBackend = v; saveAdv(); },
-  }));
-
-  const flagsGroup = createGroup(body, 'Chromium Flags');
-
-  flagsGroup.appendChild(createToggleRow({
-    label: 'Remove Useless Features',
-    desc: 'Disables crash dump reporting, Chromium logging, the renderer hang monitor, and other unused features',
-    checked: !!adv.removeUselessFeatures, restart: true, safety: 1,
-    onChange: (v) => { adv.removeUselessFeatures = v; saveAdv(); },
-  }));
-
-  flagsGroup.appendChild(createToggleRow({
-    label: 'Extra Performance Tweaks',
-    desc: 'Forces GPU rasterization past the driver blocklist, disables driver bug workarounds and the software fallback, prefers the high-performance GPU, and skips proxy resolution',
-    checked: !!adv.perfTweaks, restart: true, safety: 3,
-    onChange: (v) => { adv.perfTweaks = v; saveAdv(); },
-  }));
-
-  const debugGroup = createGroup(body, 'Debugging');
-
-  debugGroup.appendChild(createToggleRow({
-    label: 'Verbose Logging',
-    desc: 'Forward all preload console output to the Electron log file',
-    checked: adv.verboseLogging, instant: true,
-    onChange: (v) => {
-      adv.verboseLogging = v; saveAdv();
-      setVerbose(v);
-    },
-  }));
 }

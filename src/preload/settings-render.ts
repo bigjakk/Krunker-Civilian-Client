@@ -20,7 +20,7 @@ import {
   type SettingsBag,
   buildGeneralSection, buildGameSection, buildKeystrokesRows, buildPerformanceSection,
   buildSwapperSection, buildAppearanceSection, buildMatchmakerSection, buildDiscordSection,
-  buildChatSection, buildAdvancedSection,
+  buildChatSection,
 } from './settings-sections';
 import { buildAccountsSection } from './alt-manager';
 import { getInstances, setScriptEnabled } from './userscripts';
@@ -378,7 +378,7 @@ function renderSettings(searchQuery?: string): void {
   const cats: CatDef[] = [
     { key: 'General', label: 'General', icon: 'tune', build: (b) => buildGeneralSection(b, gameConf, uiConfRaw, bag) },
     { key: 'Game', label: 'Game', icon: 'sports_esports', build: (b) => buildGameSection(b, gameConf, uiConfRaw, bag) },
-    { key: 'Performance', label: 'Performance', icon: 'speed', build: (b) => buildPerformanceSection(b, allConf.performance, isWindows) },
+    { key: 'Performance', label: 'Performance', icon: 'speed', build: (b) => buildPerformanceSection(b, allConf.performance, allConf.advanced, isWindows) },
     { key: 'Swapper', label: 'Swapper', icon: 'swap_horiz', build: (b) => buildSwapperSection(b, allConf.swapper) },
     { key: 'Appearance', label: 'Appearance', icon: 'palette', build: (b) => buildAppearanceSection(b, uiConfRaw) },
     { key: 'Matchmaker', label: 'Matchmaker', icon: 'travel_explore', build: (b) => buildMatchmakerSection(b, allConf.matchmaker, bag) },
@@ -387,7 +387,6 @@ function renderSettings(searchQuery?: string): void {
     { key: 'Accounts', label: 'Accounts', icon: 'people', build: (b) => buildAccountsSection(createGroup(b), reapplySearch) },
     { key: 'Keystrokes', label: 'Keystrokes', icon: 'keyboard', build: (b) => buildKeystrokesRows(b) },
     { key: 'Userscripts', label: 'Userscripts', icon: 'code', build: (b) => renderUserscriptsSection(b) },
-    { key: 'Advanced', label: 'Advanced', icon: 'settings', build: (b) => buildAdvancedSection(b, allConf.advanced, isWindows) },
     { key: 'Manage', label: 'Backup & Reset', icon: 'restart_alt', build: (b) => buildManageSection(b) },
   ];
 
