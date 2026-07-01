@@ -33,8 +33,6 @@ export interface AppConfig {
   performance: {
     fpsUnlocked: boolean;
     higherMaxFps: boolean;
-    hardwareAccel: boolean;
-    gpuPreference: 'high-performance' | 'low-power' | 'default';
     processPriority: string;
   };
   game: {
@@ -158,8 +156,6 @@ export const DEFAULT_CONFIG: AppConfig = {
   performance: {
     fpsUnlocked: true,
     higherMaxFps: false,
-    hardwareAccel: true,
-    gpuPreference: 'high-performance',
     processPriority: 'Normal',
   },
   game: {
