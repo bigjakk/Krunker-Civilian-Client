@@ -75,7 +75,7 @@ Any `.js` file in the scripts folder will be loaded as a userscript if enabled i
 
 ## Custom Electron Build
 
-This client uses a custom-patched Electron 42 build to overcome the aim freezing issue present in modern Electron versions. The patched binary is downloaded automatically during `npm install`.
+This client uses a custom-patched Electron build to overcome the aim freezing issue present in modern Electron versions. The patched binary is downloaded automatically during `npm install`.
 
 For details on the patch and build instructions, see [Electron-Websocket-Fix](https://github.com/bigjakk/Electron-Websocket-Fix).
 
