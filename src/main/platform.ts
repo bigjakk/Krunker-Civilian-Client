@@ -45,30 +45,17 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
   // ── FPS uncap ──
   // disable-frame-rate-limit causes compositor CPU spin on Chromium 84+, starving
   // input events. On Electron 43 (Chromium 150), this is fixed by a patch to
-  // cc/scheduler/scheduler.cc in our custom Electron build. The latency recovery
-  // flags below are no-ops on Chromium 94+ (features were removed), but are
-  // harmless to keep — Chromium ignores unknown feature flags.
+  // cc/scheduler/scheduler.cc in our custom Electron build.
   if (performance.fpsUnlocked) {
     app.commandLine.appendSwitch('disable-frame-rate-limit');
     app.commandLine.appendSwitch('disable-gpu-vsync');
     app.commandLine.appendSwitch('max-gum-fps', '9999');
-    enableFeatures('ImplLatencyRecovery', 'MainLatencyRecovery');
     // Opt-in deeper compositor frame queue (depth 2 vs the patched default of 1).
     // Read by the custom Electron's CustomMaxPendingFrames feature param. Off → not
     // emitted → the binary keeps its compiled default of 1. Trades input latency on
     // low-end machines for higher peak FPS on present-bound (capable) ones.
     if (performance.higherMaxFps) enableFeatures('CustomMaxPendingFrames:count/2');
   }
-
-  // ── Compositor / GPU display thread priority ──
-  // Always-on. With FPS uncap the renderer can produce frames faster than the
-  // GPU/compositor can present them; without these flags the present pipeline
-  // gets starved by the renderer thread, so the FPS counter reads 1000+ while
-  // visible output stutters to ~20fps. These flags raise the Blink compositor
-  // and GPU process display threads above renderer priority so frames actually
-  // make it to the screen. Most acute on Linux + NVIDIA + XWayland (where the
-  // present path has more overhead than Windows D3D11), but harmless on Windows.
-  enableFeatures('BlinkCompositorUseDisplayThreadPriority', 'GpuUseDisplayThreadPriority');
 
   // ── Always-on platform flags ──
   app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
