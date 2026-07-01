@@ -318,7 +318,7 @@ export function buildPerformanceSection(
 
   body.appendChild(createToggleRow({
     label: 'Higher Max FPS',
-    desc: 'Lets powerful machines reach higher framerates. May cause input lag or stutter on low-end hardware (requires restart)',
+    desc: 'Lets powerful machines reach higher framerates. May cause input lag or stutter on low-end hardware. Recommended to keep disabled (requires restart)',
     checked: perf.higherMaxFps, restart: true, safety: 4,
     onChange: (v) => { perf.higherMaxFps = v; savePerf(); },
   }));
