@@ -44,7 +44,7 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
 
   // ── FPS uncap ──
   // disable-frame-rate-limit causes compositor CPU spin on Chromium 84+, starving
-  // input events. On Electron 42 (Chromium 147), this is fixed by a patch to
+  // input events. On Electron 43 (Chromium 150), this is fixed by a patch to
   // cc/scheduler/scheduler.cc in our custom Electron build. The latency recovery
   // flags below are no-ops on Chromium 94+ (features were removed), but are
   // harmless to keep — Chromium ignores unknown feature flags.
