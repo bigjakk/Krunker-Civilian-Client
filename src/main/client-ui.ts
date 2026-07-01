@@ -438,46 +438,59 @@ ${THEME_CSS}
 }
 
 
-/* ── KCC action button grid ── */
-.kcc-action-grid {
+/* ── Backup & Reset page ── */
+.kcc-manage-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  padding: 0 12px 12px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
 }
-.kcc-action-btn {
+.kcc-manage-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 13px;
   background: var(--kcc-surface-card);
-  color: var(--kcc-text-primary);
-  border: 2px solid var(--kcc-border-medium);
-  padding: 10px 12px;
-  border-radius: 6px;
-  cursor: pointer;
+  border: 1px solid var(--kcc-border-default);
+  border-radius: 8px;
   font-size: 13px;
-  font-weight: 600;
-  text-align: center;
-  transition: background 0.15s, border-color 0.15s;
+  color: var(--kcc-text-primary);
+  cursor: pointer;
   user-select: none;
+  transition: background 0.15s, border-color 0.15s;
 }
-.kcc-action-btn:hover {
-  background: var(--kcc-surface-hover);
-  border-color: var(--kcc-border-focus);
+.kcc-manage-btn:hover { background: var(--kcc-surface-hover); border-color: var(--kcc-border-focus); }
+.kcc-manage-btn:active { transform: scale(0.98); }
+.kcc-manage-btn .material-icons { font-size: 17px; color: var(--kcc-text-muted); }
+.kcc-dzone-label { color: rgba(239,83,80,0.75); }
+.kcc-dzone {
+  border: 1px solid rgba(239,83,80,0.3);
+  background: rgba(239,83,80,0.05);
+  border-radius: 10px;
 }
-.kcc-action-btn:active {
-  transform: scale(0.97);
+.kcc-drow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border-bottom: 1px solid rgba(239,83,80,0.12);
 }
-.kcc-action-btn.full {
-  grid-column: 1 / -1;
+.kcc-drow:last-child { border-bottom: none; }
+.kcc-drow-main { flex: 1; min-width: 0; }
+.kcc-drow-title { font-size: 16px; color: var(--kcc-text-primary); }
+.kcc-drow-desc { font-size: 13px; line-height: 1.4; color: var(--kcc-text-muted); margin-top: 2px; }
+.kcc-dbtn {
+  flex: none;
+  background: transparent;
+  color: var(--kcc-red);
+  border: 1px solid rgba(239,83,80,0.45);
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
 }
-.kcc-action-btn.kcc-ab-purple { border-color: #ab47bc; }
-.kcc-action-btn.kcc-ab-purple:hover { border-color: #ce93d8; }
-.kcc-action-btn.kcc-ab-cyan { border-color: #00bcd4; }
-.kcc-action-btn.kcc-ab-cyan:hover { border-color: #4dd0e1; }
-.kcc-action-btn.kcc-ab-pink { border-color: #ec407a; }
-.kcc-action-btn.kcc-ab-pink:hover { border-color: #f48fb1; }
-.kcc-action-btn.kcc-ab-red { border-color: var(--kcc-red); }
-.kcc-action-btn.kcc-ab-red:hover { border-color: var(--kcc-red-hover); }
-.kcc-action-btn.kcc-ab-orange { border-color: var(--kcc-orange); }
-.kcc-action-btn.kcc-ab-orange:hover { border-color: var(--kcc-orange-hover); }
+.kcc-dbtn:hover { background: rgba(239,83,80,0.12); }
 
 /* floating toasts css that is required */
 .kcc-holder-update {

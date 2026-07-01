@@ -216,53 +216,82 @@ function updateSearch(query: string): void {
 }
 
 // ── Backup & reset actions ──
+// Grouped action page: backup and client maintenance as icon buttons, with the
+// destructive actions set apart in a red danger zone with per-action descriptions.
 function buildManageSection(body: HTMLElement): void {
-  const grid = document.createElement('div');
-  grid.className = 'kcc-action-grid';
+  const makeActionBtn = (icon: string, label: string, onClick: () => void): HTMLElement => {
+    const btn = document.createElement('div');
+    btn.className = 'kcc-manage-btn';
+    btn.innerHTML = '<span class="material-icons">' + icon + '</span>' + escapeHtml(label);
+    btn.addEventListener('click', onClick);
+    return btn;
+  };
+  const makeSection = (label: string): HTMLElement => {
+    const l = document.createElement('div');
+    l.className = 'kcc-group-label';
+    l.textContent = label;
+    body.appendChild(l);
+    const grid = document.createElement('div');
+    grid.className = 'kcc-manage-grid';
+    body.appendChild(grid);
+    return grid;
+  };
 
-  const actionButtons: Array<{ label: string; color: string; full?: boolean; action: () => void }> = [
-    { label: 'Export Settings', color: 'kcc-ab-cyan', action: () => {
-      const krunker = collectKrunkerSettings();
-      ipcRenderer.invoke('export-settings', krunker).then((res: any) => {
-        if (res && res.success) showToast('Settings exported');
-        else if (res && !res.canceled) showToast('Export failed: ' + (res.error || 'unknown error'));
+  const backupGrid = makeSection('Backup');
+  backupGrid.appendChild(makeActionBtn('file_download', 'Export Settings', () => {
+    const krunker = collectKrunkerSettings();
+    ipcRenderer.invoke('export-settings', krunker).then((res: any) => {
+      if (res && res.success) showToast('Settings exported');
+      else if (res && !res.canceled) showToast('Export failed: ' + (res.error || 'unknown error'));
+    });
+  }));
+  backupGrid.appendChild(makeActionBtn('file_upload', 'Import Settings', () => {
+    showConfirm({
+      title: 'Import Settings',
+      message: 'Import settings from a file? This overwrites your current client and Krunker settings (alt accounts are not affected) and restarts the client.',
+      confirmLabel: 'Import',
+    }).then((ok) => {
+      if (!ok) return;
+      ipcRenderer.invoke('import-settings').then((res: any) => {
+        if (res && res.success) {
+          applyKrunkerSettings(res.krunker);
+          ipcRenderer.invoke('restart-client');
+        } else if (res && !res.canceled) {
+          showToast('Import failed: ' + (res.error || 'unknown error'));
+        }
       });
-    }},
-    { label: 'Import Settings', color: 'kcc-ab-purple', action: () => {
-      showConfirm({
-        title: 'Import Settings',
-        message: 'Import settings from a file? This overwrites your current client and Krunker settings (alt accounts are not affected) and restarts the client.',
-        confirmLabel: 'Import',
-      }).then((ok) => {
-        if (!ok) return;
-        ipcRenderer.invoke('import-settings').then((res: any) => {
-          if (res && res.success) {
-            applyKrunkerSettings(res.krunker);
-            ipcRenderer.invoke('restart-client');
-          } else if (res && !res.canceled) {
-            showToast('Import failed: ' + (res.error || 'unknown error'));
-          }
-        });
-      });
-    }},
-    { label: 'Open Resource Swapper', color: 'kcc-ab-pink', action: () => ipcRenderer.invoke('open-swap-folder') },
-    { label: 'Reset Resource Swapper', color: 'kcc-ab-pink', action: () => {
+    });
+  }));
+
+  const clientGrid = makeSection('Client');
+  clientGrid.appendChild(makeActionBtn('folder', 'Swapper Folder', () => ipcRenderer.invoke('open-swap-folder')));
+  clientGrid.appendChild(makeActionBtn('description', 'Electron Logs', () => ipcRenderer.invoke('open-electron-log')));
+  clientGrid.appendChild(makeActionBtn('refresh', 'Restart Client', () => ipcRenderer.invoke('restart-client')));
+
+  const dzLabel = document.createElement('div');
+  dzLabel.className = 'kcc-group-label kcc-dzone-label';
+  dzLabel.textContent = 'Danger Zone';
+  body.appendChild(dzLabel);
+  const dzone = document.createElement('div');
+  dzone.className = 'kcc-dzone';
+  body.appendChild(dzone);
+
+  const dangerActions: Array<{ title: string; desc: string; button: string; action: () => void }> = [
+    { title: 'Reset Resource Swapper', desc: 'Deletes all files in the swapper folder. Cannot be undone.', button: 'Reset', action: () => {
       showConfirm({
         title: 'Reset Resource Swapper',
         message: 'This deletes all files in the swapper folder and cannot be undone.',
         confirmLabel: 'Reset', danger: true,
       }).then((ok) => { if (ok) ipcRenderer.invoke('reset-swapper'); });
     }},
-    { label: 'Open Electron Logs', color: 'kcc-ab-red', action: () => ipcRenderer.invoke('open-electron-log') },
-    { label: 'Restart Client', color: 'kcc-ab-orange', full: true, action: () => ipcRenderer.invoke('restart-client') },
-    { label: 'Reset Options', color: 'kcc-ab-red', action: () => {
+    { title: 'Reset Options', desc: 'Resets all client settings to their defaults and restarts the client.', button: 'Reset', action: () => {
       showConfirm({
         title: 'Reset Options',
         message: 'Reset all settings to their defaults? The client will restart.',
         confirmLabel: 'Reset', danger: true,
       }).then((ok) => { if (ok) ipcRenderer.invoke('reset-options'); });
     }},
-    { label: 'Delete All Data', color: 'kcc-ab-red', action: () => {
+    { title: 'Delete All Data', desc: 'Clears config, logs, and all Krunker site data including logins and in-game settings. Userscripts and swapper files are kept.', button: 'Delete', action: () => {
       showConfirm({
         title: 'Delete All Data',
         message: 'Clears your config, logs, and all Krunker site data — including your logins and in-game settings. Your userscripts and swapper files are kept. The client will restart.',
@@ -271,14 +300,21 @@ function buildManageSection(body: HTMLElement): void {
     }},
   ];
 
-  for (const ab of actionButtons) {
+  for (const d of dangerActions) {
+    const row = document.createElement('div');
+    row.className = 'kcc-drow';
+    row.innerHTML =
+      '<div class="kcc-drow-main">' +
+        '<div class="kcc-drow-title">' + escapeHtml(d.title) + '</div>' +
+        '<div class="kcc-drow-desc">' + escapeHtml(d.desc) + '</div>' +
+      '</div>';
     const btn = document.createElement('button');
-    btn.className = 'kcc-action-btn ' + ab.color + (ab.full ? ' full' : '');
-    btn.textContent = ab.label;
-    btn.addEventListener('click', ab.action);
-    grid.appendChild(btn);
+    btn.className = 'kcc-dbtn';
+    btn.textContent = d.button;
+    btn.addEventListener('click', d.action);
+    row.appendChild(btn);
+    dzone.appendChild(row);
   }
-  body.appendChild(grid);
 }
 
 interface CatDef { key: string; label: string; icon: string; build: (body: HTMLElement) => void; }
