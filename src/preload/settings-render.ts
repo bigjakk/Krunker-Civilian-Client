@@ -12,7 +12,7 @@ import { savedConsole as _console } from './saved-console';
 import { openKeybindDialog, keybindDisplayString } from './keybind-dialog';
 import { showConfirm } from './confirm-dialog';
 import {
-  createToggleRow, createButtonRow, createInfoRow,
+  createToggleRow, createButtonRow, createInfoRow, createGroup,
   createRowShell, createSelect, onSettingChanged,
   resetRefreshNotification,
 } from './settings-controls';
@@ -348,7 +348,7 @@ function renderSettings(searchQuery?: string): void {
     { key: 'Matchmaker', label: 'Matchmaker', icon: 'travel_explore', build: (b) => buildMatchmakerSection(b, allConf.matchmaker, bag) },
     { key: 'Chat', label: 'Chat', icon: 'chat', build: (b) => buildChatSection(b, gameConf, allConf.translator) },
     { key: 'Discord', label: 'Discord', icon: 'forum', build: (b) => buildDiscordSection(b, allConf.discord) },
-    { key: 'Accounts', label: 'Accounts', icon: 'people', build: (b) => buildAccountsSection(b, reapplySearch) },
+    { key: 'Accounts', label: 'Accounts', icon: 'people', build: (b) => buildAccountsSection(createGroup(b), reapplySearch) },
     { key: 'Keystrokes', label: 'Keystrokes', icon: 'keyboard', build: (b) => buildKeystrokesRows(b) },
     { key: 'Userscripts', label: 'Userscripts', icon: 'code', build: (b) => renderUserscriptsSection(b) },
     { key: 'Advanced', label: 'Advanced', icon: 'settings', build: (b) => buildAdvancedSection(b, allConf.advanced, isWindows) },
@@ -416,22 +416,26 @@ function renderUserscriptsSection(body: HTMLElement): void {
   ipcRenderer.invoke('get-config', 'userscripts').then((usConf: any) => {
     const us = { ...DEFAULT_CONFIG.userscripts, ...usConf };
 
-    body.appendChild(createToggleRow({
+    const engineGroup = createGroup(body);
+
+    engineGroup.appendChild(createToggleRow({
       label: 'Userscripts',
       desc: 'Load custom scripts from the scripts folder',
       checked: us.enabled, restart: true,
       onChange: (v) => { us.enabled = v; ipcRenderer.invoke('set-config', 'userscripts', us); },
     }));
 
-    body.appendChild(createButtonRow({
+    engineGroup.appendChild(createButtonRow({
       label: 'Scripts Folder',
       desc: 'Place .js userscript files here',
       buttons: [{ icon: 'folder', label: 'Scripts', title: 'Open Folder', onClick: () => ipcRenderer.invoke('userscripts-open-folder') }],
     }).row);
 
+    const scriptsGroup = createGroup(body, 'Installed Scripts');
+
     const scriptInstances = getInstances();
     if (scriptInstances.length === 0) {
-      body.appendChild(createInfoRow('No userscripts found. Place .js files in the scripts folder and reload.'));
+      scriptsGroup.appendChild(createInfoRow('No userscripts found. Place .js files in the scripts folder and reload.'));
       reapplySearch();
       return;
     }
@@ -446,12 +450,12 @@ function renderUserscriptsSection(body: HTMLElement): void {
       const { row: scriptRow, control } = createRowShell(inst.meta.name || inst.filename, descHtml);
       control.innerHTML =
         '<label class="kcc-toggle"><input type="checkbox"' + (inst.enabled ? ' checked' : '') + '><span class="kcc-toggle-track"></span></label>';
-      body.appendChild(scriptRow);
+      scriptsGroup.appendChild(scriptRow);
 
       const cb = control.querySelector('input[type="checkbox"]') as HTMLInputElement;
       const settingsContainer = document.createElement('div');
       settingsContainer.className = 'kcc-us-settings';
-      body.appendChild(settingsContainer);
+      scriptsGroup.appendChild(settingsContainer);
 
       if (inst.enabled && inst.settings) {
         renderScriptSettings(inst, settingsContainer);

@@ -11,6 +11,7 @@ import {
   createKeybindRow, createSimpleKeyRow, createToggleRow, createSelectRow,
   createNumberRow, createCheckboxGrid, createButtonRow, createTextRow,
   createInfoRow, createRowShell, createSelect, makeButton, onSettingChanged,
+  createGroup,
 } from './settings-controls';
 import { setClassicSocial, startHidePopups, stopHidePopups } from './menu-tweaks';
 import { initHPCounter, destroyHPCounter } from './competitive';
@@ -33,7 +34,9 @@ export function buildGeneralSection(
 ): void {
   const game = { ...DEFAULT_CONFIG.game, ...gameConf };
 
-  body.appendChild(createSelectRow({
+  const tabsGroup = createGroup(body, 'Tabs & Social');
+
+  tabsGroup.appendChild(createSelectRow({
     label: 'Social/Hub Tab Behaviour',
     desc: 'How social, market, and editor pages open when clicked',
     options: [{ value: 'New Window', label: 'Tabs (Separate Window)' }, { value: 'Same Window', label: 'Tabs (Overlay Game)' }],
@@ -41,7 +44,7 @@ export function buildGeneralSection(
     onChange: (v) => { game.socialTabBehaviour = v; ipcRenderer.invoke('set-config', 'game', game); },
   }));
 
-  body.appendChild(createToggleRow({
+  tabsGroup.appendChild(createToggleRow({
     label: 'Remember Tabs',
     desc: 'Restore your open tabs when you reopen the social/hub window',
     checked: game.rememberTabs, instant: true,
@@ -54,14 +57,16 @@ export function buildGeneralSection(
     ipcRenderer.invoke('set-config', 'ui', ui);
   }
 
-  body.appendChild(createToggleRow({
+  tabsGroup.appendChild(createToggleRow({
     label: 'Classic Social',
     desc: 'Open the standalone social page in a tab instead of the in-game panel',
     checked: ui.classicSocial ?? false, instant: true,
     onChange: (v) => { ui.classicSocial = v; saveUI(); setClassicSocial(v); },
   }));
 
-  body.appendChild(createToggleRow({
+  const clientGroup = createGroup(body, 'Client');
+
+  clientGroup.appendChild(createToggleRow({
     label: 'Show Exit Button',
     desc: 'Show the exit button in the game sidebar',
     checked: ui.showExitButton, instant: true,
@@ -72,21 +77,21 @@ export function buildGeneralSection(
     },
   }));
 
-  body.appendChild(createToggleRow({
+  clientGroup.appendChild(createToggleRow({
     label: 'Join as Spectator',
     desc: 'Automatically enable spectate mode when joining a game',
     checked: game.joinAsSpectator, instant: true,
     onChange: (v) => { game.joinAsSpectator = v; ipcRenderer.invoke('set-config', 'game', game); },
   }));
 
-  body.appendChild(createToggleRow({
+  clientGroup.appendChild(createToggleRow({
     label: 'Show Changelog',
     desc: 'Show release notes popup when the client updates',
     checked: ui.showChangelog ?? true, instant: true,
     onChange: (v) => { ui.showChangelog = v; saveUI(); },
   }));
 
-  body.appendChild(createButtonRow({
+  clientGroup.appendChild(createButtonRow({
     label: 'Changelog',
     desc: 'View release notes for the current version',
     buttons: [{ icon: 'article', label: 'Show', onClick: () => {
@@ -94,24 +99,28 @@ export function buildGeneralSection(
     } }],
   }).row);
 
-  body.appendChild(createKeybindRow('Toggle Fullscreen', 'Fullscreen the game window (default F11)', bag.binds.fullscreenToggle, (b) => {
+  const hotkeysGroup = createGroup(body, 'Hotkeys');
+
+  hotkeysGroup.appendChild(createKeybindRow('Toggle Fullscreen', 'Fullscreen the game window (default F11)', bag.binds.fullscreenToggle, (b) => {
     bag.binds.fullscreenToggle = b;
     bag.saveBinds();
   }, undefined, true));
 
-  body.appendChild(createKeybindRow('Screenshot', 'Copy the game view to your clipboard (default F9)', bag.binds.screenshot, (b) => {
+  hotkeysGroup.appendChild(createKeybindRow('Screenshot', 'Copy the game view to your clipboard (default F9)', bag.binds.screenshot, (b) => {
     bag.binds.screenshot = b;
     bag.saveBinds();
   }, undefined, true));
 
-  body.appendChild(createToggleRow({
+  const shotsGroup = createGroup(body, 'Screenshots');
+
+  shotsGroup.appendChild(createToggleRow({
     label: 'Save Screenshots to Folder',
     desc: 'Also save a PNG copy to the screenshots folder (always copies to clipboard)',
     checked: game.screenshotSave ?? false, instant: true,
     onChange: (v) => { game.screenshotSave = v; ipcRenderer.invoke('set-config', 'game', game); },
   }));
 
-  body.appendChild(createButtonRow({
+  shotsGroup.appendChild(createButtonRow({
     label: 'Screenshots Folder',
     desc: 'Where saved screenshots are written',
     buttons: [{ icon: 'folder', label: 'Screenshots', title: 'Open Folder', onClick: () => ipcRenderer.invoke('open-screenshots-folder') }],
@@ -131,8 +140,10 @@ export function buildGameSection(
     ipcRenderer.invoke('set-config', 'ui', ui);
   }
 
+  const inputGroup = createGroup(body, 'Input & HUD');
+
   if (bag.isWindows) {
-    body.appendChild(createToggleRow({
+    inputGroup.appendChild(createToggleRow({
       label: 'Raw Input',
       desc: 'Bypass OS mouse acceleration for direct 1:1 sensor input (Windows only)',
       checked: game.rawInput ?? true, refreshOnly: true,
@@ -140,21 +151,21 @@ export function buildGameSection(
     }));
   }
 
-  body.appendChild(createToggleRow({
+  inputGroup.appendChild(createToggleRow({
     label: 'Show Ping in Player List',
     desc: 'Replace the ping icon with numeric millisecond values in the player list',
     checked: game.showPing ?? true, refreshOnly: true,
     onChange: (v) => { game.showPing = v; saveGame(); },
   }));
 
-  body.appendChild(createToggleRow({
+  inputGroup.appendChild(createToggleRow({
     label: 'Direct Server Ping',
     desc: 'Replace Krunker\'s ping with a TCP round-trip measurement to the game server',
     checked: ui.directServerPing ?? false, refreshOnly: true,
     onChange: (v) => { ui.directServerPing = v; saveUI(); },
   }));
 
-  body.appendChild(createToggleRow({
+  inputGroup.appendChild(createToggleRow({
     label: 'Hardpoint Enemy Counter',
     desc: 'Show enemy capture points in Hardpoint mode',
     checked: game.hpEnemyCounter ?? true, refreshOnly: true,
@@ -164,21 +175,25 @@ export function buildGameSection(
     },
   }));
 
-  body.appendChild(createToggleRow({
+  const worldGroup = createGroup(body, 'World');
+
+  worldGroup.appendChild(createToggleRow({
     label: 'Hide Bunny NPCs',
     desc: 'Block the bunny NPC models that spawn in public matches',
     checked: game.hideBunnies ?? false, refreshOnly: true,
     onChange: (v) => { game.hideBunnies = v; saveGame(); },
   }));
 
-  body.appendChild(createToggleRow({
+  worldGroup.appendChild(createToggleRow({
     label: 'Block Death Screen Animation',
     desc: 'Disable the slide-in animation on the death screen',
     checked: ui.deathscreenAnimation, instant: true,
     onChange: (v) => { ui.deathscreenAnimation = v; saveUI(); setDeathAnimBlock(v); },
   }));
 
-  body.appendChild(createToggleRow({
+  const menuGroup = createGroup(body, 'Menu');
+
+  menuGroup.appendChild(createToggleRow({
     label: 'Hide Menu Popups',
     desc: 'Hide promotional notifications, offers, and streams on the main menu',
     checked: ui.hideMenuPopups, instant: true,
@@ -188,14 +203,14 @@ export function buildGameSection(
     },
   }));
 
-  body.appendChild(createToggleRow({
+  menuGroup.appendChild(createToggleRow({
     label: 'Menu Timer',
     desc: 'Show the game/spectate timer on the menu screen',
     checked: ui.menuTimer ?? true, instant: true,
     onChange: (v) => { ui.menuTimer = v; saveUI(); setMenuTimer(v); },
   }));
 
-  body.appendChild(createToggleRow({
+  menuGroup.appendChild(createToggleRow({
     label: 'KCC Watermark',
     desc: 'Show the KCC version watermark in-game and on the menu, and the brand header in this menu and the ranked queue',
     checked: ui.watermark ?? true, instant: true,
@@ -221,13 +236,15 @@ export function buildKeystrokesRows(body: HTMLElement): void {
     updateKeystrokes(ks);
   }
 
+  const overlayGroup = createGroup(body, 'Overlay');
+
   const enableRow = createToggleRow({
     label: 'Keystrokes Overlay',
     desc: 'Show on-screen WASD/Shift/Space + 2 aux keys (great for streaming)',
     checked: false, instant: true,
     onChange: (v) => { ks.enabled = v; save(); },
   });
-  body.appendChild(enableRow);
+  overlayGroup.appendChild(enableRow);
 
   const mouseRow = createToggleRow({
     label: 'Mouse Overlay',
@@ -235,7 +252,7 @@ export function buildKeystrokesRows(body: HTMLElement): void {
     checked: false, instant: true,
     onChange: (v) => { ks.mouseEnabled = v; save(); },
   });
-  body.appendChild(mouseRow);
+  overlayGroup.appendChild(mouseRow);
 
   const sizeRow = createNumberRow({
     label: 'Overlay Size',
@@ -243,7 +260,9 @@ export function buildKeystrokesRows(body: HTMLElement): void {
     min: 1, max: 6, step: 0.1, value: 2.5, instant: true,
     onChange: (v) => { ks.size = v; save(); },
   });
-  body.appendChild(sizeRow);
+  overlayGroup.appendChild(sizeRow);
+
+  const auxGroup = createGroup(body, 'Aux Keys');
 
   const showAuxRow = createToggleRow({
     label: 'Show Aux Keys',
@@ -251,7 +270,7 @@ export function buildKeystrokesRows(body: HTMLElement): void {
     checked: true, instant: true,
     onChange: (v) => { ks.showAuxKeys = v; save(); },
   });
-  body.appendChild(showAuxRow);
+  auxGroup.appendChild(showAuxRow);
 
   const aux1Row = createSimpleKeyRow({
     label: 'Aux Key 1',
@@ -259,7 +278,7 @@ export function buildKeystrokesRows(body: HTMLElement): void {
     value: 'r', instant: true,
     onChange: (v) => { ks.auxKey1 = v; save(); },
   });
-  body.appendChild(aux1Row);
+  auxGroup.appendChild(aux1Row);
 
   const aux2Row = createSimpleKeyRow({
     label: 'Aux Key 2',
@@ -267,7 +286,7 @@ export function buildKeystrokesRows(body: HTMLElement): void {
     value: 'n', instant: true,
     onChange: (v) => { ks.auxKey2 = v; save(); },
   });
-  body.appendChild(aux2Row);
+  auxGroup.appendChild(aux2Row);
 
   const KEYSTROKES_CREDIT_URL = 'https://gist.github.com/KraXen72/2ea1332440b0c66b83ca9b73afc38269';
   const creditRow = createInfoRow(
@@ -309,14 +328,16 @@ export function buildPerformanceSection(
     ipcRenderer.invoke('set-config', 'performance', perf);
   }
 
-  body.appendChild(createToggleRow({
+  const fpsGroup = createGroup(body, 'Frame Rate');
+
+  fpsGroup.appendChild(createToggleRow({
     label: 'Unlimited FPS',
     desc: 'Uncap the frame rate (requires restart)',
     checked: perf.fpsUnlocked, restart: true,
     onChange: (v) => { perf.fpsUnlocked = v; savePerf(); },
   }));
 
-  body.appendChild(createToggleRow({
+  fpsGroup.appendChild(createToggleRow({
     label: 'Higher Max FPS',
     desc: 'Lets powerful machines reach higher framerates. May cause input lag or stutter on low-end hardware. Recommended to keep disabled (requires restart)',
     checked: perf.higherMaxFps, restart: true, safety: 4,
@@ -324,7 +345,8 @@ export function buildPerformanceSection(
   }));
 
   if (isWindows) {
-    body.appendChild(createSelectRow({
+    const sysGroup = createGroup(body, 'System');
+    sysGroup.appendChild(createSelectRow({
       label: 'Process Priority',
       desc: 'OS-level process priority for the client (Windows only)',
       options: [
@@ -343,7 +365,9 @@ export function buildPerformanceSection(
 export function buildSwapperSection(body: HTMLElement, swapperConf: any): void {
   const swapEnabled = swapperConf ? swapperConf.enabled : DEFAULT_CONFIG.swapper.enabled;
 
-  body.appendChild(createToggleRow({
+  const group = createGroup(body);
+
+  group.appendChild(createToggleRow({
     label: 'Resource Swapper',
     desc: 'Replace game textures, sounds, and models with local files',
     checked: swapEnabled,
@@ -355,7 +379,7 @@ export function buildSwapperSection(body: HTMLElement, swapperConf: any): void {
     },
   }));
 
-  body.appendChild(createButtonRow({
+  group.appendChild(createButtonRow({
     label: 'Swapper Folder',
     desc: 'Place replacement assets here (textures/, sound/, models/)',
     buttons: [{ icon: 'folder', label: 'Swapper', title: 'Open Folder', onClick: () => ipcRenderer.invoke('open-swap-folder') }],
@@ -369,12 +393,14 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
     ipcRenderer.invoke('set-config', 'ui', ui);
   }
 
+  const themeGroup = createGroup(body, 'Theme');
+
   // ── CSS Theme selector (populated from swap/themes/) ──
   const themeRowR = createRowShell('CSS Theme', 'Load a custom CSS theme from swap/themes/');
   const themeSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
   themeRowR.control.appendChild(themeSelect);
   themeRowR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Themes Folder', onClick: () => ipcRenderer.invoke('open-themes-folder') }));
-  body.appendChild(themeRowR.row);
+  themeGroup.appendChild(themeRowR.row);
 
   ipcRenderer.invoke('list-themes').then((themes: Array<{ id: string; label: string }>) => {
     themeSelect.innerHTML = '';
@@ -393,12 +419,14 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
     onSettingChanged('refresh');
   });
 
+  const loadingGroup = createGroup(body, 'Loading Screen');
+
   // ── Loading Screen Background ──
   const bgRowR = createRowShell('Loading Background', 'Custom background image for the loading screen (swap/backgrounds/)');
   const bgSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
   bgRowR.control.appendChild(bgSelect);
   bgRowR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Backgrounds Folder', onClick: () => ipcRenderer.invoke('open-backgrounds-folder') }));
-  body.appendChild(bgRowR.row);
+  loadingGroup.appendChild(bgRowR.row);
 
   ipcRenderer.invoke('list-loading-themes').then((themes: Array<{ id: string; label: string }>) => {
     bgSelect.innerHTML = '';
@@ -418,7 +446,7 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
   });
 
   // ── Background URL (overrides loading theme selection) ──
-  body.appendChild(createTextRow({
+  loadingGroup.appendChild(createTextRow({
     label: 'Background URL',
     desc: 'Direct image URL for loading screen (overrides dropdown above)',
     value: ui.backgroundUrl || '',
@@ -435,76 +463,82 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
     ipcRenderer.invoke('set-config', 'matchmaker', mm);
   }
 
-  body.appendChild(createToggleRow({
+  const mmGroup = createGroup(body, 'Matchmaking');
+
+  mmGroup.appendChild(createToggleRow({
     label: 'Custom Matchmaker',
     desc: 'Use the matchmaker hotkey to find a game matching your criteria',
     checked: mm.enabled, instant: true,
     onChange: (v) => { mm.enabled = v; saveMM(); },
   }));
 
-  body.appendChild(createToggleRow({
+  mmGroup.appendChild(createToggleRow({
     label: 'Open Server Browser on Cancel',
     desc: 'Opens the server browser when no game is found and you cancel',
     checked: mm.openServerBrowser, instant: true,
     onChange: (v) => { mm.openServerBrowser = v; saveMM(); },
   }));
 
-  body.appendChild(createToggleRow({
+  mmGroup.appendChild(createToggleRow({
     label: 'Prioritize Player Count',
     desc: 'Sort results by most players first, then by ping (default is ping first)',
     checked: mm.sortByPlayers ?? false, instant: true,
     onChange: (v) => { mm.sortByPlayers = v; saveMM(); },
   }));
 
-  body.appendChild(createToggleRow({
+  mmGroup.appendChild(createToggleRow({
     label: 'Hide Search Overlay',
     desc: 'Skip the lobby search animation and join the match instantly',
     checked: mm.hideSearchOverlay ?? false, instant: true,
     onChange: (v) => { mm.hideSearchOverlay = v; saveMM(); },
   }));
 
-  body.appendChild(createKeybindRow('Matchmaker Hotkey', 'Key to trigger the custom matchmaker', bag.binds.matchmaker, (b) => {
+  const hkGroup = createGroup(body, 'Hotkeys');
+
+  hkGroup.appendChild(createKeybindRow('Matchmaker Hotkey', 'Key to trigger the custom matchmaker', bag.binds.matchmaker, (b) => {
     bag.binds.matchmaker = b;
     bag.saveBinds();
   }, undefined, true));
-  body.appendChild(createKeybindRow('Matchmaker Cancel', 'Key to dismiss the matchmaker popup', bag.binds.matchmakerCancel, (b) => {
+  hkGroup.appendChild(createKeybindRow('Matchmaker Cancel', 'Key to dismiss the matchmaker popup', bag.binds.matchmakerCancel, (b) => {
     bag.binds.matchmakerCancel = b;
     bag.saveBinds();
   }, undefined, true));
 
-  body.appendChild(createNumberRow({
+  const filtersGroup = createGroup(body, 'Filters');
+
+  filtersGroup.appendChild(createNumberRow({
     label: 'Min Players', desc: 'Minimum player count in lobby (0-7)',
     min: 0, max: 7, value: mm.minPlayers, instant: true,
     onChange: (v) => { mm.minPlayers = v; saveMM(); },
   }));
 
-  body.appendChild(createNumberRow({
+  filtersGroup.appendChild(createNumberRow({
     label: 'Max Players', desc: 'Maximum player count in lobby (0-7)',
     min: 0, max: 7, value: mm.maxPlayers, instant: true,
     onChange: (v) => { mm.maxPlayers = v; saveMM(); },
   }));
 
-  body.appendChild(createNumberRow({
+  filtersGroup.appendChild(createNumberRow({
     label: 'Min Remaining Time', desc: 'Minimum seconds remaining in match (0-480)',
     min: 0, max: 480, value: mm.minRemainingTime, instant: true,
     onChange: (v) => { mm.minRemainingTime = v; saveMM(); },
   }));
 
-  body.appendChild(createCheckboxGrid({
+  filtersGroup.appendChild(createCheckboxGrid({
     header: 'Regions (none selected = all)',
     items: MATCHMAKER_REGIONS.map(r => ({ value: r, label: MATCHMAKER_REGION_NAMES[r] || r })),
     selected: mm.regions,
     onChange: () => saveMM(),
   }));
 
-  body.appendChild(createCheckboxGrid({
+  filtersGroup.appendChild(createCheckboxGrid({
     header: 'Gamemodes (none selected = all)',
     items: MATCHMAKER_GAMEMODE_FILTER.map(gm => ({ value: gm, label: gm })),
     selected: mm.gamemodes,
     onChange: () => saveMM(),
   }));
 
-  body.appendChild(createCheckboxGrid({
+  filtersGroup.appendChild(createCheckboxGrid({
     header: 'Maps (none selected = all)',
     items: MATCHMAKER_MAP_FILTER.map(m => ({ value: m, label: MATCHMAKER_MAP_NAMES[m] || m, icon: mapIconUrl(m) ?? undefined })),
     selected: mm.maps,
@@ -545,13 +579,16 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
     previewAudio.play().catch(() => resetPlayBtn(true));
   } });
   soundControl.appendChild(soundPlayBtn);
-  body.appendChild(soundR.row);
+  const rankedGroup = createGroup(body, 'Ranked');
+  rankedGroup.appendChild(soundR.row);
 }
 
 export function buildDiscordSection(body: HTMLElement, discordConf: any): void {
   const discord = { ...DEFAULT_CONFIG.discord, ...discordConf };
 
-  body.appendChild(createToggleRow({
+  const mainGroup = createGroup(body);
+
+  mainGroup.appendChild(createToggleRow({
     label: 'Discord Rich Presence',
     desc: 'Show game activity in your Discord profile',
     checked: discord.enabled,
@@ -562,7 +599,9 @@ export function buildDiscordSection(body: HTMLElement, discordConf: any): void {
     },
   }));
 
-  body.appendChild(createToggleRow({
+  const displayGroup = createGroup(body, 'Display');
+
+  displayGroup.appendChild(createToggleRow({
     label: 'Show Map & Gamemode',
     desc: 'Display the current map and gamemode',
     checked: discord.showMapMode,
@@ -573,7 +612,7 @@ export function buildDiscordSection(body: HTMLElement, discordConf: any): void {
     },
   }));
 
-  body.appendChild(createToggleRow({
+  displayGroup.appendChild(createToggleRow({
     label: 'Show Class',
     desc: 'Display your current class name',
     checked: discord.showClass,
@@ -584,7 +623,7 @@ export function buildDiscordSection(body: HTMLElement, discordConf: any): void {
     },
   }));
 
-  body.appendChild(createToggleRow({
+  displayGroup.appendChild(createToggleRow({
     label: 'Show Elapsed Time',
     desc: 'Display how long you\'ve been in the current match',
     checked: discord.showTimer,
@@ -595,7 +634,7 @@ export function buildDiscordSection(body: HTMLElement, discordConf: any): void {
     },
   }));
 
-  body.appendChild(createToggleRow({
+  displayGroup.appendChild(createToggleRow({
     label: 'Show Menu/Spectating Status',
     desc: 'Display "In Menus" or "Spectating" when not in a match',
     checked: discord.showStatus,
@@ -614,14 +653,16 @@ export function buildChatSection(body: HTMLElement, gameConf: any, translatorCon
     ipcRenderer.invoke('set-config', 'game', game);
   }
 
-  body.appendChild(createToggleRow({
+  const chatGroup = createGroup(body, 'Chat');
+
+  chatGroup.appendChild(createToggleRow({
     label: 'Better Chat',
     desc: 'Merge team and all-chat with colored [T]/[M] prefixes',
     checked: game.betterChat, instant: true,
     onChange: (v) => { game.betterChat = v; saveGame(); setBetterChat(v); },
   }));
 
-  body.appendChild(createNumberRow({
+  chatGroup.appendChild(createNumberRow({
     label: 'Chat History Size', desc: 'Maximum chat messages to keep (0 to disable history preservation)',
     min: 0, max: 1000, value: game.chatHistorySize, instant: true,
     onChange: (v) => { game.chatHistorySize = v; saveGame(); setChatHistorySize(v); },
@@ -634,7 +675,9 @@ export function buildChatSection(body: HTMLElement, gameConf: any, translatorCon
     ipcRenderer.invoke('set-config', 'translator', tl);
   }
 
-  body.appendChild(createToggleRow({
+  const tlGroup = createGroup(body, 'Translator');
+
+  tlGroup.appendChild(createToggleRow({
     label: 'Chat Translator',
     desc: 'Automatically translate non-English chat messages',
     checked: tl.enabled, instant: true,
@@ -645,7 +688,7 @@ export function buildChatSection(body: HTMLElement, gameConf: any, translatorCon
     },
   }));
 
-  body.appendChild(createSelectRow({
+  tlGroup.appendChild(createSelectRow({
     label: 'Target Language',
     desc: 'Language to translate messages into', instant: true,
     options: [
@@ -673,7 +716,7 @@ export function buildChatSection(body: HTMLElement, gameConf: any, translatorCon
     },
   }));
 
-  body.appendChild(createToggleRow({
+  tlGroup.appendChild(createToggleRow({
     label: 'Show Language Tag',
     desc: 'Show detected language code before translations (e.g. [FR])',
     checked: tl.showLanguageTag, instant: true,
@@ -685,7 +728,7 @@ export function buildChatSection(body: HTMLElement, gameConf: any, translatorCon
   }));
 
   // Custom skip words — messages made entirely of these (plus built-in skip terms) won't be translated.
-  body.appendChild(createTextRow({
+  tlGroup.appendChild(createTextRow({
     label: 'Custom Skip Words',
     desc: 'Comma-separated words to ignore (e.g. your nickname, friends\' names). Applies instantly.',
     value: tl.customSkipWords || '',
@@ -716,7 +759,9 @@ export function buildAdvancedSection(
         { value: 'vulkan', label: 'Vulkan' },
       ];
 
-  body.appendChild(createSelectRow({
+  const gfxGroup = createGroup(body, 'Graphics');
+
+  gfxGroup.appendChild(createSelectRow({
     label: 'ANGLE Backend',
     desc: 'Graphics API used for WebGL rendering',
     options: angleOptions,
@@ -733,8 +778,9 @@ export function buildAdvancedSection(
     { key: 'experimentalFlags', label: 'Experimental Flags', desc: 'Enables accelerated video decode, native GPU memory buffers, high DPI support, and disables pings/proxy', safety: 4 },
   ];
 
+  const flagsGroup = createGroup(body, 'Chromium Flags');
   for (const t of advToggles) {
-    body.appendChild(createToggleRow({
+    flagsGroup.appendChild(createToggleRow({
       label: t.label, desc: t.desc,
       checked: !!adv[t.key], restart: true,
       safety: t.safety,
@@ -742,7 +788,9 @@ export function buildAdvancedSection(
     }));
   }
 
-  body.appendChild(createToggleRow({
+  const debugGroup = createGroup(body, 'Debugging');
+
+  debugGroup.appendChild(createToggleRow({
     label: 'Verbose Logging',
     desc: 'Forward all preload console output to the Electron log file',
     checked: adv.verboseLogging, instant: true,

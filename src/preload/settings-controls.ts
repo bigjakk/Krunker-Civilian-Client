@@ -118,6 +118,24 @@ export function createInfoRow(descHtml: string): HTMLElement {
   return row;
 }
 
+// ── Group card ──
+// Wraps related rows in a faint card with an optional overline label. Builders
+// append rows to the returned element instead of the panel body. In search mode
+// the card chrome is flattened away (display: contents) so results read as a
+// plain list.
+export function createGroup(body: HTMLElement, label?: string): HTMLElement {
+  const group = document.createElement('div');
+  group.className = 'kcc-group';
+  if (label) {
+    const l = document.createElement('div');
+    l.className = 'kcc-group-label';
+    l.textContent = label;
+    group.appendChild(l);
+  }
+  body.appendChild(group);
+  return group;
+}
+
 // ── Keybind rows ──
 export function createKeybindRow(label: string, desc: string, currentBind: Keybind, onBind: (bind: Keybind) => void, safety?: number, instant?: boolean): HTMLElement {
   const { row, control } = createRowShell(label, escapeHtml(desc), { safety, instant });

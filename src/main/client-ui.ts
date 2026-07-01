@@ -145,6 +145,26 @@ ${THEME_CSS}
 .kcc-settings.kcc-searching .kcc-pane { padding-left: 4px; }
 .kcc-settings.kcc-searching .kcc-cat-head { display: block; }
 
+/* -- Group cards -- */
+.kcc-group {
+  background: rgba(255,255,255,0.024);
+  border: 1px solid var(--kcc-border-subtle);
+  border-radius: 10px;
+  padding: 2px 6px;
+  margin-bottom: 10px;
+}
+.kcc-group-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--kcc-text-dim);
+  padding: 12px 11px 3px;
+}
+/* search mode: flatten the cards so results read as one plain list */
+.kcc-settings.kcc-searching .kcc-group { display: contents; }
+.kcc-settings.kcc-searching .kcc-group-label { display: none; }
+
 /* -- Row -- */
 .kcc-row {
   display: flex;
@@ -153,8 +173,13 @@ ${THEME_CSS}
   padding: 12px 6px 12px 11px;
   border-left: 2px solid transparent;
   border-bottom: 1px solid var(--kcc-border-subtle);
+  border-radius: 8px;
+  transition: background 0.12s;
 }
-.kcc-row:last-child { border-bottom: none; }
+.kcc-row:hover { background: rgba(255,255,255,0.035); }
+.kcc-row:last-child,
+.kcc-group > :last-child > .kcc-row:last-child,
+.kcc-group > .kcc-row:has(+ .kcc-us-settings:empty:last-child) { border-bottom: none; }
 .kcc-row-main { flex: 1; min-width: 0; }
 .kcc-row-title {
   display: flex;
