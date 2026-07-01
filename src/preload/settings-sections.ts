@@ -316,6 +316,13 @@ export function buildPerformanceSection(
     onChange: (v) => { perf.fpsUnlocked = v; savePerf(); },
   }));
 
+  body.appendChild(createToggleRow({
+    label: 'Higher Max FPS',
+    desc: 'Lets powerful machines reach higher framerates. May cause input lag or stutter on low-end hardware (requires restart)',
+    checked: perf.higherMaxFps, restart: true, safety: 4,
+    onChange: (v) => { perf.higherMaxFps = v; savePerf(); },
+  }));
+
   if (isWindows) {
     body.appendChild(createSelectRow({
       label: 'Process Priority',

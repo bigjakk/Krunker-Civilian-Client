@@ -53,6 +53,11 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('disable-gpu-vsync');
     app.commandLine.appendSwitch('max-gum-fps', '9999');
     enableFeatures('ImplLatencyRecovery', 'MainLatencyRecovery');
+    // Opt-in deeper compositor frame queue (depth 2 vs the patched default of 1).
+    // Read by the custom Electron's CustomMaxPendingFrames feature param. Off → not
+    // emitted → the binary keeps its compiled default of 1. Trades input latency on
+    // low-end machines for higher peak FPS on present-bound (capable) ones.
+    if (performance.higherMaxFps) enableFeatures('CustomMaxPendingFrames:count/2');
   }
 
   // ── Compositor / GPU display thread priority ──
