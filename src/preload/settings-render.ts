@@ -8,6 +8,7 @@ import { ipcRenderer } from 'electron';
 import type { Keybind } from '../main/config';
 import { DEFAULT_CONFIG } from '../main/config-defaults';
 import { escapeHtml, showToast } from './utils';
+import { KCC_ICON_DATA_URL } from './header-icon';
 import { savedConsole as _console } from './saved-console';
 import { openKeybindDialog, keybindDisplayString } from './keybind-dialog';
 import { showConfirm } from './confirm-dialog';
@@ -357,7 +358,7 @@ function renderSettings(searchQuery?: string): void {
   header.className = 'kcc-header';
   if (!showBrand) header.style.display = 'none';
   header.innerHTML =
-    '<div class="kcc-header-mark"><span class="material-icons">shield</span></div>' +
+    '<div class="kcc-header-mark"><img src="' + KCC_ICON_DATA_URL + '" alt="KCC" draggable="false"></div>' +
     '<div class="kcc-header-text">' +
       '<div class="kcc-header-name">Civilian Client</div>' +
       '<div class="kcc-header-ver">v' + escapeHtml(version || '') + '</div>' +

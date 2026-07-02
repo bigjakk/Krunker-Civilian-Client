@@ -81,15 +81,18 @@ ${THEME_CSS}
 .kcc-header-mark {
   width: 34px;
   height: 34px;
-  border-radius: 9px;
   flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--kcc-accent);
-  color: #fff;
 }
-.kcc-header-mark .material-icons { font-size: 20px; }
+.kcc-header-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  -webkit-user-select: none;
+  user-select: none;
+}
 .kcc-header-name {
   font-size: 15px;
   font-weight: 500;
