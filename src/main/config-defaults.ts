@@ -47,6 +47,7 @@ export interface AppConfig {
     hpEnemyCounter: boolean;
     hideBunnies: boolean;
     screenshotSave: boolean;
+    headshotSound: 'off' | 'kill' | 'hit';
   };
   keystrokes: {
     enabled: boolean;
@@ -170,6 +171,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     hpEnemyCounter: true,
     hideBunnies: false,
     screenshotSave: false,
+    headshotSound: 'off',
   },
   keystrokes: {
     enabled: false,

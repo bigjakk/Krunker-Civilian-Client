@@ -15,9 +15,14 @@ import { savedConsole as _console, setVerbose } from './saved-console';
 import { initAltManagerButton } from './alt-manager';
 import { startHidePopups, setClassicSocial } from './menu-tweaks';
 import { initBanlog } from './banlog';
+import { installGameSocketTap } from './game-socket';
+import { installSoundHook, setHeadshotSoundMode } from './headshot-sound';
 
 
 _console.log('[KCC] Preload script loaded');
+
+// ── Game socket tap: wrap window.WebSocket before the game socket opens (read-only) ──
+installGameSocketTap();
 
 // preventDefault on wheel events avoids Chromium 100+ pacing frame production to vsync during scroll gestures (FPS would tank from 1000+ to refresh rate). Skip when target is inside a real scrollable element so menus still scroll.
 window.addEventListener('wheel', (e: WheelEvent) => {
@@ -203,6 +208,12 @@ ipcRenderer.on('main_did-finish-load', () => {
     }
     if (isGamePage) {
       initRankProgress();
+    }
+
+    // ── Headshot sound ──
+    if (isGamePage) {
+      setHeadshotSoundMode(gameConf?.headshotSound ?? 'off');
+      installSoundHook();
     }
 
     // ── Keystrokes + Mouse overlay ──

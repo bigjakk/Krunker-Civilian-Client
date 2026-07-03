@@ -15,6 +15,8 @@ import {
 } from './settings-controls';
 import { setClassicSocial, startHidePopups, stopHidePopups } from './menu-tweaks';
 import { initHPCounter, destroyHPCounter } from './competitive';
+import { setHeadshotSoundMode } from './headshot-sound';
+import type { HeadshotSoundMode } from './headshot-sound';
 import { updateKeystrokes } from './keystrokes';
 import type { KeystrokesConfig } from './keystrokes';
 import { setBetterChat, setChatHistorySize } from './chat';
@@ -173,6 +175,18 @@ export function buildGameSection(
       game.hpEnemyCounter = v; saveGame();
       if (v) initHPCounter(); else destroyHPCounter();
     },
+  }));
+
+  inputGroup.appendChild(createSelectRow({
+    label: 'Headshot Sound',
+    desc: 'Play the headshot hit sound on every kill, or on every hit. Also applies to a resource-swapped custom headshot sound.',
+    options: [
+      { value: 'off', label: 'Off' },
+      { value: 'kill', label: 'On Every Kill' },
+      { value: 'hit', label: 'On Every Hit' },
+    ],
+    value: game.headshotSound ?? 'off', instant: true,
+    onChange: (v) => { game.headshotSound = v as HeadshotSoundMode; saveGame(); setHeadshotSoundMode(v as HeadshotSoundMode); },
   }));
 
   const worldGroup = createGroup(body, 'World');
