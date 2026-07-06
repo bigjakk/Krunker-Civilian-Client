@@ -16,3 +16,4 @@ Trace-*
 *.heapprofile
 userscripts/
 docs/
+.playwright-mcp/
