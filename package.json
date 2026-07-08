@@ -16,6 +16,7 @@
     "download-electron": "node scripts/download-electron.js",
     "dist:win": "npm run build && electron-builder --win",
     "dist:linux": "npm run build && electron-builder --linux",
+    "dist:mac": "sh scripts/dist-mac.sh",
     "dist:all": "npm run build && electron-builder --win --linux",
     "clean": "rimraf dist out",
     "lint": "eslint src/",
