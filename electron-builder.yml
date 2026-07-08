@@ -71,6 +71,18 @@ linux:
       Keywords: krunker;fps;game;
       StartupWMClass: krunker-civilian-client
 
+# macOS test build (arm64), ad-hoc signed. For distribution: Developer ID + notarize.
+mac:
+  target:
+    - target: dmg
+      arch: [arm64]
+  category: public.app-category.action-games
+  icon: build/icon.icns
+  identity: null
+
+dmg:
+  artifactName: "${productName}-${version}-mac-${arch}.${ext}"
+
 publish:
   provider: github
   owner: bigjakk
