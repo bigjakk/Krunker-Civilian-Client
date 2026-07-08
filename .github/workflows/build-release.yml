@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,14 +12,18 @@ permissions:
   attestations: write   # write the provenance attestation
 
 jobs:
-  build-and-release:
+  version-check:
     runs-on: ubuntu-latest
+    outputs:
+      VERSION: ${{ steps.vc.outputs.VERSION }}
+      TAG: ${{ steps.vc.outputs.TAG }}
+      SKIP: ${{ steps.vc.outputs.SKIP }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
       - name: Check if version already released
-        id: version-check
+        id: vc
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -35,14 +40,21 @@ jobs:
             echo "SKIP=false" >> "$GITHUB_OUTPUT"
           fi
 
+  build-desktop:
+    name: Build Windows + Linux
+    needs: version-check
+    if: needs.version-check.outputs.SKIP == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Setup Node.js
-        if: steps.version-check.outputs.SKIP == 'false'
         uses: actions/setup-node@v5
         with:
           node-version: '22'
 
       - name: Install system dependencies
-        if: steps.version-check.outputs.SKIP == 'false'
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update -qq
@@ -55,55 +67,105 @@ jobs:
           WINEDEBUG=-all wine wineboot --init || true
 
       - name: Install dependencies
-        if: steps.version-check.outputs.SKIP == 'false'
         run: npm ci --legacy-peer-deps
 
       - name: Build source
-        if: steps.version-check.outputs.SKIP == 'false'
         run: npm run build
 
       - name: Build Windows distributables
-        if: steps.version-check.outputs.SKIP == 'false'
         env:
           WINEDEBUG: "-all"
         run: npx electron-builder --win -c.electronDist=node_modules/electron/dist-win --publish never
 
       - name: Build Linux distributables
-        if: steps.version-check.outputs.SKIP == 'false'
         run: npx electron-builder --linux -c.electronDist=node_modules/electron/dist-linux --publish never
 
       - name: Report build sizes
-        if: steps.version-check.outputs.SKIP == 'false'
         run: |
           echo "=== Build output sizes ==="
           ls -lh out/*.exe out/*.AppImage out/*.deb 2>/dev/null || true
 
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-desktop
+          path: |
+            out/*.exe
+            out/*.AppImage
+            out/*.deb
+          if-no-files-found: error
+
+  build-mac:
+    name: Build macOS (arm64)
+    needs: version-check
+    if: needs.version-check.outputs.SKIP == 'false'
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build macOS DMG
+        run: npm run dist:mac
+
+      - name: Report build size
+        run: ls -lh out/*.dmg 2>/dev/null || true
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-mac
+          path: out/*.dmg
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    needs: [version-check, build-desktop, build-mac]
+    if: needs.version-check.outputs.SKIP == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: List collected artifacts
+        run: ls -lh out/ 2>/dev/null || true
+
       - name: Attest build provenance
-        if: steps.version-check.outputs.SKIP == 'false'
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             out/*.exe
             out/*.AppImage
             out/*.deb
+            out/*.dmg
 
       - name: Generate release notes
-        if: steps.version-check.outputs.SKIP == 'false'
         run: |
           git fetch --unshallow 2>/dev/null || true
           chmod +x scripts/generate-release-notes.sh
-          scripts/generate-release-notes.sh "${{ steps.version-check.outputs.TAG }}" > /tmp/release-notes.md
+          scripts/generate-release-notes.sh "${{ needs.version-check.outputs.TAG }}" > /tmp/release-notes.md
           echo "--- Generated release notes ---"
           cat /tmp/release-notes.md
 
       - name: Create GitHub release and upload assets
-        if: steps.version-check.outputs.SKIP == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Collect built artifacts
           ASSETS=()
-          for file in out/*.exe out/*.AppImage out/*.deb; do
+          for file in out/*.exe out/*.AppImage out/*.deb out/*.dmg; do
             [ -f "$file" ] || continue
             ASSETS+=("$file")
           done
@@ -117,9 +179,9 @@ jobs:
           echo "Uploading ${#ASSETS[@]} assets:"
           printf '  %s\n' "${ASSETS[@]}"
 
-          gh release create "${{ steps.version-check.outputs.TAG }}" \
+          gh release create "${{ needs.version-check.outputs.TAG }}" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "${{ steps.version-check.outputs.TAG }}" \
+            --title "${{ needs.version-check.outputs.TAG }}" \
             --notes-file /tmp/release-notes.md \
             --draft=false \
             --latest \
