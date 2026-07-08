@@ -8,6 +8,7 @@ out/
 .claude/
 *.swp
 *.swo
+.DS_Store
 nul
 CLAUDE.md
 /Screenshot*
