@@ -202,5 +202,6 @@ main().then(() => {
     console.error('');
     console.error(`  Win asset:   ${PLATFORMS.win32.asset}`);
     console.error(`  Linux asset: ${PLATFORMS.linux.asset}`);
+    console.error(`  macOS asset: ${PLATFORMS.darwin.asset}`);
     process.exit(1);
 });

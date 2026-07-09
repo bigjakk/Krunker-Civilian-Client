@@ -128,7 +128,11 @@ jobs:
   release:
     name: Create Release
     needs: [version-check, build-desktop, build-mac]
-    if: needs.version-check.outputs.SKIP == 'false'
+    # Publish only from main. A workflow_dispatch on any other branch still runs
+    # the build jobs (artifacts land in the workflow run for testing) but must
+    # never create a real --latest release of unmerged code — the in-app update
+    # checker would offer it to every user.
+    if: needs.version-check.outputs.SKIP == 'false' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
