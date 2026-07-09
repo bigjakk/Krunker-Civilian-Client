@@ -119,7 +119,12 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
   // deferral, and no proxy resolution (breaks proxied setups).
   if (advanced.perfTweaks) {
     app.commandLine.appendSwitch('enable-gpu-rasterization');
-    app.commandLine.appendSwitch('disable-gpu-driver-bug-workarounds');
+    // Keep Chromium's driver-bug workarounds ON for mac: disabling them makes
+    // Krunker's draws fail command-buffer validation on ANGLE Metal
+    // (GL_INVALID_OPERATION "Vertex buffer is not big enough" spam; confirmed
+    // 2026-07-08 — errors vanish with workarounds active, Crankshaft never
+    // disables them). Windows/Linux keep the switch.
+    if (info.os !== 'darwin') app.commandLine.appendSwitch('disable-gpu-driver-bug-workarounds');
     app.commandLine.appendSwitch('disable-software-rasterizer');
     app.commandLine.appendSwitch('force-high-performance-gpu');
     app.commandLine.appendSwitch('raise-timer-frequency');
