@@ -9,6 +9,9 @@
 # store-credentials), overridable via KCC_NOTARY_PROFILE. CI instead sets
 # APPLE_API_KEY (path to .p8) + APPLE_API_KEY_ID + APPLE_API_ISSUER.
 # KCC_SKIP_NOTARIZE=1 skips notarization for a quick signed local build.
+# KCC_REQUIRE_SIGNED=1 (set by CI for release builds) forbids the ad-hoc
+# fallback: the script fails instead of producing an artifact that every
+# client's updater and Gatekeeper would reject.
 set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,6 +23,20 @@ OUTAPP="out/mac-arm64/$APPNAME.app"
 DMG="out/$APPNAME-$VERSION-mac-arm64.dmg"
 
 IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')"
+
+# Release builds must never fall back to ad-hoc signing: an unsigned DMG
+# published to GitHub would be offered to every installed client, whose
+# updater hard-requires our Developer ID team and would fail on every launch.
+if [ -n "$KCC_REQUIRE_SIGNED" ]; then
+    if [ -z "$IDENTITY" ]; then
+        echo "[dist-mac] ERROR: KCC_REQUIRE_SIGNED is set but no 'Developer ID Application' identity is available — refusing to build an ad-hoc-signed release artifact." >&2
+        exit 1
+    fi
+    if [ -n "$KCC_SKIP_NOTARIZE" ]; then
+        echo "[dist-mac] ERROR: KCC_REQUIRE_SIGNED and KCC_SKIP_NOTARIZE are mutually exclusive — a release artifact must be notarized." >&2
+        exit 1
+    fi
+fi
 
 echo "[dist-mac] building renderer/main bundles..."
 npm run build
@@ -54,29 +71,45 @@ done
 [ -n "$ok" ] || { echo "[dist-mac] hdiutil create failed after 3 attempts"; rm -rf "$STAGE"; exit 1; }
 rm -rf "$STAGE"
 
+# Run notarytool with whichever credentials are configured (CI API key vs local
+# keychain profile) — one place, so submit and the failure-log fetch can't drift.
+notary() {
+    if [ -n "$APPLE_API_KEY" ]; then
+        xcrun notarytool "$@" --key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER"
+    else
+        xcrun notarytool "$@" --keychain-profile "${KCC_NOTARY_PROFILE:-kcc-notary}"
+    fi
+}
+
+# Extract a field from notarytool's JSON output; empty on parse failure.
+notary_field() {
+    node -p "try{JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))[process.argv[2]]||''}catch(e){''}" "$1" "$2"
+}
+
 if [ -n "$IDENTITY" ] && [ -z "$KCC_SKIP_NOTARIZE" ]; then
     codesign --sign "$IDENTITY" "$DMG"
     echo "[dist-mac] notarizing (uploads to Apple, takes a few minutes)..."
-    NOTARY_OUT="$(mktemp)"
-    if [ -n "$APPLE_API_KEY" ]; then
-        xcrun notarytool submit "$DMG" --key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" \
-            --issuer "$APPLE_API_ISSUER" --wait 2>&1 | tee "$NOTARY_OUT"
-    else
-        xcrun notarytool submit "$DMG" --keychain-profile "${KCC_NOTARY_PROFILE:-kcc-notary}" \
-            --wait 2>&1 | tee "$NOTARY_OUT"
-    fi
-    if ! grep -q "status: Accepted" "$NOTARY_OUT"; then
-        SUBMISSION_ID="$(grep -m1 "id:" "$NOTARY_OUT" | awk '{print $2}')"
-        echo "[dist-mac] NOTARIZATION FAILED — fetching log for $SUBMISSION_ID..."
-        if [ -n "$APPLE_API_KEY" ]; then
-            xcrun notarytool log "$SUBMISSION_ID" --key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER"
+    NOTARY_JSON="$(mktemp)"
+    # Machine-readable result instead of grepping prose. notarytool's exit code is
+    # unreliable (0 even on status Invalid), so decide on the parsed status; `|| true`
+    # keeps set -e from killing us before we can report a submit/auth failure.
+    notary submit "$DMG" --wait --output-format json > "$NOTARY_JSON" || true
+    STATUS="$(notary_field "$NOTARY_JSON" status)"
+    SUBMISSION_ID="$(notary_field "$NOTARY_JSON" id)"
+    if [ "$STATUS" != "Accepted" ]; then
+        echo "[dist-mac] NOTARIZATION FAILED (status: ${STATUS:-none})"
+        cat "$NOTARY_JSON"
+        rm -f "$NOTARY_JSON"
+        if [ -n "$SUBMISSION_ID" ]; then
+            echo "[dist-mac] fetching notarization log for $SUBMISSION_ID..."
+            notary log "$SUBMISSION_ID" || true
         else
-            xcrun notarytool log "$SUBMISSION_ID" --keychain-profile "${KCC_NOTARY_PROFILE:-kcc-notary}"
+            echo "[dist-mac] no submission id — submit failed before upload (credentials or network); see notarytool output above"
         fi
-        rm -f "$NOTARY_OUT"
         exit 1
     fi
-    rm -f "$NOTARY_OUT"
+    rm -f "$NOTARY_JSON"
+    echo "[dist-mac] notarization accepted (id: $SUBMISSION_ID)"
     xcrun stapler staple "$DMG"
     xcrun stapler validate "$DMG" && echo "[dist-mac] notarized + stapled"
     spctl --assess --type open --context context:primary-signature -v "$DMG" && echo "[dist-mac] Gatekeeper: accepted"
