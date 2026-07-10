@@ -11,6 +11,7 @@ Was AI used in the creation of this client? Yes, if you came across this client 
 
 **Download:**
 [Windows (x64)](https://github.com/bigjakk/Krunker-Civilian-Client/releases/latest) -
+[macOS (Apple Silicon)](https://github.com/bigjakk/Krunker-Civilian-Client/releases/latest) -
 [Linux (AppImage)](https://github.com/bigjakk/Krunker-Civilian-Client/releases/latest)
 
 ## Features
@@ -89,7 +90,7 @@ For details on the patch and build instructions, see [Electron-Websocket-Fix](ht
    npm install
    ```
 3. Run: `npm start` or `npm run dev` (dev mode with sourcemaps)
-4. Package: `npm run dist:win` or `npm run dist:linux`
+4. Package: `npm run dist:win`, `npm run dist:mac`, or `npm run dist:linux`
 
 ## Credits
 
