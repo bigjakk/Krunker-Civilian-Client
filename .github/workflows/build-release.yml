@@ -86,7 +86,7 @@ jobs:
           ls -lh out/*.exe out/*.AppImage out/*.deb 2>/dev/null || true
 
       - name: Upload desktop artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist-desktop
           path: |
@@ -157,7 +157,7 @@ jobs:
         run: ls -lh out/*.dmg 2>/dev/null || true
 
       - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist-mac
           path: out/*.dmg
@@ -177,7 +177,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: out
           merge-multiple: true
