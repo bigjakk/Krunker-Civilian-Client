@@ -246,20 +246,6 @@ app.whenReady().then(async () => {
     electronLog.log('[KCC] App Nap / timer coalescing opt-out active (darwin)');
   }
 
-  // KCC_MAIN_LAG_PROBE=1: log main-process event-loop stalls (>50ms) with wall-clock
-  // timestamps, to correlate against the renderer pace-probe HUD's INPUT STARVED
-  // episodes. A stalled main loop can't route input events to the renderer — the
-  // leading suspect for "600fps but 300-800ms mouse holes". Debug only.
-  if (process.env.KCC_MAIN_LAG_PROBE) {
-    let lastTick = Date.now();
-    setInterval(() => {
-      const now = Date.now();
-      const lag = now - lastTick - 100;
-      lastTick = now;
-      if (lag > 50) console.log(`[KCC-lag] ${new Date(now).toISOString().slice(11, 23)} main-loop stall ~${lag}ms`);
-    }, 100);
-  }
-
   // ── Update check ──
   // Windows NSIS and macOS (Developer ID signed) self-install in place. Portable and
   // AppImage builds can't, so they get a notice with a manual download link. Dev builds
@@ -404,9 +390,6 @@ async function launchApp(): Promise<void> {
     'wss://*.krunker.io/*',
   ];
 
-  // KCC_NO_WEBREQUEST=1: stutter-bisect kill-switch — no request interception at all
-  // (disables ad-block, bunny block, swapper redirects, direct-ping detection).
-  if (!process.env.KCC_NO_WEBREQUEST)
   ses.webRequest.onBeforeRequest({ urls: requestFilterUrls }, (details, callback) => {
     // Direct ping: detect game-server WebSocket (lobby-* host) and start TCP timing.
     if (details.resourceType === 'webSocket'
@@ -445,7 +428,7 @@ async function launchApp(): Promise<void> {
   }
 
   // ── CORS fix for swapped resources ──
-  if (swapper && !process.env.KCC_NO_WEBREQUEST) {
+  if (swapper) {
     ses.webRequest.onHeadersReceived(({ responseHeaders }, callback) => {
       if (!responseHeaders) return callback({});
       for (const key in responseHeaders) {
@@ -475,9 +458,7 @@ async function launchApp(): Promise<void> {
     frame: true,
     backgroundColor: '#000000',
     webPreferences: {
-      // KCC_NO_PRELOAD=1: stutter-bisect kill-switch — full client, but zero
-      // renderer-side KCC code (no feature observers/pollers). Debug only.
-      preload: process.env.KCC_NO_PRELOAD ? undefined : join(__dirname, '..', 'preload', 'index.js'),
+      preload: join(__dirname, '..', 'preload', 'index.js'),
       session: ses,
       contextIsolation: false,
       nodeIntegration: false,
@@ -687,11 +668,6 @@ async function launchApp(): Promise<void> {
     // Rescan swap directory so new/changed files are picked up on refresh
     if (swapper) swapper.rescan().catch((err) => electronLog.warn('[KCC] Swapper rescan failed:', err));
 
-    // KCC_NO_INJECT=1: stutter-bisect kill-switch — skip all page CSS/JS injections.
-    if (process.env.KCC_NO_INJECT) {
-      win.webContents.send('main_did-finish-load');
-      return;
-    }
     const cssInjections = [
       win.webContents.insertCSS(HIDE_ADS_CSS),
       win.webContents.insertCSS(ALL_CLIENT_CSS),

@@ -79,14 +79,7 @@ export class TabManager {
                 sandbox: false,
             },
         });
-        // KCC_NO_TABBAR=1: stutter-bisect kill-switch — destroy the tab bar
-        // webContents so no second renderer process exists from boot
-        // (social tabs will NOT work in this mode). Debug only.
-        if (process.env.KCC_NO_TABBAR) {
-            this.tabBarView.webContents.close();
-        } else {
-            this.tabBarView.webContents.loadURL(TAB_BAR_DATA_URL);
-        }
+        this.tabBarView.webContents.loadURL(TAB_BAR_DATA_URL);
 
         // ── Container view (holds tab bar + active tab content) ──
         this.containerView = new View();
