@@ -247,10 +247,9 @@ app.whenReady().then(async () => {
   }
 
   // ── Update check ──
-  // Only Windows NSIS builds self-install in place: the Setup.exe is a real installer
-  // that swaps the app while it's closed. macOS (DMG), Linux (AppImage), and Windows
-  // portable can't safely swap a running app, so they show a notice linking the release
-  // page and the user downloads the new build manually. Dev builds are skipped.
+  // Only Windows NSIS self-installs: the Setup.exe swaps the app while it's closed.
+  // macOS, Linux (AppImage), and Windows-portable can't swap a running app, so they
+  // show a notice linking the release page for a manual download. Dev builds skip.
   const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR;
   const isAppImage = !!process.env.APPIMAGE;
   const isDev = !app.isPackaged;
@@ -265,7 +264,6 @@ app.whenReady().then(async () => {
       if (update) {
         electronLog.log(`[KCC] Update available: v${update.version}`);
 
-        // Ask user before downloading
         const accepted = await showUpdatePrompt(update.version, appVersion);
         if (!accepted) {
           electronLog.log('[KCC] User skipped update');
@@ -283,9 +281,8 @@ app.whenReady().then(async () => {
           try {
             await downloadUpdate(update.downloadUrl, installerPath, (pct) => {
               if (!cancelled && !updateWin.isDestroyed()) {
-                // At 100% the bytes are down but downloadUpdate is still hashing the
-                // file for SHA-256 — show "Verifying" + an indeterminate sweep so the
-                // bar doesn't look frozen at 100%.
+                // At 100% the bytes are down but downloadUpdate is still hashing the file,
+                // so show "Verifying" + an indeterminate sweep instead of a stuck 100%.
                 sendProgress(pct >= 100 ? 'Verifying download...' : `Downloading update... ${pct}%`, pct >= 100 ? -1 : pct);
               }
             }, update.sha256);
@@ -294,15 +291,14 @@ app.whenReady().then(async () => {
             // download await (the window's close button is the cancel path).
             if (!cancelled && !updateWin.isDestroyed()) {
               sendProgress('Installing update...', -1);
-              installUpdate(installerPath); // spawns the NSIS installer, then quits
-              return; // app quits inside the installer call
+              installUpdate(installerPath);
+              return; // installUpdate spawns the installer and quits the app
             }
           } catch (err) {
             electronLog.error('[KCC] Update download/install failed:', err);
             if (!updateWin.isDestroyed()) updateWin.close();
-            // The user explicitly accepted this update — surface the failure instead
-            // of silently launching the old version (it would otherwise repeat every
-            // launch with no explanation).
+            // The user accepted this update — surface the failure instead of silently
+            // launching the old version, which would just repeat the prompt next launch.
             const detail = (err as Error).message || String(err);
             const { response } = await dialog.showMessageBox({
               type: 'error',
@@ -332,8 +328,7 @@ app.whenReady().then(async () => {
         electronLog.log(`[KCC] Update available (notify-only): v${notice.version}`);
         const downloading = await showUpdateAvailableNotice(notice.version, appVersion);
         if (downloading) {
-          // User chose to grab the update manually — open the release page and quit
-          // instead of launching the old version.
+          // Open the release page and quit instead of launching the old version.
           electronLog.log('[KCC] User chose to download update; opening release page and quitting');
           await shell.openExternal(notice.releaseUrl).catch(() => {});
           app.quit();
