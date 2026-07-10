@@ -1,8 +1,8 @@
 import { get as httpsGet } from 'https';
-import { createReadStream, createWriteStream, renameSync, unlinkSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { createReadStream, createWriteStream, renameSync, unlinkSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'fs';
 import { createHash } from 'crypto';
 import { spawn, execFileSync } from 'child_process';
-import { join, dirname } from 'path';
+import { join } from 'path';
 import { app } from 'electron';
 import { electronLog } from './logger';
 
@@ -52,6 +52,13 @@ function updateAssetPattern(): RegExp {
 // Team ID of our Developer ID Application cert — the macOS auto-updater refuses to
 // install any downloaded build not signed by this team.
 const APPLE_TEAM_ID = 'K3L8M9BR93';
+
+// A release version must be a plain version token: it flows into a filesystem path
+// (the downloaded installer's name) and into the update dialog's HTML, so reject
+// anything carrying path separators, HTML metacharacters, or whitespace.
+function isSafeVersion(v: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(v);
+}
 
 const CHECK_TIMEOUT_MS = 10000;
 const DOWNLOAD_TIMEOUT_MS = 300000; // 5 minutes
@@ -161,6 +168,10 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
   if (!release) return null;
 
   const remoteVersion = (release.tag_name || '').replace(/^v/i, '');
+  if (remoteVersion && !isSafeVersion(remoteVersion)) {
+    electronLog.error('[KCC-Update] Rejecting release with unsafe version token:', remoteVersion);
+    return null;
+  }
   electronLog.log('[KCC-Update] Latest release:', remoteVersion, '| Current:', currentVersion);
   if (!remoteVersion || !versionLessThan(currentVersion, remoteVersion)) {
     electronLog.log('[KCC-Update] Already up to date');
@@ -206,6 +217,10 @@ export async function checkForUpdateNotice(currentVersion: string): Promise<Upda
   if (!release) return null;
 
   const remoteVersion = (release.tag_name || '').replace(/^v/i, '');
+  if (remoteVersion && !isSafeVersion(remoteVersion)) {
+    electronLog.error('[KCC-Update] Rejecting release with unsafe version token:', remoteVersion);
+    return null;
+  }
   electronLog.log('[KCC-Update] Latest release:', remoteVersion, '| Current:', currentVersion);
   if (!remoteVersion || !versionLessThan(currentVersion, remoteVersion)) {
     electronLog.log('[KCC-Update] Already up to date');
@@ -355,48 +370,49 @@ export function installUpdateMac(dmgPath: string): void {
   // not issue a cert with our OU to anyone else, so this is the trust anchor.
   const requirement = `anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "${APPLE_TEAM_ID}"`;
 
-  const staged = join(app.getPath('temp'), 'kcc-update-staging', APP_NAME);
-  const attachOut = execFileSync('hdiutil', ['attach', dmgPath, '-nobrowse', '-noverify'], { encoding: 'utf8' });
-  const volume = attachOut.split('\n').map((l) => l.split('\t').pop()?.trim()).find((p) => p && p.startsWith('/Volumes/'));
-  if (!volume) throw new Error('[KCC-Update] failed to mount update DMG');
+  // Private 0700 working dir (mkdtemp) for the mount point, the staged copy, and the
+  // swap helper — keeps them out of world-writable temp, and gives a deterministic
+  // mount path so we never parse hdiutil output or trust an attacker-chosen volume name.
+  const work = mkdtempSync(join(app.getPath('temp'), 'kcc-update-'));
+  const mountPoint = join(work, 'mnt');
+  const staged = join(work, APP_NAME);
+  mkdirSync(mountPoint);
 
   try {
-    const newApp = join(volume, APP_NAME);
+    execFileSync('hdiutil', ['attach', dmgPath, '-nobrowse', '-noverify', '-mountpoint', mountPoint], { stdio: 'pipe' });
+    const newApp = join(mountPoint, APP_NAME);
     if (!existsSync(newApp)) throw new Error('[KCC-Update] no app bundle in update DMG');
 
     // ── Authenticity + integrity gate (offline-capable). Throws on any mismatch. ──
     execFileSync('codesign', ['--verify', '--deep', '--strict', '-R', '=' + requirement, newApp], { stdio: 'pipe' });
     electronLog.log(`[KCC-Update] update verified: Developer ID team ${APPLE_TEAM_ID}`);
 
-    // Stage a copy on disk so the DMG can be unmounted immediately.
-    rmSync(dirname(staged), { recursive: true, force: true });
-    mkdirSync(dirname(staged), { recursive: true });
+    // Stage a copy inside the private dir so the DMG can be unmounted immediately.
     execFileSync('ditto', [newApp, staged]);
   } finally {
-    try { execFileSync('hdiutil', ['detach', volume, '-quiet']); } catch { /* best effort */ }
+    try { execFileSync('hdiutil', ['detach', mountPoint, '-force', '-quiet']); } catch { /* best effort */ }
   }
 
   const installApp = process.execPath.replace(/\.app\/Contents\/MacOS\/[^/]+$/, '.app');
 
-  // Helper reads its paths from argv ($1..$3) — never interpolated into the script
-  // body — so odd characters in a path cannot break out. Waits (bounded ~20s) for
-  // our PID to exit, swaps the bundle with rollback, relaunches, self-cleans.
-  const helper = join(app.getPath('temp'), 'kcc-update.sh');
+  // Helper reads its paths from argv ($1..$4) — never interpolated into the script
+  // body — so odd characters in a path cannot break out. Waits (bounded ~20s) for our
+  // PID to exit, swaps the bundle with rollback, relaunches, removes the private dir.
+  const helper = join(work, 'swap.sh');
   writeFileSync(helper, [
     '#!/bin/sh',
-    'STAGED="$1"; INSTALL="$2"; PID="$3"',
+    'STAGED="$1"; INSTALL="$2"; PID="$3"; WORK="$4"',
     'i=0; while kill -0 "$PID" 2>/dev/null && [ "$i" -lt 100 ]; do sleep 0.2; i=$((i+1)); done',
     'if mv "$INSTALL" "$INSTALL.bak" 2>/dev/null; then',
     '  if /usr/bin/ditto "$STAGED" "$INSTALL"; then rm -rf "$INSTALL.bak"; else rm -rf "$INSTALL"; mv "$INSTALL.bak" "$INSTALL"; fi',
     'else',
     '  /usr/bin/ditto "$STAGED" "$INSTALL"',
     'fi',
-    'rm -rf "$STAGED"',
     '/usr/bin/open "$INSTALL"',
-    'rm -f "$0"',
+    'rm -rf "$WORK"',
   ].join('\n'), { mode: 0o755 });
 
   electronLog.log('[KCC-Update] staged; helper will swap', installApp, 'after quit');
-  spawn('/bin/sh', [helper, staged, installApp, String(process.pid)], { detached: true, stdio: 'ignore' }).unref();
+  spawn('/bin/sh', [helper, staged, installApp, String(process.pid), work], { detached: true, stdio: 'ignore' }).unref();
   app.quit();
 }
