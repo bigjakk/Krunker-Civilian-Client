@@ -1,8 +1,7 @@
 import { get as httpsGet } from 'https';
-import { createReadStream, createWriteStream, renameSync, unlinkSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'fs';
+import { createReadStream, createWriteStream, renameSync, unlinkSync, existsSync } from 'fs';
 import { createHash } from 'crypto';
-import { spawn, execFileSync } from 'child_process';
-import { join } from 'path';
+import { spawn } from 'child_process';
 import { app } from 'electron';
 import { electronLog } from './logger';
 
@@ -41,17 +40,16 @@ const UPDATE_CONFIG = {
   allowedHosts: ['github.com', 'githubusercontent.com'],
 };
 
-// The release asset to self-install, per platform. Windows = NSIS installer,
-// macOS = the signed + notarized arm64 DMG. Linux self-installs via the notice path.
+/** Human-facing releases page, for "download it manually" fallbacks. */
+export const RELEASES_URL = UPDATE_CONFIG.releasesUrl;
+
+// The release asset the app self-installs. Only Windows self-installs (the NSIS
+// Setup.exe); macOS, Linux, and Windows-portable use the notice path, which links
+// the release page instead of downloading a specific asset.
 function updateAssetPattern(): RegExp {
   if (process.platform === 'win32') return /Setup\.exe$/i;
-  if (process.platform === 'darwin') return /mac-arm64\.dmg$/i;
   return /$^/; // matches nothing
 }
-
-// Team ID of our Developer ID Application cert — the macOS auto-updater refuses to
-// install any downloaded build not signed by this team.
-const APPLE_TEAM_ID = 'K3L8M9BR93';
 
 // A release version must be a plain version token: it flows into a filesystem path
 // (the downloaded installer's name) and into the update dialog's HTML, so reject
@@ -356,63 +354,3 @@ export function installUpdate(installerPath: string): void {
   app.quit();
 }
 
-/**
- * macOS in-place update from a downloaded DMG. Mounts it, then REFUSES to proceed
- * unless the app inside is validly signed by our Developer ID team — the security
- * gate that makes auto-installing downloaded code safe (a forged or tampered build
- * cannot satisfy an Apple-anchored requirement carrying our Team ID). Stages a copy,
- * then a detached helper waits for us to quit, swaps the bundle (move-aside so a
- * failed copy rolls back), and relaunches.
- */
-export function installUpdateMac(dmgPath: string): void {
-  const APP_NAME = 'Krunker Civilian Client.app';
-  // "Apple-anchored, a Developer ID Application cert, carrying our Team ID." Apple will
-  // not issue a cert with our OU to anyone else, so this is the trust anchor.
-  const requirement = `anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "${APPLE_TEAM_ID}"`;
-
-  // Private 0700 working dir (mkdtemp) for the mount point, the staged copy, and the
-  // swap helper — keeps them out of world-writable temp, and gives a deterministic
-  // mount path so we never parse hdiutil output or trust an attacker-chosen volume name.
-  const work = mkdtempSync(join(app.getPath('temp'), 'kcc-update-'));
-  const mountPoint = join(work, 'mnt');
-  const staged = join(work, APP_NAME);
-  mkdirSync(mountPoint);
-
-  try {
-    execFileSync('hdiutil', ['attach', dmgPath, '-nobrowse', '-noverify', '-mountpoint', mountPoint], { stdio: 'pipe' });
-    const newApp = join(mountPoint, APP_NAME);
-    if (!existsSync(newApp)) throw new Error('[KCC-Update] no app bundle in update DMG');
-
-    // ── Authenticity + integrity gate (offline-capable). Throws on any mismatch. ──
-    execFileSync('codesign', ['--verify', '--deep', '--strict', '-R', '=' + requirement, newApp], { stdio: 'pipe' });
-    electronLog.log(`[KCC-Update] update verified: Developer ID team ${APPLE_TEAM_ID}`);
-
-    // Stage a copy inside the private dir so the DMG can be unmounted immediately.
-    execFileSync('ditto', [newApp, staged]);
-  } finally {
-    try { execFileSync('hdiutil', ['detach', mountPoint, '-force', '-quiet']); } catch { /* best effort */ }
-  }
-
-  const installApp = process.execPath.replace(/\.app\/Contents\/MacOS\/[^/]+$/, '.app');
-
-  // Helper reads its paths from argv ($1..$4) — never interpolated into the script
-  // body — so odd characters in a path cannot break out. Waits (bounded ~20s) for our
-  // PID to exit, swaps the bundle with rollback, relaunches, removes the private dir.
-  const helper = join(work, 'swap.sh');
-  writeFileSync(helper, [
-    '#!/bin/sh',
-    'STAGED="$1"; INSTALL="$2"; PID="$3"; WORK="$4"',
-    'i=0; while kill -0 "$PID" 2>/dev/null && [ "$i" -lt 100 ]; do sleep 0.2; i=$((i+1)); done',
-    'if mv "$INSTALL" "$INSTALL.bak" 2>/dev/null; then',
-    '  if /usr/bin/ditto "$STAGED" "$INSTALL"; then rm -rf "$INSTALL.bak"; else rm -rf "$INSTALL"; mv "$INSTALL.bak" "$INSTALL"; fi',
-    'else',
-    '  /usr/bin/ditto "$STAGED" "$INSTALL"',
-    'fi',
-    '/usr/bin/open "$INSTALL"',
-    'rm -rf "$WORK"',
-  ].join('\n'), { mode: 0o755 });
-
-  electronLog.log('[KCC-Update] staged; helper will swap', installApp, 'after quit');
-  spawn('/bin/sh', [helper, staged, installApp, String(process.pid), work], { detached: true, stdio: 'ignore' }).unref();
-  app.quit();
-}

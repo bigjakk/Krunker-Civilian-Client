@@ -43,9 +43,7 @@ const SHARED_CSS = `
     border-radius: 3px;
     transition: width 0.3s ease;
   }
-  /* Indeterminate sweep for steps with no measurable progress (verify, install).
-     Runs on the renderer's compositor, so it keeps animating even while the main
-     process is blocked on the synchronous mount/copy. */
+  /* Indeterminate sweep for steps with no measurable progress (verify, install). */
   .progress-container.indeterminate .progress-bar {
     width: 40%;
     transition: none;

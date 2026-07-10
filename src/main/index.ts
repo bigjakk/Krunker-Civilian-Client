@@ -11,7 +11,7 @@ import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper } fro
 import { UserscriptManager } from './userscripts';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog, getLogPath, closeLogStreams } from './logger';
-import { checkForUpdate, downloadUpdate, installUpdate, installUpdateMac, checkForUpdateNotice } from './updater';
+import { checkForUpdate, downloadUpdate, installUpdate, checkForUpdateNotice, RELEASES_URL } from './updater';
 import { showUpdateWindow, showUpdatePrompt, showUpdateAvailableNotice } from './update-window';
 import { DiscordRPC } from './discord-rpc';
 import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS } from './css-themes';
@@ -247,18 +247,18 @@ app.whenReady().then(async () => {
   }
 
   // ── Update check ──
-  // Windows NSIS and macOS (Developer ID signed) self-install in place. Portable and
-  // AppImage builds can't, so they get a notice with a manual download link. Dev builds
-  // are skipped.
+  // Only Windows NSIS builds self-install in place: the Setup.exe is a real installer
+  // that swaps the app while it's closed. macOS (DMG), Linux (AppImage), and Windows
+  // portable can't safely swap a running app, so they show a notice linking the release
+  // page and the user downloads the new build manually. Dev builds are skipped.
   const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR;
   const isAppImage = !!process.env.APPIMAGE;
   const isDev = !app.isPackaged;
   const isNsisInstall = !isDev && process.platform === 'win32' && !isPortable && !isAppImage;
-  const isMacInstall = !isDev && process.platform === 'darwin';
-  const canSelfInstall = isNsisInstall || isMacInstall;
+
   if (isDev) {
     electronLog.log('[KCC] Skipping update check (dev mode)');
-  } else if (canSelfInstall) {
+  } else if (isNsisInstall) {
     try {
       electronLog.log('[KCC] Checking for updates...');
       const update = await checkForUpdate(appVersion);
@@ -275,8 +275,7 @@ app.whenReady().then(async () => {
 
           const tempDir = join(app.getPath('temp'), 'kcc-update');
           if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true });
-          const isMac = process.platform === 'darwin';
-          const installerPath = join(tempDir, isMac ? `KCC-${update.version}.dmg` : `KCC-${update.version}-Setup.exe`);
+          const installerPath = join(tempDir, `KCC-${update.version}-Setup.exe`);
 
           let cancelled = false;
           updateWin.on('closed', () => { cancelled = true; });
@@ -291,22 +290,30 @@ app.whenReady().then(async () => {
               }
             }, update.sha256);
 
-            if (!cancelled) {
+            // Re-check right before installing: `cancelled` can flip during the
+            // download await (the window's close button is the cancel path).
+            if (!cancelled && !updateWin.isDestroyed()) {
               sendProgress('Installing update...', -1);
-              // installUpdate*/installUpdateMac run synchronously and freeze the main
-              // process (mount, codesign, copy). Yield a tick first so the renderer
-              // actually paints "Installing..." before that freeze — otherwise the bar
-              // sits at "Downloading... 100%" through the whole install and looks stuck.
-              await new Promise((resolve) => setTimeout(resolve, 80));
-              // installUpdateMac verifies the download is signed by our Developer ID
-              // (Team K3L8M9BR93) before swapping — it never runs unverified code.
-              if (isMac) installUpdateMac(installerPath);
-              else installUpdate(installerPath);
+              installUpdate(installerPath); // spawns the NSIS installer, then quits
               return; // app quits inside the installer call
             }
           } catch (err) {
             electronLog.error('[KCC] Update download/install failed:', err);
             if (!updateWin.isDestroyed()) updateWin.close();
+            // The user explicitly accepted this update — surface the failure instead
+            // of silently launching the old version (it would otherwise repeat every
+            // launch with no explanation).
+            const detail = (err as Error).message || String(err);
+            const { response } = await dialog.showMessageBox({
+              type: 'error',
+              title: 'Update failed',
+              message: `The update to v${update.version} could not be installed.`,
+              detail: `${detail}\n\nYou can download it manually from the releases page — the current version keeps working in the meantime.`,
+              buttons: ['Open Releases Page', 'Continue'],
+              defaultId: 1,
+              cancelId: 1,
+            });
+            if (response === 0) await shell.openExternal(RELEASES_URL).catch(() => {});
           }
         }
       } else {
@@ -316,8 +323,8 @@ app.whenReady().then(async () => {
       electronLog.error('[KCC] Update check failed:', err);
     }
   } else {
-    // Portable / AppImage / other packaged builds: can't self-install — just notify
-    // and link to the release page so the user can grab the right download.
+    // macOS (DMG) / Linux (AppImage) / Windows portable: can't self-install — just
+    // notify and link to the release page so the user can grab the right download.
     try {
       electronLog.log('[KCC] Checking for updates (notify-only)...');
       const notice = await checkForUpdateNotice(appVersion);
