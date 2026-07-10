@@ -1,7 +1,8 @@
 import { get as httpsGet } from 'https';
-import { createReadStream, createWriteStream, renameSync, unlinkSync, existsSync } from 'fs';
+import { createReadStream, createWriteStream, renameSync, unlinkSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { createHash } from 'crypto';
-import { spawn } from 'child_process';
+import { spawn, execFileSync } from 'child_process';
+import { join, dirname } from 'path';
 import { app } from 'electron';
 import { electronLog } from './logger';
 
@@ -37,9 +38,20 @@ interface GithubRelease {
 const UPDATE_CONFIG = {
   checkUrl: 'https://api.github.com/repos/bigjakk/Krunker-Civilian-Client/releases/latest',
   releasesUrl: 'https://github.com/bigjakk/Krunker-Civilian-Client/releases/latest',
-  assetPattern: /Setup\.exe$/i,
   allowedHosts: ['github.com', 'githubusercontent.com'],
 };
+
+// The release asset to self-install, per platform. Windows = NSIS installer,
+// macOS = the signed + notarized arm64 DMG. Linux self-installs via the notice path.
+function updateAssetPattern(): RegExp {
+  if (process.platform === 'win32') return /Setup\.exe$/i;
+  if (process.platform === 'darwin') return /mac-arm64\.dmg$/i;
+  return /$^/; // matches nothing
+}
+
+// Team ID of our Developer ID Application cert — the macOS auto-updater refuses to
+// install any downloaded build not signed by this team.
+const APPLE_TEAM_ID = 'K3L8M9BR93';
 
 const CHECK_TIMEOUT_MS = 10000;
 const DOWNLOAD_TIMEOUT_MS = 300000; // 5 minutes
@@ -155,9 +167,10 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
     return null;
   }
 
-  const setupAsset = (release.assets || []).find((a) => UPDATE_CONFIG.assetPattern.test(a.name));
+  const pattern = updateAssetPattern();
+  const setupAsset = (release.assets || []).find((a) => pattern.test(a.name));
   if (!setupAsset) {
-    electronLog.error('[KCC-Update] No Setup.exe asset found in release', remoteVersion);
+    electronLog.error('[KCC-Update] No installable asset matching', String(pattern), 'in release', remoteVersion);
     return null;
   }
 
@@ -325,5 +338,65 @@ export function installUpdate(installerPath: string): void {
     stdio: 'ignore',
   });
   child.unref();
+  app.quit();
+}
+
+/**
+ * macOS in-place update from a downloaded DMG. Mounts it, then REFUSES to proceed
+ * unless the app inside is validly signed by our Developer ID team — the security
+ * gate that makes auto-installing downloaded code safe (a forged or tampered build
+ * cannot satisfy an Apple-anchored requirement carrying our Team ID). Stages a copy,
+ * then a detached helper waits for us to quit, swaps the bundle (move-aside so a
+ * failed copy rolls back), and relaunches.
+ */
+export function installUpdateMac(dmgPath: string): void {
+  const APP_NAME = 'Krunker Civilian Client.app';
+  // "Apple-anchored, a Developer ID Application cert, carrying our Team ID." Apple will
+  // not issue a cert with our OU to anyone else, so this is the trust anchor.
+  const requirement = `anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "${APPLE_TEAM_ID}"`;
+
+  const staged = join(app.getPath('temp'), 'kcc-update-staging', APP_NAME);
+  const attachOut = execFileSync('hdiutil', ['attach', dmgPath, '-nobrowse', '-noverify'], { encoding: 'utf8' });
+  const volume = attachOut.split('\n').map((l) => l.split('\t').pop()?.trim()).find((p) => p && p.startsWith('/Volumes/'));
+  if (!volume) throw new Error('[KCC-Update] failed to mount update DMG');
+
+  try {
+    const newApp = join(volume, APP_NAME);
+    if (!existsSync(newApp)) throw new Error('[KCC-Update] no app bundle in update DMG');
+
+    // ── Authenticity + integrity gate (offline-capable). Throws on any mismatch. ──
+    execFileSync('codesign', ['--verify', '--deep', '--strict', '-R', '=' + requirement, newApp], { stdio: 'pipe' });
+    electronLog.log(`[KCC-Update] update verified: Developer ID team ${APPLE_TEAM_ID}`);
+
+    // Stage a copy on disk so the DMG can be unmounted immediately.
+    rmSync(dirname(staged), { recursive: true, force: true });
+    mkdirSync(dirname(staged), { recursive: true });
+    execFileSync('ditto', [newApp, staged]);
+  } finally {
+    try { execFileSync('hdiutil', ['detach', volume, '-quiet']); } catch { /* best effort */ }
+  }
+
+  const installApp = process.execPath.replace(/\.app\/Contents\/MacOS\/[^/]+$/, '.app');
+
+  // Helper reads its paths from argv ($1..$3) — never interpolated into the script
+  // body — so odd characters in a path cannot break out. Waits (bounded ~20s) for
+  // our PID to exit, swaps the bundle with rollback, relaunches, self-cleans.
+  const helper = join(app.getPath('temp'), 'kcc-update.sh');
+  writeFileSync(helper, [
+    '#!/bin/sh',
+    'STAGED="$1"; INSTALL="$2"; PID="$3"',
+    'i=0; while kill -0 "$PID" 2>/dev/null && [ "$i" -lt 100 ]; do sleep 0.2; i=$((i+1)); done',
+    'if mv "$INSTALL" "$INSTALL.bak" 2>/dev/null; then',
+    '  if /usr/bin/ditto "$STAGED" "$INSTALL"; then rm -rf "$INSTALL.bak"; else rm -rf "$INSTALL"; mv "$INSTALL.bak" "$INSTALL"; fi',
+    'else',
+    '  /usr/bin/ditto "$STAGED" "$INSTALL"',
+    'fi',
+    'rm -rf "$STAGED"',
+    '/usr/bin/open "$INSTALL"',
+    'rm -f "$0"',
+  ].join('\n'), { mode: 0o755 });
+
+  electronLog.log('[KCC-Update] staged; helper will swap', installApp, 'after quit');
+  spawn('/bin/sh', [helper, staged, installApp, String(process.pid)], { detached: true, stdio: 'ignore' }).unref();
   app.quit();
 }

@@ -11,7 +11,7 @@ import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper } fro
 import { UserscriptManager } from './userscripts';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog, getLogPath, closeLogStreams } from './logger';
-import { checkForUpdate, downloadUpdate, installUpdate, checkForUpdateNotice } from './updater';
+import { checkForUpdate, downloadUpdate, installUpdate, installUpdateMac, checkForUpdateNotice } from './updater';
 import { showUpdateWindow, showUpdatePrompt, showUpdateAvailableNotice } from './update-window';
 import { DiscordRPC } from './discord-rpc';
 import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS } from './css-themes';
@@ -261,15 +261,18 @@ app.whenReady().then(async () => {
   }
 
   // ── Update check ──
-  // NSIS installs self-update in place. Portable and AppImage builds can't, so they get
-  // a notice with a link to download the new version manually. Dev builds are skipped.
+  // Windows NSIS and macOS (Developer ID signed) self-install in place. Portable and
+  // AppImage builds can't, so they get a notice with a manual download link. Dev builds
+  // are skipped.
   const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR;
   const isAppImage = !!process.env.APPIMAGE;
   const isDev = !app.isPackaged;
   const isNsisInstall = !isDev && process.platform === 'win32' && !isPortable && !isAppImage;
+  const isMacInstall = !isDev && process.platform === 'darwin';
+  const canSelfInstall = isNsisInstall || isMacInstall;
   if (isDev) {
     electronLog.log('[KCC] Skipping update check (dev mode)');
-  } else if (isNsisInstall) {
+  } else if (canSelfInstall) {
     try {
       electronLog.log('[KCC] Checking for updates...');
       const update = await checkForUpdate(appVersion);
@@ -286,7 +289,8 @@ app.whenReady().then(async () => {
 
           const tempDir = join(app.getPath('temp'), 'kcc-update');
           if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true });
-          const installerPath = join(tempDir, `KCC-${update.version}-Setup.exe`);
+          const isMac = process.platform === 'darwin';
+          const installerPath = join(tempDir, isMac ? `KCC-${update.version}.dmg` : `KCC-${update.version}-Setup.exe`);
 
           let cancelled = false;
           updateWin.on('closed', () => { cancelled = true; });
@@ -294,17 +298,28 @@ app.whenReady().then(async () => {
           try {
             await downloadUpdate(update.downloadUrl, installerPath, (pct) => {
               if (!cancelled && !updateWin.isDestroyed()) {
-                sendProgress(`Downloading update... ${pct}%`, pct);
+                // At 100% the bytes are down but downloadUpdate is still hashing the
+                // file for SHA-256 — show "Verifying" + an indeterminate sweep so the
+                // bar doesn't look frozen at 100%.
+                sendProgress(pct >= 100 ? 'Verifying download...' : `Downloading update... ${pct}%`, pct >= 100 ? -1 : pct);
               }
             }, update.sha256);
 
             if (!cancelled) {
-              sendProgress('Installing update...', 100);
-              installUpdate(installerPath);
-              return; // app.quit() called by installUpdate
+              sendProgress('Installing update...', -1);
+              // installUpdate*/installUpdateMac run synchronously and freeze the main
+              // process (mount, codesign, copy). Yield a tick first so the renderer
+              // actually paints "Installing..." before that freeze — otherwise the bar
+              // sits at "Downloading... 100%" through the whole install and looks stuck.
+              await new Promise((resolve) => setTimeout(resolve, 80));
+              // installUpdateMac verifies the download is signed by our Developer ID
+              // (Team K3L8M9BR93) before swapping — it never runs unverified code.
+              if (isMac) installUpdateMac(installerPath);
+              else installUpdate(installerPath);
+              return; // app quits inside the installer call
             }
           } catch (err) {
-            electronLog.error('[KCC] Update download failed:', err);
+            electronLog.error('[KCC] Update download/install failed:', err);
             if (!updateWin.isDestroyed()) updateWin.close();
           }
         }
