@@ -50,6 +50,16 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('disable-frame-rate-limit');
     app.commandLine.appendSwitch('disable-gpu-vsync');
     app.commandLine.appendSwitch('max-gum-fps', '9999');
+    // macOS: VSyncAlignedPresentationForScrolling (default-on since M140) holds
+    // CA commits for the next CVDisplayLink tick during scroll interactions or
+    // while a previous swap is still queued. Swap acks only fire on commit, and
+    // the frame-pacing patch paces draws by acks, so a single 2-deep queue
+    // moment (settings-menu scroll, cmd-tab stall) latches the game to exactly
+    // vsync until rendering pauses — the "reverts to vsync until refresh" bug.
+    // The second name covers pre-M148 Chromium; unknown names are ignored.
+    if (info.os === 'darwin') {
+      disableFeatures('VSyncAlignedPresentationForScrolling', 'VSyncAlignedPresent');
+    }
     // Opt-in deeper compositor frame queue (depth 2 vs the patched default of 1).
     // Read by the custom Electron's CustomMaxPendingFrames feature param. Off → not
     // emitted → the binary keeps its compiled default of 1. Trades input latency on
