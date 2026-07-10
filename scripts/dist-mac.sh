@@ -9,9 +9,8 @@
 # store-credentials), overridable via KCC_NOTARY_PROFILE. CI instead sets
 # APPLE_API_KEY (path to .p8) + APPLE_API_KEY_ID + APPLE_API_ISSUER.
 # KCC_SKIP_NOTARIZE=1 skips notarization for a quick signed local build.
-# KCC_REQUIRE_SIGNED=1 (set by CI for release builds) forbids the ad-hoc
-# fallback: the script fails instead of producing an artifact that every
-# client's updater and Gatekeeper would reject.
+# KCC_REQUIRE_SIGNED=1 (CI release builds) forbids the ad-hoc fallback — fail
+# rather than ship a DMG that Gatekeeper would reject on every download.
 set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -24,9 +23,8 @@ DMG="out/$APPNAME-$VERSION-mac-arm64.dmg"
 
 IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')"
 
-# Release builds must never fall back to ad-hoc signing: an unsigned DMG
-# published to GitHub would be offered to every installed client, whose
-# updater hard-requires our Developer ID team and would fail on every launch.
+# A published release must be properly signed — an ad-hoc DMG trips Gatekeeper
+# on the user's machine when they open the download.
 if [ -n "$KCC_REQUIRE_SIGNED" ]; then
     if [ -z "$IDENTITY" ]; then
         echo "[dist-mac] ERROR: KCC_REQUIRE_SIGNED is set but no 'Developer ID Application' identity is available — refusing to build an ad-hoc-signed release artifact." >&2
@@ -71,8 +69,8 @@ done
 [ -n "$ok" ] || { echo "[dist-mac] hdiutil create failed after 3 attempts"; rm -rf "$STAGE"; exit 1; }
 rm -rf "$STAGE"
 
-# Run notarytool with whichever credentials are configured (CI API key vs local
-# keychain profile) — one place, so submit and the failure-log fetch can't drift.
+# notarytool with whichever creds are set (CI API key vs local keychain profile),
+# in one place so submit and the log fetch can't drift apart.
 notary() {
     if [ -n "$APPLE_API_KEY" ]; then
         xcrun notarytool "$@" --key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER"

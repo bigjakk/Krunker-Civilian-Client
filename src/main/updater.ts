@@ -40,20 +40,16 @@ const UPDATE_CONFIG = {
   allowedHosts: ['github.com', 'githubusercontent.com'],
 };
 
-/** Human-facing releases page, for "download it manually" fallbacks. */
 export const RELEASES_URL = UPDATE_CONFIG.releasesUrl;
 
-// The release asset the app self-installs. Only Windows self-installs (the NSIS
-// Setup.exe); macOS, Linux, and Windows-portable use the notice path, which links
-// the release page instead of downloading a specific asset.
+// Only Windows self-installs (the NSIS Setup.exe); other platforms use the notice path.
 function updateAssetPattern(): RegExp {
   if (process.platform === 'win32') return /Setup\.exe$/i;
   return /$^/; // matches nothing
 }
 
-// A release version must be a plain version token: it flows into a filesystem path
-// (the downloaded installer's name) and into the update dialog's HTML, so reject
-// anything carrying path separators, HTML metacharacters, or whitespace.
+// The version flows into a filesystem path (installer name) and the dialog HTML, so
+// reject anything with path separators, HTML metacharacters, or whitespace.
 function isSafeVersion(v: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(v);
 }
@@ -61,9 +57,6 @@ function isSafeVersion(v: string): boolean {
 const CHECK_TIMEOUT_MS = 10000;
 const DOWNLOAD_TIMEOUT_MS = 300000; // 5 minutes
 
-/**
- * Validate that a redirect URL stays on an allowed host.
- */
 function isAllowedRedirect(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -73,10 +66,6 @@ function isAllowedRedirect(url: string): boolean {
   }
 }
 
-/**
- * Simple semver comparison: returns true if a < b.
- * Handles versions like "0.1.0", "1.2.3".
- */
 function versionLessThan(a: string, b: string): boolean {
   const pa = a.split('.').map(Number);
   const pb = b.split('.').map(Number);
@@ -90,10 +79,7 @@ function versionLessThan(a: string, b: string): boolean {
   return false;
 }
 
-/**
- * Fetch and parse the latest GitHub release. Follows redirects (validated against
- * allowed hosts) and resolves null on any error, timeout, or non-200 status.
- */
+/** Resolves the latest GitHub release, or null on any error/timeout/non-200 (never rejects). */
 function fetchLatestRelease(currentVersion: string): Promise<GithubRelease | null> {
   return new Promise((resolve) => {
     const headers = { 'User-Agent': 'KrunkerCivilianClient/' + currentVersion };
@@ -107,7 +93,6 @@ function fetchLatestRelease(currentVersion: string): Promise<GithubRelease | nul
 
       const req = httpsGet(url, { headers }, (res) => {
         electronLog.log('[KCC-Update] Check response status:', res.statusCode);
-        // Follow redirects (with domain validation)
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           const redirectUrl = res.headers.location;
           electronLog.log('[KCC-Update] Redirected to:', redirectUrl);
@@ -183,13 +168,12 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
     return null;
   }
 
-  // Validate the download URL points to an allowed host
   if (!isAllowedRedirect(setupAsset.browser_download_url)) {
     electronLog.error('[KCC-Update] Download URL points to untrusted host:', setupAsset.browser_download_url);
     return null;
   }
 
-  // Extract SHA-256 digest from GitHub API (format: "sha256:<hex>")
+  // GitHub returns the digest as "sha256:<hex>"
   const sha256 = (setupAsset.digest || '').replace(/^sha256:/i, '');
   if (!sha256) {
     electronLog.error('[KCC-Update] No SHA-256 digest found for asset');
@@ -206,9 +190,8 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
 }
 
 /**
- * Check for a newer release without downloading anything — for builds that can't
- * self-install (portable, AppImage). Returns the new version plus a link to the
- * release page, where the user can pick the download for their platform.
+ * Newer-release check for builds that can't self-install (macOS, Linux, portable):
+ * returns the version plus a link to the release page, without downloading anything.
  */
 export async function checkForUpdateNotice(currentVersion: string): Promise<UpdateNotice | null> {
   const release = await fetchLatestRelease(currentVersion);
@@ -226,7 +209,6 @@ export async function checkForUpdateNotice(currentVersion: string): Promise<Upda
   }
 
   const releaseUrl = release.html_url || UPDATE_CONFIG.releasesUrl;
-  // Final guard: never hand out a link to an untrusted host.
   if (!isAllowedRedirect(releaseUrl)) {
     electronLog.error('[KCC-Update] Notice URL points to untrusted host:', releaseUrl);
     return null;
@@ -264,7 +246,6 @@ export function downloadUpdate(url: string, destPath: string, onProgress: Progre
       const req = httpsGet(downloadUrl, {
         headers: { 'User-Agent': 'KrunkerCivilianClient' },
       }, (res) => {
-        // Follow redirects (with domain validation)
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           const redirectUrl = res.headers.location;
           electronLog.log('[KCC-Update] Download redirected to:', redirectUrl);
