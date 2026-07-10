@@ -100,6 +100,8 @@ jobs:
     needs: version-check
     if: needs.version-check.outputs.SKIP == 'false'
     runs-on: macos-latest
+    outputs:
+      SIGNED: ${{ steps.signing.outputs.enabled }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -112,15 +114,36 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      # Signing is optional: with the secrets present the DMG is signed +
-      # notarized; without them scripts/dist-mac.sh falls back to an ad-hoc build,
-      # so forks/PRs without the secrets still get a working (unsigned) artifact.
+      # Signing policy: release builds (main) MUST be Developer ID signed +
+      # notarized — the in-app updater only installs builds signed by our team,
+      # so publishing an ad-hoc DMG would give every installed client an update
+      # that downloads and then fails verification on every launch. Off main
+      # (workflow_dispatch test runs, forks) the secrets may be absent and
+      # scripts/dist-mac.sh falls back to an ad-hoc test build; those runs can
+      # never publish (the release job is gated to main + SIGNED). Partially
+      # configured secrets are a hard error on every branch: they'd otherwise
+      # produce a 0-byte notary key and a confusing notarytool auth failure.
       - name: Detect signing secrets
         id: signing
         env:
           MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_API_KEY_B64: ${{ secrets.APPLE_API_KEY_B64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
-          if [ -n "$MAC_CERT_P12" ]; then echo "enabled=true" >> "$GITHUB_OUTPUT"; else echo "enabled=false" >> "$GITHUB_OUTPUT"; fi
+          missing=""
+          for v in MAC_CERT_P12 MAC_CERT_PASSWORD APPLE_API_KEY_B64 APPLE_API_KEY_ID APPLE_API_ISSUER; do
+            [ -n "$(printenv "$v")" ] || missing="$missing $v"
+          done
+          if [ -z "$missing" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          elif [ "$(echo "$missing" | wc -w)" -eq 5 ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::macOS signing secrets are partially configured — missing:$missing. Set all five or none."
+            exit 1
+          fi
 
       - name: Import Developer ID certificate
         if: steps.signing.outputs.enabled == 'true'
@@ -151,6 +174,10 @@ jobs:
           APPLE_API_KEY: ${{ runner.temp }}/notary.p8
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          # A main-branch run can publish a release, so it must never fall back
+          # to ad-hoc signing — dist-mac.sh hard-fails instead. Other branches
+          # (dispatch test runs) keep the unsigned fallback for test artifacts.
+          KCC_REQUIRE_SIGNED: ${{ github.ref == 'refs/heads/main' && '1' || '' }}
         run: npm run dist:mac
 
       - name: Report build size
@@ -169,8 +196,11 @@ jobs:
     # Publish only from main. A workflow_dispatch on any other branch still runs
     # the build jobs (artifacts land in the workflow run for testing) but must
     # never create a real --latest release of unmerged code — the in-app update
-    # checker would offer it to every user.
-    if: needs.version-check.outputs.SKIP == 'false' && github.ref == 'refs/heads/main'
+    # checker would offer it to every user. SIGNED must be true for the same
+    # reason: an ad-hoc DMG in a release would fail every client's Developer ID
+    # verification forever (belt-and-braces — on main dist-mac.sh already
+    # refuses to build unsigned via KCC_REQUIRE_SIGNED).
+    if: needs.version-check.outputs.SKIP == 'false' && github.ref == 'refs/heads/main' && needs.build-mac.outputs.SIGNED == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
