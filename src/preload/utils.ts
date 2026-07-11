@@ -43,6 +43,9 @@ export function setDeathAnimBlock(enabled: boolean): void {
 // ── Menu Timer ──
 // Shows the native spectate/game timer prominently on the menu screen.
 // CSS approach from crankshaft/glorp.
+// Krunker hides every #spectateUI child on the menu via
+// `.onMenu #spectateUI > div:not(#replayControls) { display: none !important }`,
+// so the rule that reveals #spectateHUD (the timer) must out-specify it.
 
 const MENU_TIMER_ID = 'kcc-menuTimer';
 const MENU_TIMER_CSS = `
@@ -53,8 +56,9 @@ const MENU_TIMER_CSS = `
 #uiBase.onMenu #specGameInfo,
 #uiBase.onMenu #spec0,
 #uiBase.onMenu #specControlHolder,
+#uiBase.onMenu #specStats,
 #uiBase.onMenu #specNames { display: none !important; }
-#uiBase.onMenu #spectateHUD {
+#uiBase.onMenu #spectateUI #spectateHUD {
   box-sizing: border-box; display: flex !important; justify-content: center;
   height: 0.5rem; white-space: nowrap; width: max-content;
   position: fixed; top: calc(50% + 140px);
@@ -68,13 +72,6 @@ const MENU_TIMER_CSS = `
   background-color: transparent; padding: 25px; font-size: 42px; border-radius: 0.5em;
 }
 #uiBase.onMenu #specKPDContr { display: none; }
-#uiBase.onMenu #spectateUI div#specStats {
-  position: absolute; top: calc(50% + 13em); left: 50%; transform: translateX(-50%); z-index: 1;
-}
-#uiBase.onMenu #spectateUI div#specStats:before {
-  content: "Spectating"; position: absolute; bottom: 100%; left: 50%;
-  transform: translateX(-50%); font-size: 1.2em; padding-bottom: 0.5em;
-}
 `;
 
 export function setMenuTimer(enabled: boolean): void {
