@@ -248,6 +248,9 @@ ipcRenderer.on('main_did-finish-load', () => {
         (el: any) => el.offsetParent !== null && el.textContent?.trim() === 'Claim'
       );
       setInterval(() => {
+        // The battle-pass window only exists in menus; skip the document-wide
+        // selector + offsetParent (layout) read while pointer-locked in-game.
+        if (document.pointerLockElement) return;
         const bar = document.querySelector('.bpBotH') as HTMLElement | null;
         if (!bar || bar.offsetParent === null) return;
         const existing = document.getElementById('claimAllBtn');
