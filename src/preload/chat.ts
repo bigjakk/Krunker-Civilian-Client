@@ -37,6 +37,10 @@ function isTeamMode(): boolean {
 }
 
 function handleMutations(mutations: MutationRecord[]): void {
+    // Whether this batch re-inserted history above the viewport (which changes
+    // scrollHeight after Krunker's own scroll-to-bottom already ran).
+    let reInserted = false;
+
     // ── Chat history: re-insert removed messages ──
     if (historyMax > 0 && chatList && observer) {
         const removed: HTMLElement[] = [];
@@ -47,6 +51,7 @@ function handleMutations(mutations: MutationRecord[]): void {
             }
         }
         if (removed.length > 0) {
+            reInserted = true;
             reInsertGuard = true;
             observer.disconnect();
             const heightBefore = chatList.scrollHeight;
@@ -96,11 +101,18 @@ function handleMutations(mutations: MutationRecord[]): void {
     }
 
     // Krunker force-scrolls #chatList to the bottom on every new message. When
-    // the user has scrolled up, undo that and hold their position; otherwise
-    // follow the latest message. (This runs before the resulting scroll event,
-    // so the restored position is what updatePauseState sees.)
+    // the user has scrolled up, undo that and hold their position. When
+    // following, Krunker's own scroll already landed at the bottom — repeating
+    // it here cost a forced-layout scrollHeight read per message; only re-pin
+    // when history re-insertion changed scrollHeight after Krunker's scroll.
+    // (This runs before the resulting scroll event, so the restored position
+    // is what updatePauseState sees.)
     if (chatList) {
-        chatList.scrollTop = scrollPaused ? savedScrollTop : chatList.scrollHeight;
+        if (scrollPaused) {
+            chatList.scrollTop = savedScrollTop;
+        } else if (reInserted) {
+            chatList.scrollTop = chatList.scrollHeight;
+        }
     }
 }
 
