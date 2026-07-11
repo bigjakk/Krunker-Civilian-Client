@@ -188,7 +188,13 @@ function updateChatClamp(): void {
     const root = document.documentElement;
     const list = chatList ?? document.getElementById('chatList');
     const menu = document.getElementById('menuItemContainer');
-    if (!list || !menu || menu.offsetHeight === 0) {
+    // In-game detection must be layout-free: this runs on a 250ms safety tick,
+    // and the old `menu.offsetHeight === 0` check forced a layout flush every
+    // tick mid-combat just to conclude "menu hidden, do nothing". #uiBase only
+    // carries onMenu on the menu screen; the offsetHeight fallback then runs
+    // solely while the menu is actually up.
+    const uiBase = document.getElementById('uiBase');
+    if (!list || !menu || !uiBase?.classList.contains('onMenu') || menu.offsetHeight === 0) {
         // Menu hidden (in-game) — let Krunker manage the chat normally.
         list?.classList.remove('kcc-chat-clamped');
         root.style.removeProperty('--kcc-chat-max');
