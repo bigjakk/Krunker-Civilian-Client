@@ -4,7 +4,7 @@ import type { MatchmakerConfig } from './matchmaker';
 import { hookSettings } from './settings-render';
 import { initUserscripts } from './userscripts';
 import { initTranslator } from './translator';
-import { setDeathAnimBlock, setMenuTimer, setWatermark, showToast } from './utils';
+import { installCompositorAnimFix, setDeathAnimBlock, setMenuTimer, setWatermark, showToast } from './utils';
 import { initChat } from './chat';
 import { initHPCounter, initRankProgress } from './competitive';
 import { initKeystrokes } from './keystrokes';
@@ -167,6 +167,7 @@ ipcRenderer.on('main_did-finish-load', () => {
       }, 500);
     }
 
+    if (isGamePage) installCompositorAnimFix();
     if (uiConf?.deathscreenAnimation) setDeathAnimBlock(true);
     if (uiConf?.hideMenuPopups) startHidePopups();
     if (uiConf?.menuTimer ?? true) setMenuTimer(true);
