@@ -40,6 +40,34 @@ export function setDeathAnimBlock(enabled: boolean): void {
   }
 }
 
+// ── Compositor-only death-screen animations ──
+// Krunker's death-screen entrance animations — `chat-moveup` on
+// #uiBase.onDeathScrn #chatHolder and `death-ui-moveup` on .death-ui-bottom* —
+// animate `bottom`, a layout property, so every frame of their 1.5s run forces
+// style+layout on the main thread right as the death UI appears. Redefining the
+// keyframes to a translateY over the same distance keeps the exact motion
+// (the elements' static `bottom` is already the keyframes' final value) but
+// runs entirely on the compositor. Same-name @keyframes resolve to the last
+// definition in document order; this is injected at did-finish-load, after
+// Krunker's stylesheets. Distances from krunker main.css (2026-07-11):
+// chat-moveup -300px→75px = 375px; death-ui-moveup -300px→40px = 340px.
+// setDeathAnimBlock above still fully disables the .death-ui-bottom* panels
+// when the deathscreenAnimation setting is on.
+
+const COMPOSITOR_ANIM_ID = 'kcc-compositorAnim';
+const COMPOSITOR_ANIM_CSS = `
+@keyframes chat-moveup { 0% { transform: translateY(375px); } 100% { transform: translateY(0); } }
+@keyframes death-ui-moveup { 0% { transform: translateY(340px); } 100% { transform: translateY(0); } }
+`;
+
+export function installCompositorAnimFix(): void {
+    if (document.getElementById(COMPOSITOR_ANIM_ID)) return;
+    const el = document.createElement('style');
+    el.id = COMPOSITOR_ANIM_ID;
+    el.textContent = COMPOSITOR_ANIM_CSS;
+    document.head.appendChild(el);
+}
+
 // ── Menu Timer ──
 // Shows the native spectate/game timer prominently on the menu screen.
 // CSS approach from crankshaft/glorp.
