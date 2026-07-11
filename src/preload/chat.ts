@@ -26,6 +26,12 @@ let _con: SavedConsole | null = null;
 const SCROLL_BOTTOM_THRESHOLD = 30; // px from bottom to consider "at bottom"
 const USER_SCROLL_WINDOW = 200; // ms after a wheel that 'scroll' counts as user-driven
 
+// Messages KCC removes on purpose (e.g. "Text & Voice Chat" notices). Their
+// removal fires a later observer batch whose removedNodes look identical to a
+// Krunker history prune — without this marker the history block would
+// re-insert them at the top of the list.
+const kccRemovedNodes = new WeakSet<Node>();
+
 function isChatMessage(node: Node): node is HTMLElement {
     return node.nodeType === 1 && (node as HTMLElement).id?.startsWith('chatMsg_');
 }
@@ -47,7 +53,7 @@ function handleMutations(mutations: MutationRecord[]): void {
         for (const mut of mutations) {
             if (reInsertGuard) break;
             for (const node of mut.removedNodes) {
-                if (isChatMessage(node)) removed.push(node);
+                if (isChatMessage(node) && !kccRemovedNodes.has(node)) removed.push(node);
             }
         }
         if (removed.length > 0) {
@@ -81,6 +87,7 @@ function handleMutations(mutations: MutationRecord[]): void {
 
                 // Remove "Text & Voice Chat" system messages
                 if (chatMsg.textContent?.includes('Text & Voice Chat')) {
+                    kccRemovedNodes.add(node);
                     node.remove();
                     continue;
                 }
