@@ -15,9 +15,20 @@ const HS = 'headshot_0';
 const HIT_SOUNDS = new Set(['hit_0', 'crit_0']);
 
 let mode: HeadshotSoundMode = 'off';
+let unsubscribeFrames: (() => void) | null = null;
 
 export function setHeadshotSoundMode(next: HeadshotSoundMode): void {
   mode = next === 'kill' || next === 'hit' ? next : 'off';
+  // Only 'kill' consumes game frames (it replays the ding on the GetKill
+  // event); 'hit' works entirely through the SOUND.play wrapper. Subscribing
+  // only while in 'kill' keeps game-socket's handler set empty otherwise, so
+  // its per-frame fast path skips the Uint8Array + TextDecoder work entirely.
+  if (mode === 'kill' && !unsubscribeFrames) {
+    unsubscribeFrames = onGameFrame(onFrame);
+  } else if (mode !== 'kill' && unsubscribeFrames) {
+    unsubscribeFrames();
+    unsubscribeFrames = null;
+  }
 }
 
 // ── Sound manager wrapper (remap + suppress) ──
@@ -51,9 +62,10 @@ export function installSoundHook(): void {
   _console.log('[KCC-HS] sound manager hooked');
 }
 
-// Replay the ding on '6' (GetKill).
-onGameFrame((event) => {
+// Replay the ding on '6' (GetKill). Subscribed only while mode === 'kill'
+// (see setHeadshotSoundMode).
+function onFrame(event: string): void {
   if (event !== '6' || mode !== 'kill') return;
   const S = (window as any).SOUND;
   if (S && typeof S.play === 'function') S.play(HS, 1, false);
-});
+}
