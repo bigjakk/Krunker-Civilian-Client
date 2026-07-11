@@ -54,20 +54,37 @@ echo "[dist-mac] building DMG via hdiutil..."
 STAGE="$(mktemp -d)"
 ditto "$OUTAPP" "$STAGE/$APPNAME.app"
 ln -s /Applications "$STAGE/Applications"
+# Give the mounted volume the app icon instead of the generic disk-image icon.
+# Finder uses a .VolumeIcon.icns at the volume root, but only when the root also
+# carries the "custom icon" attribute — and hdiutil create -srcfolder drops that
+# attribute. So build a read-write image, set the bit on the live volume, then
+# convert to a compressed read-only image (the conversion preserves the bit).
+cp build/icon.icns "$STAGE/.VolumeIcon.icns"
+SETFILE="$(xcrun -f SetFile 2>/dev/null || true)"
+RWDIR="$(mktemp -d)"; RW="$RWDIR/rw.dmg"
 rm -f "$DMG"
 # hdiutil create intermittently fails with "Resource busy" on GitHub macOS
 # runners (why electron-builder's dmg-builder retries it) — retry up to 3x.
 ok=""
 for attempt in 1 2 3; do
-    if hdiutil create -volname "$APPNAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null; then
+    if hdiutil create -volname "$APPNAME" -srcfolder "$STAGE" -ov -format UDRW -fs HFS+ "$RW" >/dev/null; then
         ok=1
         break
     fi
     echo "[dist-mac] hdiutil create failed (attempt $attempt/3), retrying in 5s..."
     sleep 5
 done
-[ -n "$ok" ] || { echo "[dist-mac] hdiutil create failed after 3 attempts"; rm -rf "$STAGE"; exit 1; }
+[ -n "$ok" ] || { echo "[dist-mac] hdiutil create failed after 3 attempts"; rm -rf "$STAGE" "$RWDIR"; exit 1; }
 rm -rf "$STAGE"
+if [ -n "$SETFILE" ]; then
+    MP="$(hdiutil attach "$RW" -nobrowse -readwrite | grep -o '/Volumes/.*$' | head -1)"
+    "$SETFILE" -a C "$MP"
+    hdiutil detach "$MP" >/dev/null 2>&1 || hdiutil detach "$MP" -force >/dev/null 2>&1
+else
+    echo "[dist-mac] WARNING: SetFile unavailable — mounted DMG keeps the generic volume icon"
+fi
+hdiutil convert "$RW" -format UDZO -o "$DMG" >/dev/null
+rm -rf "$RWDIR"
 
 # notarytool with whichever creds are set (CI API key vs local keychain profile),
 # in one place so submit and the log fetch can't drift apart.
