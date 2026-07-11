@@ -173,6 +173,9 @@ export function initBanlog(): void {
     // The observer gives instant conversion; the poll (re)attaches it as the popup
     // opens/closes and keeps the "x ago" text fresh over time.
     setInterval(() => {
+        // The KPD popup only exists in menus; skip the document-wide selector
+        // scans while pointer-locked in-game.
+        if (document.pointerLockElement) return;
         ensureObserver();
         runEnhance();
     }, 500);
