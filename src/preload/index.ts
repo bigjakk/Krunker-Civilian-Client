@@ -26,6 +26,13 @@ installGameSocketTap();
 
 // preventDefault on wheel events avoids Chromium 100+ pacing frame production to vsync during scroll gestures (FPS would tank from 1000+ to refresh rate). Skip when target is inside a real scrollable element so menus still scroll.
 window.addEventListener('wheel', (e: WheelEvent) => {
+    // Pointer lock = in-game weapon scroll: nothing is scrollable, and the
+    // ancestor walk below forces style+layout (getComputedStyle/scrollHeight)
+    // on every wheel tick mid-combat. Block the gesture without walking.
+    if (document.pointerLockElement) {
+        e.preventDefault();
+        return;
+    }
     let el = e.target as HTMLElement | null;
     while (el && el !== document.body && el !== document.documentElement) {
         const cs = getComputedStyle(el);
