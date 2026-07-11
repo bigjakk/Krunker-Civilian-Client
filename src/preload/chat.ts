@@ -60,17 +60,20 @@ function handleMutations(mutations: MutationRecord[]): void {
             reInserted = true;
             reInsertGuard = true;
             observer.disconnect();
-            const heightBefore = chatList.scrollHeight;
             const firstLive = chatList.firstChild;
             for (const node of removed) {
                 chatList.insertBefore(node, firstLive);
             }
+            // The restored list matches what savedScrollTop was recorded
+            // against; only the top-trim below shifts the anchor, so subtract
+            // exactly that (and skip the layout reads when not paused).
+            const heightRestored = scrollPaused ? chatList.scrollHeight : 0;
             while (chatList.children.length > historyMax) {
                 chatList.removeChild(chatList.firstChild!);
             }
-            // Re-inserting happens above the viewport, so shift the saved anchor
-            // by the net height change to keep the user pinned to the same line.
-            if (scrollPaused) savedScrollTop += chatList.scrollHeight - heightBefore;
+            if (scrollPaused) {
+                savedScrollTop = Math.max(0, savedScrollTop - (heightRestored - chatList.scrollHeight));
+            }
             observer.observe(chatList, { childList: true });
             reInsertGuard = false;
         }
