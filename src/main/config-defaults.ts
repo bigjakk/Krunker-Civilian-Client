@@ -225,7 +225,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     showStatus: true,
   },
   translator: {
-    enabled: true,
+    enabled: false,
     targetLanguage: 'en',
     showLanguageTag: true,
     customSkipWords: '',
