@@ -115,6 +115,8 @@ export interface AppConfig {
     targetLanguage: string;
     showLanguageTag: boolean;
     customSkipWords: string;
+    textColor: string;
+    textStyle: 'normal' | 'italic' | 'bold' | 'bold-italic';
   };
   advanced: {
     removeUselessFeatures: boolean;
@@ -229,6 +231,8 @@ export const DEFAULT_CONFIG: AppConfig = {
     targetLanguage: 'en',
     showLanguageTag: true,
     customSkipWords: '',
+    textColor: '#88ff88',
+    textStyle: 'italic',
   },
   advanced: {
     removeUselessFeatures: true,

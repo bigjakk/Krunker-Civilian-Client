@@ -11,7 +11,7 @@ import {
   createKeybindRow, createSimpleKeyRow, createToggleRow, createSelectRow,
   createNumberRow, createCheckboxGrid, createButtonRow, createTextRow,
   createInfoRow, createRowShell, createSelect, makeButton, onSettingChanged,
-  createGroup,
+  createGroup, createColorRow,
 } from './settings-controls';
 import { setClassicSocial, startHidePopups, stopHidePopups } from './menu-tweaks';
 import { initHPCounter, destroyHPCounter } from './competitive';
@@ -749,6 +749,24 @@ export function buildChatSection(body: HTMLElement, gameConf: any, translatorCon
 
   const tlGroup = createGroup(body, 'Translator');
 
+  // Live preview — the .kcc-translation line tracks the --kcc-tl-* vars, so it
+  // restyles in real time (even while dragging inside the color picker).
+  // Built before the rows so their handlers can refresh the tag text.
+  const pvShell = createRowShell('Preview', 'How translations appear in chat', { block: true });
+  const pvBox = document.createElement('div');
+  pvBox.className = 'kcc-tl-preview';
+  const pvChat = document.createElement('div');
+  pvChat.textContent = 'Player_One: bonjour tout le monde';
+  const pvTl = document.createElement('div');
+  pvTl.className = 'kcc-translation';
+  const refreshPreview = (): void => {
+    pvTl.textContent = '\u{1F310} Player_One: hello everyone' + (tl.showLanguageTag ? ' [FR]' : '');
+  };
+  refreshPreview();
+  pvBox.appendChild(pvChat);
+  pvBox.appendChild(pvTl);
+  pvShell.control.appendChild(pvBox);
+
   tlGroup.appendChild(createToggleRow({
     label: 'Chat Translator',
     desc: 'Automatically translate non-English chat messages',
@@ -796,8 +814,40 @@ export function buildChatSection(body: HTMLElement, gameConf: any, translatorCon
       tl.showLanguageTag = v;
       saveTL();
       updateTranslatorConfig({ showLanguageTag: v });
+      refreshPreview();
     },
   }));
+
+  tlGroup.appendChild(createColorRow({
+    label: 'Translation Color',
+    desc: 'Text color of translated messages',
+    value: tl.textColor, defaultValue: DEFAULT_CONFIG.translator.textColor, instant: true,
+    onInput: (v) => updateTranslatorConfig({ textColor: v }),
+    onChange: (v) => {
+      tl.textColor = v;
+      saveTL();
+      updateTranslatorConfig({ textColor: v });
+    },
+  }));
+
+  tlGroup.appendChild(createSelectRow({
+    label: 'Translation Style',
+    desc: 'Font style of translated messages', instant: true,
+    options: [
+      { value: 'normal', label: 'Normal' },
+      { value: 'italic', label: 'Italic' },
+      { value: 'bold', label: 'Bold' },
+      { value: 'bold-italic', label: 'Bold + Italic' },
+    ],
+    value: tl.textStyle,
+    onChange: (v) => {
+      tl.textStyle = v;
+      saveTL();
+      updateTranslatorConfig({ textStyle: v });
+    },
+  }));
+
+  tlGroup.appendChild(pvShell.row);
 
   // Custom skip words — messages made entirely of these (plus built-in skip terms) won't be translated.
   tlGroup.appendChild(createTextRow({
