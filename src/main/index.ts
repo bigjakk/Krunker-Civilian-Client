@@ -131,6 +131,14 @@ if (advancedConfig.angleBackend && !validBackends.includes(advancedConfig.angleB
 
 applyPlatformFlags(platformInfo, advancedConfig, perfConfig);
 
+// ── User agent ──
+// Deliberately not a browser UA. Electron's default reports the true Chromium build, a
+// version real Chrome can't emit, and the captcha rejects it. Claiming to be Chrome instead
+// invites a consistency check our Sec-CH-UA fails, which only survives on well-reputed IPs.
+// Claiming nothing has nothing to contradict. Krunker reads 'Electron' to keep the captcha
+// clearance across refreshes.
+app.userAgentFallback = 'Electron';
+
 // ── App identity (must match electron-builder appId for taskbar pin persistence) ──
 app.setAppUserModelId('com.krunkercivilian.client');
 
@@ -323,10 +331,8 @@ async function launchApp(): Promise<void> {
   // closes its dialog and then calls this; if no window exists when that dialog's
   // 'closed' event fires, the window-all-closed handler would quit the app instead.
 
-  // ── Session: persistent partition + clean user-agent ──
+  // ── Session: persistent partition ──
   const ses = session.fromPartition('persist:krunker');
-  const rawUA = ses.getUserAgent();
-  ses.setUserAgent(rawUA.replace(/\s*krunker-civilian-client\/\S+/i, ''));
 
   // ── Register swapper file protocol on this session ──
   registerSwapperFileProtocol(ses);
