@@ -55,6 +55,16 @@ function renderMarkdown(md: string): string {
     return out.join('\n').replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
 }
 
+const DISCORD_INVITE_URL = 'https://discord.gg/DM8GXnbCbg';
+
+// Older release notes include the Discord line in the body; drop it since the popup now has a fixed footer
+function stripDiscordLine(md: string): string {
+    return md.split('\n')
+        .filter(line => !/^\s*Questions, bugs, or feedback\?/i.test(line))
+        .join('\n')
+        .trimEnd();
+}
+
 function showChangelogPopup(version: string, body: string): void {
     const host = document.createElement('div');
     host.id = 'kcc-changelog-host';
@@ -145,6 +155,15 @@ function showChangelogPopup(version: string, body: string): void {
         .body a:hover { text-decoration: underline; }
         .body strong { color: #fff; font-weight: 600; }
         .body em { color: rgba(255,255,255,0.9); }
+        .footer {
+            flex-shrink: 0;
+            padding: 14px 24px 16px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.6);
+        }
+        .footer a { color: #6ea8fe; text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
     `;
 
     const overlay = document.createElement('div');
@@ -171,10 +190,15 @@ function showChangelogPopup(version: string, body: string): void {
 
     const bodyDiv = document.createElement('div');
     bodyDiv.className = 'body';
-    bodyDiv.innerHTML = renderMarkdown(body);
+    bodyDiv.innerHTML = renderMarkdown(stripDiscordLine(body));
+
+    const footer = document.createElement('div');
+    footer.className = 'footer';
+    footer.innerHTML = `Questions, bugs, or feedback? <a href="${DISCORD_INVITE_URL}" target="_blank">Join the Discord</a>`;
 
     modal.appendChild(header);
     modal.appendChild(bodyDiv);
+    modal.appendChild(footer);
     overlay.appendChild(modal);
     shadow.appendChild(style);
     shadow.appendChild(overlay);
