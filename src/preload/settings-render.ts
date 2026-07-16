@@ -265,6 +265,7 @@ function buildManageSection(body: HTMLElement): void {
   }));
 
   const clientGrid = makeSection('Client');
+  clientGrid.appendChild(makeActionBtn('folder_open', 'Client Folder', () => ipcRenderer.invoke('open-client-folder')));
   clientGrid.appendChild(makeActionBtn('folder', 'Swapper Folder', () => ipcRenderer.invoke('open-swap-folder')));
   clientGrid.appendChild(makeActionBtn('description', 'Electron Logs', () => ipcRenderer.invoke('open-electron-log')));
   clientGrid.appendChild(makeActionBtn('refresh', 'Restart Client', () => ipcRenderer.invoke('restart-client')));

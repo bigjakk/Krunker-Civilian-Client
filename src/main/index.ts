@@ -954,6 +954,7 @@ async function launchApp(): Promise<void> {
   ipcMain.handle('open-electron-log', () => {
     shell.openPath(getLogPath());
   });
+  ipcMain.handle('open-client-folder', () => shell.openPath(app.getPath('userData')));
   ipcMain.handle('reset-swapper', async () => {
     try {
       const entries = await fsp.readdir(swapDir, { withFileTypes: true });
