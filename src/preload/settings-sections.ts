@@ -394,8 +394,9 @@ export function buildPerformanceSection(
     : [
         { value: 'default', label: 'Default' },
         { value: 'gl',     label: 'OpenGL' },
-        { value: 'vulkan', label: 'Vulkan' },
       ];
+  // ANGLE has no Vulkan backend on macOS
+  if (process.platform === 'linux') angleOptions.push({ value: 'vulkan', label: 'Vulkan' });
 
   sysGroup.appendChild(createSelectRow({
     label: 'ANGLE Backend',

@@ -28,9 +28,9 @@ export function detectPlatform(): PlatformInfo {
 
 /** Canonical set of valid `angleBackend` values per platform. The settings UI dropdown must stay in sync. */
 export function getValidAngleBackends(info: PlatformInfo): readonly string[] {
-  return info.isWindows
-    ? ['default', 'gl', 'd3d11', 'd3d11on12']
-    : ['default', 'gl', 'vulkan'];
+  if (info.isWindows) return ['default', 'gl', 'd3d11', 'd3d11on12'];
+  // macOS ANGLE has no Vulkan backend (Metal/GL only)
+  return info.isLinux ? ['default', 'gl', 'vulkan'] : ['default', 'gl'];
 }
 
 export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['advanced'], performance: AppConfig['performance']): void {
