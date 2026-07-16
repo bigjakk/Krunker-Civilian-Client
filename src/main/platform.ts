@@ -7,7 +7,6 @@ export interface PlatformInfo {
   os: Platform;
   isWindows: boolean;
   isLinux: boolean;
-  useNativeTitlebar: boolean;
 }
 
 export function detectPlatform(): PlatformInfo {
@@ -19,7 +18,6 @@ export function detectPlatform(): PlatformInfo {
     os,
     isWindows,
     isLinux,
-    useNativeTitlebar: isLinux,
   };
 }
 
