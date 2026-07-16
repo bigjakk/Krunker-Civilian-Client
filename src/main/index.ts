@@ -183,6 +183,19 @@ const BUNNY_URL_RE = /user-assets\.krunker\.io\/(?:60585\/|(?:61806|61814|61815|
 const EMPTY_RESPONSE_URL = 'data:,';
 let hideBunnies = false;
 
+// ── Turf Wars clan banner blocklist ──
+// EnvRankBanner props (wall/pole banner variants) placed on official maps to
+// show the owning clan. Blocking model.obj drops the whole prop, clan overlay
+// included — same empty-redirect trick as the bunnies.
+const TURF_BANNER_URL_PATTERNS = [
+  '*://user-assets.krunker.io/64295/model.obj*',
+  '*://user-assets.krunker.io/64300/model.obj*',
+  '*://user-assets.krunker.io/64301/model.obj*',
+  '*://user-assets.krunker.io/64303/model.obj*',
+];
+const TURF_BANNER_URL_RE = /user-assets\.krunker\.io\/(?:64295|64300|64301|64303)\/model\.obj/;
+let hideTurfBanners = false;
+
 // ── Escape pointer lock fix ──
 const ESCAPE_POINTERLOCK_FIX_JS = `
 document.addEventListener('keydown', function(e) {
@@ -388,12 +401,15 @@ async function launchApp(): Promise<void> {
   // The broad *://*.krunker.io/* pattern lets the swapper intercept any krunker asset.
   // swapper.getRedirect() returns null before its async scan completes, so swapped
   // resources simply pass through until the scan finishes — no re-registration needed.
-  hideBunnies = config.get('game')?.hideBunnies ?? false;
+  const gameConf = config.get('game');
+  hideBunnies = gameConf?.hideBunnies ?? false;
+  hideTurfBanners = gameConf?.hideTurfBanners ?? false;
   // *://* matches only http/https — wss needs an explicit pattern so the
   // webRequest handler fires on WebSocket upgrades for direct-ping detection.
   const requestFilterUrls = [
     ...BLOCKED_URL_PATTERNS,
     ...BUNNY_URL_PATTERNS,
+    ...TURF_BANNER_URL_PATTERNS,
     '*://*.krunker.io/*',
     'wss://*.krunker.io/*',
   ];
@@ -413,6 +429,10 @@ async function launchApp(): Promise<void> {
     }
     // Bunny NPC block — redirect to empty body (matches Glorp's SetUri(null))
     if (hideBunnies && BUNNY_URL_RE.test(details.url)) {
+      return callback({ redirectURL: EMPTY_RESPONSE_URL });
+    }
+    // Turf Wars clan banner block — same empty-body redirect
+    if (hideTurfBanners && TURF_BANNER_URL_RE.test(details.url)) {
       return callback({ redirectURL: EMPTY_RESPONSE_URL });
     }
     // Check swapper next — redirect matching assets to local files
@@ -778,6 +798,7 @@ async function launchApp(): Promise<void> {
       cachedGameConf = null;
       const newGame = value as any;
       hideBunnies = newGame?.hideBunnies ?? false;
+      hideTurfBanners = newGame?.hideTurfBanners ?? false;
       // Switch tab mode if socialTabBehaviour changed
       if (newGame?.socialTabBehaviour) {
         const newMode: 'same' | 'new' = newGame.socialTabBehaviour === 'Same Window' ? 'same' : 'new';

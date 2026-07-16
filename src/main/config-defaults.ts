@@ -46,6 +46,7 @@ export interface AppConfig {
     showPing: boolean;
     hpEnemyCounter: boolean;
     hideBunnies: boolean;
+    hideTurfBanners: boolean;
     screenshotSave: boolean;
     headshotSound: 'off' | 'kill' | 'hit';
   };
@@ -172,6 +173,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     showPing: true,
     hpEnemyCounter: true,
     hideBunnies: false,
+    hideTurfBanners: false,
     screenshotSave: false,
     headshotSound: 'off',
   },

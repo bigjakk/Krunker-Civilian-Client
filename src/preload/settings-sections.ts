@@ -199,6 +199,13 @@ export function buildGameSection(
   }));
 
   worldGroup.appendChild(createToggleRow({
+    label: 'Hide Turf War Banners',
+    desc: 'Block the clan banner decorations placed on official maps by Turf Wars',
+    checked: game.hideTurfBanners ?? false, refreshOnly: true,
+    onChange: (v) => { game.hideTurfBanners = v; saveGame(); },
+  }));
+
+  worldGroup.appendChild(createToggleRow({
     label: 'Block Death Screen Animation',
     desc: 'Disable the slide-in animation on the death screen',
     checked: ui.deathscreenAnimation, instant: true,
