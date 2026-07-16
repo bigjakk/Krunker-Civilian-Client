@@ -2,14 +2,12 @@ import { app } from 'electron';
 import type { AppConfig } from './config';
 
 export type Platform = 'win32' | 'linux' | 'darwin';
-export type GpuBackend = 'angle' | 'opengl' | 'vulkan' | 'default';
 
 export interface PlatformInfo {
   os: Platform;
   isWindows: boolean;
   isLinux: boolean;
   useNativeTitlebar: boolean;
-  gpuBackend: GpuBackend;
 }
 
 export function detectPlatform(): PlatformInfo {
@@ -22,7 +20,6 @@ export function detectPlatform(): PlatformInfo {
     isWindows,
     isLinux,
     useNativeTitlebar: isLinux,
-    gpuBackend: isWindows ? 'angle' : 'default',
   };
 }
 
