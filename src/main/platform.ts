@@ -1,4 +1,5 @@
 import { app } from 'electron';
+import { join } from 'path';
 import type { AppConfig } from './config';
 
 export type Platform = 'win32' | 'linux' | 'darwin';
@@ -19,6 +20,13 @@ export function detectPlatform(): PlatformInfo {
     isWindows,
     isLinux,
   };
+}
+
+// Explicit window icon for dev; packaged builds use the exe/icns/desktop icon
+// (build/ isn't in the asar). Undefined when packaged.
+export function devWindowIcon(): string | undefined {
+  if (app.isPackaged) return undefined;
+  return join(app.getAppPath(), 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 }
 
 /** Canonical set of valid `angleBackend` values per platform. The settings UI dropdown must stay in sync. */

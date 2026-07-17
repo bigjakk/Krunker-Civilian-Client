@@ -2,6 +2,7 @@ import { BrowserWindow, WebContentsView, View, Menu, clipboard, ipcMain, shell }
 import { TAB_BAR_DATA_URL } from './tab-bar-html';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog } from './logger';
+import { devWindowIcon } from './platform';
 
 const KRUNKER_SOCIAL = 'https://krunker.io/social.html';
 const TAB_BAR_HEIGHT = 40;
@@ -122,6 +123,7 @@ export class TabManager {
             backgroundColor: '#000000',
             autoHideMenuBar: true,
             title: 'KCC - Tabs',
+            icon: devWindowIcon(),
             show: false,
             webPreferences: {
                 nodeIntegration: false,

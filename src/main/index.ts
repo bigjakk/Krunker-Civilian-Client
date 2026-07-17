@@ -5,7 +5,7 @@ import { get as httpsGet } from 'https';
 import { execFile } from 'child_process';
 import * as os from 'os';
 import { Socket } from 'net';
-import { detectPlatform, applyPlatformFlags, getValidAngleBackends } from './platform';
+import { detectPlatform, applyPlatformFlags, getValidAngleBackends, devWindowIcon } from './platform';
 import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount, DEFAULT_CONFIG } from './config';
 import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper } from './swapper';
 import { UserscriptManager } from './userscripts';
@@ -485,6 +485,7 @@ async function launchApp(): Promise<void> {
     y: savedWindow.y,
     frame: true,
     backgroundColor: '#000000',
+    icon: devWindowIcon(),
     webPreferences: {
       preload: join(__dirname, '..', 'preload', 'index.js'),
       session: ses,
