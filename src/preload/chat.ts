@@ -36,16 +36,35 @@ function isChatMessage(node: Node): node is HTMLElement {
     return node.nodeType === 1 && (node as HTMLElement).id?.startsWith('chatMsg_');
 }
 
+// Krunker only displays the active channel's messages (the globe toggle);
+// Better Chat shows both channels at once and labels them instead.
+const MERGE_CSS = '#chatList > * { display: block !important; }';
+let mergeStyle: HTMLStyleElement | null = null;
+
+function syncMergeCss(): void {
+    if (betterChatEnabled && !mergeStyle && document.head) {
+        mergeStyle = document.createElement('style');
+        mergeStyle.id = 'kcc-chatMerge';
+        mergeStyle.textContent = MERGE_CSS;
+        document.head.appendChild(mergeStyle);
+    } else if (!betterChatEnabled && mergeStyle) {
+        mergeStyle.remove();
+        mergeStyle = null;
+    }
+}
+
 function isTeamMode(): boolean {
-    const modeEl = document.getElementById('gameModeLabel') || document.getElementById('subGameMode');
-    if (!modeEl) return false;
-    return TEAM_MODES.has(modeEl.textContent?.trim() || '');
+    try {
+        return TEAM_MODES.has((window as any).getGameActivity?.()?.mode ?? '');
+    } catch { /* game API unavailable */ }
+    return false;
 }
 
 function handleMutations(mutations: MutationRecord[]): void {
-    // Whether this batch re-inserted history above the viewport (which changes
-    // scrollHeight after Krunker's own scroll-to-bottom already ran).
-    let reInserted = false;
+    // Whether this batch changed scrollHeight after Krunker's own
+    // scroll-to-bottom already ran (history re-inserted above the viewport,
+    // or a [T]/[M] tag re-wrapping a line) — the follow pin must be redone.
+    let needsRePin = false;
 
     // ── Chat history: re-insert removed messages ──
     if (historyMax > 0 && chatList && observer) {
@@ -57,7 +76,7 @@ function handleMutations(mutations: MutationRecord[]): void {
             }
         }
         if (removed.length > 0) {
-            reInserted = true;
+            needsRePin = true;
             reInsertGuard = true;
             observer.disconnect();
             const firstLive = chatList.firstChild;
@@ -95,9 +114,11 @@ function handleMutations(mutations: MutationRecord[]): void {
                     continue;
                 }
 
-                // Only tag in team modes with proper chat messages
+                // Only tag in team modes with proper chat messages. The
+                // sender name sits outside .chatMsg, so match the LRM-wrapped
+                // "name:" on the whole .chatItem.
                 if (!teamMode) continue;
-                if (!chatMsg.innerHTML.includes('\u202E:')) continue;
+                if (!node.querySelector('.chatItem')?.textContent?.includes('\u200E:')) continue;
                 if (!node.dataset.tab) continue;
 
                 const isTeam = node.dataset.tab === '1';
@@ -106,6 +127,7 @@ function handleMutations(mutations: MutationRecord[]): void {
                 tag.style.color = isTeam ? '#00FF00' : '#FF0000';
                 tag.textContent = isTeam ? '[T]' : '[M]';
                 chatMsg.insertBefore(tag, chatMsg.firstChild);
+                needsRePin = true;
             }
         }
     }
@@ -114,13 +136,13 @@ function handleMutations(mutations: MutationRecord[]): void {
     // the user has scrolled up, undo that and hold their position. When
     // following, Krunker's own scroll already landed at the bottom — repeating
     // it here cost a forced-layout scrollHeight read per message; only re-pin
-    // when history re-insertion changed scrollHeight after Krunker's scroll.
+    // when this handler changed scrollHeight after Krunker's scroll.
     // (This runs before the resulting scroll event, so the restored position
     // is what updatePauseState sees.)
     if (chatList) {
         if (scrollPaused) {
             chatList.scrollTop = savedScrollTop;
-        } else if (reInserted) {
+        } else if (needsRePin) {
             chatList.scrollTop = chatList.scrollHeight;
         }
     }
@@ -168,9 +190,23 @@ function resumeChatScroll(): void {
     pinToBottom();
 }
 
+// Krunker's old chat switched the send channel with Tab; the new UI only has
+// the globe button. Restore the shortcut by driving Krunker's own switcher.
+// Document-level capture so it survives Krunker re-mounting the input.
+function handleChatTab(e: KeyboardEvent): void {
+    if (!betterChatEnabled || e.key !== 'Tab' || e.repeat) return;
+    if ((e.target as HTMLElement | null)?.id !== 'chatInput') return;
+    e.preventDefault();
+    try {
+        (window as any).switchChat?.(document.getElementById('chatSwitch'));
+    } catch { /* game API unavailable */ }
+}
+
 function tryAttach(): boolean {
     chatList = document.getElementById('chatList');
     if (!chatList) return false;
+
+    document.addEventListener('keydown', handleChatTab, true);
 
     observer = new MutationObserver(handleMutations);
     observer.observe(chatList, { childList: true });
@@ -190,6 +226,7 @@ function tryAttach(): boolean {
         if (document.pointerLockElement) resumeChatScroll();
     });
 
+    syncMergeCss();
     _con?.log('[KCC-Chat] Observer attached to #chatList');
     return true;
 }
@@ -286,6 +323,7 @@ export function initChat(options: { betterChat: boolean; chatHistorySize: number
 
 export function setBetterChat(enabled: boolean): void {
     betterChatEnabled = enabled;
+    syncMergeCss();
 }
 
 export function setChatHistorySize(size: number): void {
