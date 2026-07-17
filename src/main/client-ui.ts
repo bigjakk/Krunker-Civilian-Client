@@ -79,8 +79,8 @@ ${THEME_CSS}
   border-bottom: 1px solid var(--kcc-border-default);
 }
 .kcc-header-mark {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   flex: none;
   display: flex;
   align-items: center;
