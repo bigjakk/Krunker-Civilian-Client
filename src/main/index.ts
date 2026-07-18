@@ -14,7 +14,7 @@ import { electronLog, getLogPath, closeLogStreams } from './logger';
 import { checkForUpdate, downloadUpdate, installUpdate, checkForUpdateNotice, RELEASES_URL } from './updater';
 import { showUpdateWindow, showUpdatePrompt, showUpdateAvailableNotice } from './update-window';
 import { DiscordRPC } from './discord-rpc';
-import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS } from './css-themes';
+import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS, GAME_THEMES_DIR, SOCIAL_THEMES_DIR } from './css-themes';
 import { TabManager } from './tab-manager';
 import { openRankedQueue, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
 import { takeScreenshot, openScreenshotsFolder } from './screenshot';
@@ -382,8 +382,8 @@ async function launchApp(): Promise<void> {
   // ── Resource swapper ──
   const swapperConfig = config.get('swapper');
   const swapDir = swapperConfig.path || join(app.getPath('userData'), 'Krunker Civilian Client', 'swapper');
-  // Ensure swap subdirectories exist (themes/, backgrounds/)
-  for (const sub of ['themes', 'backgrounds']) {
+  // Ensure swap subdirectories exist (themes/, backgrounds/, socialthemes/)
+  for (const sub of [GAME_THEMES_DIR, 'backgrounds', SOCIAL_THEMES_DIR]) {
     const dir = join(swapDir, sub);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
@@ -639,6 +639,9 @@ async function launchApp(): Promise<void> {
   const preloadPath = join(__dirname, '..', 'preload', 'index.js');
   let tabMode: 'same' | 'new' = getGameConf().socialTabBehaviour === 'Same Window' ? 'same' : 'new';
   let sessionTabs: string[] = [];
+  // Tracked separately from config because set-config defers the actual write
+  let socialTheme = config.get('ui')?.socialCssTheme || 'disabled';
+  const socialThemeCSS = () => getThemeCSS(socialTheme, swapDir, SOCIAL_THEMES_DIR);
   let tabManager = new TabManager(
     win, ses, preloadPath, tabMode, isGameURL,
     () => config.get('tabWindow'),
@@ -646,6 +649,7 @@ async function launchApp(): Promise<void> {
     () => sessionTabs,
     (urls) => { sessionTabs = urls; },
     () => config.get('game.rememberTabs') ?? false,
+    socialThemeCSS,
   );
 
   // Intercept in-page navigation (e.g. window.location = '/social.html')
@@ -813,8 +817,17 @@ async function launchApp(): Promise<void> {
             () => sessionTabs,
             (urls) => { sessionTabs = urls; },
             () => config.get('game.rememberTabs') ?? false,
+            socialThemeCSS,
           );
         }
+      }
+    }
+    if (key === 'ui') {
+      // Social CSS theme swaps live on open tabs
+      const next = (value as any)?.socialCssTheme || 'disabled';
+      if (next !== socialTheme) {
+        socialTheme = next;
+        tabManager.refreshSocialTheme();
       }
     }
     pendingConfigWrites.set(key, value);
@@ -839,7 +852,8 @@ async function launchApp(): Promise<void> {
   });
   ipcMain.handle('get-swap-dir', () => swapDir);
   ipcMain.handle('open-swap-folder', () => shell.openPath(swapDir));
-  ipcMain.handle('open-themes-folder', () => shell.openPath(join(swapDir, 'themes')));
+  ipcMain.handle('open-themes-folder', () => shell.openPath(join(swapDir, GAME_THEMES_DIR)));
+  ipcMain.handle('open-social-themes-folder', () => shell.openPath(join(swapDir, SOCIAL_THEMES_DIR)));
   ipcMain.handle('open-backgrounds-folder', () => shell.openPath(join(swapDir, 'backgrounds')));
   ipcMain.handle('open-screenshots-folder', () => openScreenshotsFolder());
 
@@ -924,6 +938,7 @@ async function launchApp(): Promise<void> {
 
   // ── CSS theme & loading background IPC handlers ──
   ipcMain.handle('list-themes', () => listThemes(swapDir));
+  ipcMain.handle('list-social-themes', () => listThemes(swapDir, SOCIAL_THEMES_DIR));
   ipcMain.handle('get-theme-css', (_e, themeId: string) => getThemeCSS(themeId, swapDir));
   ipcMain.handle('list-loading-themes', () => listLoadingThemes(swapDir));
   ipcMain.handle('get-loading-screen-css', (_e, loadingTheme: string, backgroundUrl: string) => {

@@ -499,6 +499,30 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
     onSettingChanged('refresh');
   });
 
+  // ── Social CSS Theme selector (populated from swap/socialthemes/) ──
+  const socialThemeRowR = createRowShell('Social CSS Theme', 'Load a custom CSS theme for social/hub tabs from swap/socialthemes/');
+  const socialThemeSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
+  socialThemeRowR.control.appendChild(socialThemeSelect);
+  socialThemeRowR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Social Themes Folder', onClick: () => ipcRenderer.invoke('open-social-themes-folder') }));
+  themeGroup.appendChild(socialThemeRowR.row);
+
+  ipcRenderer.invoke('list-social-themes').then((themes: Array<{ id: string; label: string }>) => {
+    socialThemeSelect.innerHTML = '';
+    for (const t of themes) {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.label;
+      if (t.id === ui.socialCssTheme) opt.selected = true;
+      socialThemeSelect.appendChild(opt);
+    }
+  });
+
+  // Applies live to open tabs — no refresh needed
+  socialThemeSelect.addEventListener('change', () => {
+    ui.socialCssTheme = socialThemeSelect.value;
+    saveUI();
+  });
+
   const loadingGroup = createGroup(body, 'Loading Screen');
 
   // ── Loading Screen Background ──

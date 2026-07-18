@@ -21,6 +21,7 @@ Was AI used in the creation of this client? Yes, if you came across this client 
 - hides ads by default
 - resource swapper (textures, sounds, models)
 - CSS theme system with `@import` support (drop `.css` files in `swap/themes/`)
+- separate CSS themes for social/hub tabs (`swap/socialthemes/`)
 - custom loading screen backgrounds (`swap/backgrounds/`)
 - customizable matchmaker with lobby scan animation
   - filter by region, gamemode, map, player count, remaining time

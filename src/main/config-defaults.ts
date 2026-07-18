@@ -99,6 +99,7 @@ export interface AppConfig {
     directServerPing: boolean;
     classicSocial: boolean;
     cssTheme: string;
+    socialCssTheme: string;
     loadingTheme: string;
     backgroundUrl: string;
     showChangelog: boolean;
@@ -216,6 +217,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     directServerPing: false,
     classicSocial: false,
     cssTheme: 'disabled',
+    socialCssTheme: 'disabled',
     loadingTheme: 'disabled',
     backgroundUrl: '',
     showChangelog: true,
