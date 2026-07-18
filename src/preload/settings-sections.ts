@@ -34,7 +34,7 @@ export interface SettingsBag {
 export function buildGeneralSection(
   body: HTMLElement, gameConf: any, uiConfRaw: any, bag: SettingsBag,
 ): void {
-  const game = { ...DEFAULT_CONFIG.game, ...gameConf };
+  const game = gameConf;
 
   const tabsGroup = createGroup(body, 'Tabs & Social');
 
@@ -132,7 +132,7 @@ export function buildGeneralSection(
 export function buildGameSection(
   body: HTMLElement, gameConf: any, uiConfRaw: any, bag: SettingsBag,
 ): void {
-  const game = { ...DEFAULT_CONFIG.game, ...gameConf };
+  const game = gameConf;
   const ui = uiConfRaw;
 
   function saveGame(): void {
@@ -751,7 +751,7 @@ export function buildDiscordSection(body: HTMLElement, discordConf: any): void {
 }
 
 export function buildChatSection(body: HTMLElement, gameConf: any, translatorConf: any): void {
-  const game = { ...DEFAULT_CONFIG.game, ...gameConf };
+  const game = gameConf;
 
   function saveGame(): void {
     ipcRenderer.invoke('set-config', 'game', game);
