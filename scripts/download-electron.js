@@ -1,17 +1,19 @@
 'use strict';
 
 /**
- * Downloads patched Electron 43.0.0 builds for Windows and Linux.
+ * Downloads patched Electron 43.0.0 builds for Windows, Linux, and macOS.
  *
  * The patched Electron fixes input starvation ("aim freeze") when --disable-frame-rate-limit
  * is active on modern Chromium. Without this, uncapped FPS causes 50-300ms input delays.
  * This build also bundles thegu5's frame-pacing patch so pending-frame limits are still
- * enforced under --disable-frame-rate-limit.
+ * enforced under --disable-frame-rate-limit. The macOS (arm64) build additionally carries a
+ * null-guard for the Chromium mac present-path crash (external_begin_frame_source() null deref).
  *
  * Platform behavior:
  *   Windows:        patched Win   → dist/       (replaces stock)
  *   Linux (local):  patched Linux → dist/       (replaces stock), Win → dist-win/
  *   CI (Linux):     Win → dist-win/, Linux → dist-linux/  (stock stays in dist/)
+ *   macOS:          patched Mac   → dist/       (replaces stock, arm64)
  *
  * Usage:
  *   node scripts/download-electron.js            # download if needed
@@ -32,9 +34,11 @@ const RELEASE_TAG = 'v43.0.0';
 const PLATFORMS = {
     win32: { asset: 'electron-v43.0.0-ws-frameThrottle-patched-windows-x64.zip' },
     linux: { asset: 'electron-v43.0.0-ws-frameThrottle-patched-linux-x64.zip' },
+    darwin: { asset: 'electron-v43.0.0-ws-frameThrottle-patched-mac-arm64.zip' },
 };
 
 const IS_WIN = process.platform === 'win32';
+const IS_MAC = process.platform === 'darwin';
 const IS_CI = !!process.env.CI;
 const ELECTRON_BASE = path.resolve(__dirname, '..', 'node_modules', 'electron');
 
@@ -157,7 +161,10 @@ async function installTo(distDir, platform) {
 // ── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
-    if (IS_WIN) {
+    if (IS_MAC) {
+        // macOS local dev: patched Mac → dist/ (replaces stock)
+        await installTo(path.join(ELECTRON_BASE, 'dist'), PLATFORMS.darwin);
+    } else if (IS_WIN) {
         // Windows local dev: patched Win → dist/ (replaces stock)
         await installTo(path.join(ELECTRON_BASE, 'dist'), PLATFORMS.win32);
     } else if (IS_CI) {
@@ -174,7 +181,10 @@ async function main() {
 
     // Write path.txt so the electron package's lazy downloader (index.js)
     // considers the binary already installed and doesn't re-download stock.
-    const platformExe = IS_WIN ? 'electron.exe' : 'electron';
+    let platformExe;
+    if (IS_WIN) platformExe = 'electron.exe';
+    else if (IS_MAC) platformExe = 'Electron.app/Contents/MacOS/Electron';
+    else platformExe = 'electron';
     fs.writeFileSync(path.join(ELECTRON_BASE, 'path.txt'), platformExe);
 }
 
@@ -192,5 +202,6 @@ main().then(() => {
     console.error('');
     console.error(`  Win asset:   ${PLATFORMS.win32.asset}`);
     console.error(`  Linux asset: ${PLATFORMS.linux.asset}`);
+    console.error(`  macOS asset: ${PLATFORMS.darwin.asset}`);
     process.exit(1);
 });

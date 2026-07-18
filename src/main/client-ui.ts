@@ -79,8 +79,8 @@ ${THEME_CSS}
   border-bottom: 1px solid var(--kcc-border-default);
 }
 .kcc-header-mark {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   flex: none;
   display: flex;
   align-items: center;
@@ -289,6 +289,22 @@ ${THEME_CSS}
 .kcc-select:focus, .kcc-input:focus { border-color: var(--kcc-border-focus); }
 .kcc-select option { background: var(--kcc-surface-raised); color: var(--kcc-text-primary); }
 .kcc-input::placeholder { color: var(--kcc-text-faint); }
+
+/* -- Color input -- */
+.kcc-color {
+  width: 46px;
+  height: 30px;
+  padding: 2px;
+  background: var(--kcc-surface-input);
+  border: 1px solid var(--kcc-border-default);
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.kcc-color:hover { border-color: var(--kcc-border-medium); }
+.kcc-color::-webkit-color-swatch-wrapper { padding: 0; }
+.kcc-color::-webkit-color-swatch { border: none; border-radius: 4px; }
 
 /* -- Number (range + value) -- */
 .kcc-num { display: flex; align-items: center; gap: 12px; }
@@ -857,12 +873,28 @@ export const MATCHMAKER_SETTINGS_CSS = `
 `;
 
 export const TRANSLATOR_CSS = `
+/* !important so Krunker's settings text rules can't override the preview copy */
 .kcc-translation {
-  color: #88ff88;
-  font-style: italic;
+  color: var(--kcc-tl-color, #88ff88) !important;
+  font-style: var(--kcc-tl-font-style, italic) !important;
+  font-weight: var(--kcc-tl-font-weight, normal) !important;
+  -webkit-text-stroke-width: var(--kcc-tl-stroke, 0) !important;
   margin-left: 8px;
   margin-top: 2px;
   overflow-wrap: anywhere;
+}
+
+/* settings-panel preview box (mock chat lines; the .kcc-translation inside
+   tracks the same --kcc-tl-* vars as real chat) */
+.kcc-tl-preview {
+  flex: 1;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--kcc-border-subtle);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #fff;
 }
 `;
 

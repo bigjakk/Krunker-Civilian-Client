@@ -1,6 +1,6 @@
 {
   "name": "krunker-civilian-client",
-  "version": "0.9.3",
+  "version": "1.0.0",
   "description": "Cross-platform Krunker game client",
   "main": "dist/main/index.js",
   "homepage": "https://github.com/bigjakk/Krunker-Civilian-Client",
@@ -16,6 +16,7 @@
     "download-electron": "node scripts/download-electron.js",
     "dist:win": "npm run build && electron-builder --win",
     "dist:linux": "npm run build && electron-builder --linux",
+    "dist:mac": "sh scripts/dist-mac.sh",
     "dist:all": "npm run build && electron-builder --win --linux",
     "clean": "rimraf dist out",
     "lint": "eslint src/",

@@ -15,9 +15,12 @@ export interface LoadingThemeEntry {
     label: string;
 }
 
-export function listThemes(swapDir: string): ThemeEntry[] {
+export const GAME_THEMES_DIR = 'themes';
+export const SOCIAL_THEMES_DIR = 'socialthemes';
+
+export function listThemes(swapDir: string, subdir: string = GAME_THEMES_DIR): ThemeEntry[] {
     const entries: ThemeEntry[] = [{ id: 'disabled', label: 'Disabled' }];
-    const themesDir = join(swapDir, 'themes');
+    const themesDir = join(swapDir, subdir);
     try {
         const files = readdirSync(themesDir);
         for (const file of files) {
@@ -29,14 +32,14 @@ export function listThemes(swapDir: string): ThemeEntry[] {
     return entries;
 }
 
-export function getThemeCSS(themeId: string, swapDir: string): string {
+export function getThemeCSS(themeId: string, swapDir: string, subdir: string = GAME_THEMES_DIR): string {
     if (themeId === 'disabled' || !themeId) return '';
     const prefix = 'user:';
     if (!themeId.startsWith(prefix)) return '';
     const filename = basename(themeId.slice(prefix.length));
     if (!filename) return '';
     try {
-        return readFileSync(join(swapDir, 'themes', filename), 'utf-8');
+        return readFileSync(join(swapDir, subdir, filename), 'utf-8');
     } catch (err) { electronLog.warn('[KCC] Failed to read theme ' + filename + ':', err); return ''; }
 }
 

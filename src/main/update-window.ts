@@ -43,6 +43,16 @@ const SHARED_CSS = `
     border-radius: 3px;
     transition: width 0.3s ease;
   }
+  /* Indeterminate sweep for steps with no measurable progress (verify, install). */
+  .progress-container.indeterminate .progress-bar {
+    width: 40%;
+    transition: none;
+    animation: kcc-indet 1.15s ease-in-out infinite;
+  }
+  @keyframes kcc-indet {
+    0%   { transform: translateX(-110%); }
+    100% { transform: translateX(260%); }
+  }
   .buttons {
     display: flex;
     gap: 8px;
@@ -204,13 +214,20 @@ export function showUpdateWindow(): { window: BrowserWindow; sendProgress: (mess
   win.removeMenu();
   win.loadURL(PROGRESS_DATA_URL);
 
+  // percent >= 0 → determinate width; percent < 0 or omitted → indeterminate sweep
+  // (for the verify/install steps, which have no measurable progress).
   function sendProgress(message: string, percent?: number): void {
     if (!win.isDestroyed()) {
+      const pct = typeof percent === 'number' ? percent : -1;
       win.webContents.executeJavaScript(`(() => {
         const s = document.getElementById('status');
+        const c = document.querySelector('.progress-container');
         const p = document.getElementById('progressBar');
         if (s) s.textContent = ${JSON.stringify(message)};
-        if (p && typeof ${JSON.stringify(percent)} === 'number') p.style.width = ${JSON.stringify(percent)} + '%';
+        if (c && p) {
+          if (${pct} >= 0) { c.classList.remove('indeterminate'); p.style.width = ${pct} + '%'; }
+          else { c.classList.add('indeterminate'); }
+        }
       })()`).catch(() => {});
     }
   }

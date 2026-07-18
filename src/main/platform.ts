@@ -1,15 +1,13 @@
 import { app } from 'electron';
+import { join } from 'path';
 import type { AppConfig } from './config';
 
 export type Platform = 'win32' | 'linux' | 'darwin';
-export type GpuBackend = 'angle' | 'opengl' | 'vulkan' | 'default';
 
 export interface PlatformInfo {
   os: Platform;
   isWindows: boolean;
   isLinux: boolean;
-  useNativeTitlebar: boolean;
-  gpuBackend: GpuBackend;
 }
 
 export function detectPlatform(): PlatformInfo {
@@ -21,16 +19,21 @@ export function detectPlatform(): PlatformInfo {
     os,
     isWindows,
     isLinux,
-    useNativeTitlebar: isLinux,
-    gpuBackend: isWindows ? 'angle' : 'default',
   };
+}
+
+// Explicit window icon for dev; packaged builds use the exe/icns/desktop icon
+// (build/ isn't in the asar). Undefined when packaged.
+export function devWindowIcon(): string | undefined {
+  if (app.isPackaged) return undefined;
+  return join(app.getAppPath(), 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 }
 
 /** Canonical set of valid `angleBackend` values per platform. The settings UI dropdown must stay in sync. */
 export function getValidAngleBackends(info: PlatformInfo): readonly string[] {
-  return info.isWindows
-    ? ['default', 'gl', 'd3d11', 'd3d11on12']
-    : ['default', 'gl', 'vulkan'];
+  if (info.isWindows) return ['default', 'gl', 'd3d11', 'd3d11on12'];
+  // macOS ANGLE has no Vulkan backend (Metal/GL only)
+  return info.isLinux ? ['default', 'gl', 'vulkan'] : ['default', 'gl'];
 }
 
 export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['advanced'], performance: AppConfig['performance']): void {
@@ -50,6 +53,16 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('disable-frame-rate-limit');
     app.commandLine.appendSwitch('disable-gpu-vsync');
     app.commandLine.appendSwitch('max-gum-fps', '9999');
+    // macOS: VSyncAlignedPresentationForScrolling (default-on since M140) holds
+    // CA commits for the next CVDisplayLink tick during scroll interactions or
+    // while a previous swap is still queued. Swap acks only fire on commit, and
+    // the frame-pacing patch paces draws by acks, so a single 2-deep queue
+    // moment (settings-menu scroll, cmd-tab stall) latches the game to exactly
+    // vsync until rendering pauses — the "reverts to vsync until refresh" bug.
+    // The second name covers pre-M148 Chromium; unknown names are ignored.
+    if (info.os === 'darwin') {
+      disableFeatures('VSyncAlignedPresentationForScrolling', 'VSyncAlignedPresent');
+    }
     // Opt-in deeper compositor frame queue (depth 2 vs the patched default of 1).
     // Read by the custom Electron's CustomMaxPendingFrames feature param. Off → not
     // emitted → the binary keeps its compiled default of 1. Trades input latency on
@@ -119,7 +132,12 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
   // deferral, and no proxy resolution (breaks proxied setups).
   if (advanced.perfTweaks) {
     app.commandLine.appendSwitch('enable-gpu-rasterization');
-    app.commandLine.appendSwitch('disable-gpu-driver-bug-workarounds');
+    // Keep Chromium's driver-bug workarounds ON for mac: disabling them makes
+    // Krunker's draws fail command-buffer validation on ANGLE Metal
+    // (GL_INVALID_OPERATION "Vertex buffer is not big enough" spam; confirmed
+    // 2026-07-08 — errors vanish with workarounds active, Crankshaft never
+    // disables them). Windows/Linux keep the switch.
+    if (info.os !== 'darwin') app.commandLine.appendSwitch('disable-gpu-driver-bug-workarounds');
     app.commandLine.appendSwitch('disable-software-rasterizer');
     app.commandLine.appendSwitch('force-high-performance-gpu');
     app.commandLine.appendSwitch('raise-timer-frequency');

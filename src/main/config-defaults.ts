@@ -46,6 +46,7 @@ export interface AppConfig {
     showPing: boolean;
     hpEnemyCounter: boolean;
     hideBunnies: boolean;
+    hideTurfBanners: boolean;
     screenshotSave: boolean;
     headshotSound: 'off' | 'kill' | 'hit';
   };
@@ -98,6 +99,7 @@ export interface AppConfig {
     directServerPing: boolean;
     classicSocial: boolean;
     cssTheme: string;
+    socialCssTheme: string;
     loadingTheme: string;
     backgroundUrl: string;
     showChangelog: boolean;
@@ -115,6 +117,8 @@ export interface AppConfig {
     targetLanguage: string;
     showLanguageTag: boolean;
     customSkipWords: string;
+    textColor: string;
+    textStyle: 'normal' | 'italic' | 'bold' | 'bold-italic';
   };
   advanced: {
     removeUselessFeatures: boolean;
@@ -170,6 +174,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     showPing: true,
     hpEnemyCounter: true,
     hideBunnies: false,
+    hideTurfBanners: false,
     screenshotSave: false,
     headshotSound: 'off',
   },
@@ -212,6 +217,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     directServerPing: false,
     classicSocial: false,
     cssTheme: 'disabled',
+    socialCssTheme: 'disabled',
     loadingTheme: 'disabled',
     backgroundUrl: '',
     showChangelog: true,
@@ -225,10 +231,12 @@ export const DEFAULT_CONFIG: AppConfig = {
     showStatus: true,
   },
   translator: {
-    enabled: true,
+    enabled: false,
     targetLanguage: 'en',
     showLanguageTag: true,
     customSkipWords: '',
+    textColor: '#88ff88',
+    textStyle: 'italic',
   },
   advanced: {
     removeUselessFeatures: true,

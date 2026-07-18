@@ -1,3 +1,4 @@
+import { DEFAULT_CONFIG } from '../main/config-defaults';
 import type { SavedConsole } from './utils';
 
 // ── Config ──
@@ -7,14 +8,11 @@ interface TranslatorConfig {
   targetLanguage: string;
   showLanguageTag: boolean;
   customSkipWords: string;
+  textColor: string;
+  textStyle: string;
 }
 
-const DEFAULTS: TranslatorConfig = {
-  enabled: true,
-  targetLanguage: 'en',
-  showLanguageTag: true,
-  customSkipWords: '',
-};
+const DEFAULTS: TranslatorConfig = DEFAULT_CONFIG.translator;
 
 // ── Module state ──
 
@@ -340,6 +338,19 @@ async function translateText(text: string): Promise<{ translation: string; srcLa
 
 // ── DOM manipulation ──
 
+// Feeds the --kcc-tl-* variables consumed by .kcc-translation (TRANSLATOR_CSS),
+// so changes restyle already-rendered translations too.
+function applyTextStyle(): void {
+  const s = document.documentElement.style;
+  const bold = cfg.textStyle.includes('bold');
+  s.setProperty('--kcc-tl-color', cfg.textColor);
+  s.setProperty('--kcc-tl-font-style', cfg.textStyle.includes('italic') ? 'italic' : 'normal');
+  s.setProperty('--kcc-tl-font-weight', bold ? 'bold' : 'normal');
+  // Krunker's GameFont has a single face, so font-weight alone renders identically;
+  // a text stroke provides the visible emboldening.
+  s.setProperty('--kcc-tl-stroke', bold ? '0.5px' : '0');
+}
+
 function appendTranslation(chatNode: HTMLElement, username: string, translation: string, srcLang: string): void {
   const div = document.createElement('div');
   div.className = 'kcc-translation';
@@ -425,8 +436,12 @@ export function initTranslator(savedConsole: SavedConsole, initCfg: TranslatorCo
     targetLanguage: initCfg.targetLanguage ?? DEFAULTS.targetLanguage,
     showLanguageTag: initCfg.showLanguageTag ?? DEFAULTS.showLanguageTag,
     customSkipWords: initCfg.customSkipWords ?? DEFAULTS.customSkipWords,
+    textColor: initCfg.textColor ?? DEFAULTS.textColor,
+    textStyle: initCfg.textStyle ?? DEFAULTS.textStyle,
   };
   customSkipWords = parseCustomSkipWords(cfg.customSkipWords);
+  // Apply even when disabled so a saved color is in place if enabled later
+  applyTextStyle();
 
   if (!cfg.enabled) {
     _con.log('[KCC-TL] Translator disabled');
@@ -448,5 +463,10 @@ export function updateTranslatorConfig(update: Partial<TranslatorConfig>): void 
   if (update.customSkipWords !== undefined) {
     cfg.customSkipWords = update.customSkipWords;
     customSkipWords = parseCustomSkipWords(update.customSkipWords);
+  }
+  if (update.textColor !== undefined || update.textStyle !== undefined) {
+    if (update.textColor !== undefined) cfg.textColor = update.textColor;
+    if (update.textStyle !== undefined) cfg.textStyle = update.textStyle;
+    applyTextStyle();
   }
 }

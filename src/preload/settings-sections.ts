@@ -11,7 +11,7 @@ import {
   createKeybindRow, createSimpleKeyRow, createToggleRow, createSelectRow,
   createNumberRow, createCheckboxGrid, createButtonRow, createTextRow,
   createInfoRow, createRowShell, createSelect, makeButton, onSettingChanged,
-  createGroup,
+  createGroup, createColorRow,
 } from './settings-controls';
 import { setClassicSocial, startHidePopups, stopHidePopups } from './menu-tweaks';
 import { initHPCounter, destroyHPCounter } from './competitive';
@@ -34,7 +34,7 @@ export interface SettingsBag {
 export function buildGeneralSection(
   body: HTMLElement, gameConf: any, uiConfRaw: any, bag: SettingsBag,
 ): void {
-  const game = { ...DEFAULT_CONFIG.game, ...gameConf };
+  const game = gameConf;
 
   const tabsGroup = createGroup(body, 'Tabs & Social');
 
@@ -53,7 +53,7 @@ export function buildGeneralSection(
     onChange: (v) => { game.rememberTabs = v; ipcRenderer.invoke('set-config', 'game', game); },
   }));
 
-  const ui = { ...DEFAULT_CONFIG.ui, ...uiConfRaw };
+  const ui = uiConfRaw;
 
   function saveUI(): void {
     ipcRenderer.invoke('set-config', 'ui', ui);
@@ -132,8 +132,8 @@ export function buildGeneralSection(
 export function buildGameSection(
   body: HTMLElement, gameConf: any, uiConfRaw: any, bag: SettingsBag,
 ): void {
-  const game = { ...DEFAULT_CONFIG.game, ...gameConf };
-  const ui = { ...DEFAULT_CONFIG.ui, ...uiConfRaw };
+  const game = gameConf;
+  const ui = uiConfRaw;
 
   function saveGame(): void {
     ipcRenderer.invoke('set-config', 'game', game);
@@ -196,6 +196,13 @@ export function buildGameSection(
     desc: 'Block the bunny NPC models that spawn in public matches',
     checked: game.hideBunnies ?? false, refreshOnly: true,
     onChange: (v) => { game.hideBunnies = v; saveGame(); },
+  }));
+
+  worldGroup.appendChild(createToggleRow({
+    label: 'Hide Turf War Banners',
+    desc: 'Block the clan banner decorations placed on official maps by Turf Wars',
+    checked: game.hideTurfBanners ?? false, refreshOnly: true,
+    onChange: (v) => { game.hideTurfBanners = v; saveGame(); },
   }));
 
   worldGroup.appendChild(createToggleRow({
@@ -394,8 +401,9 @@ export function buildPerformanceSection(
     : [
         { value: 'default', label: 'Default' },
         { value: 'gl',     label: 'OpenGL' },
-        { value: 'vulkan', label: 'Vulkan' },
       ];
+  // ANGLE has no Vulkan backend on macOS
+  if (process.platform === 'linux') angleOptions.push({ value: 'vulkan', label: 'Vulkan' });
 
   sysGroup.appendChild(createSelectRow({
     label: 'ANGLE Backend',
@@ -459,7 +467,7 @@ export function buildSwapperSection(body: HTMLElement, swapperConf: any): void {
 }
 
 export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void {
-  const ui = { ...DEFAULT_CONFIG.ui, ...uiConfRaw };
+  const ui = uiConfRaw;
 
   function saveUI(): void {
     ipcRenderer.invoke('set-config', 'ui', ui);
@@ -489,6 +497,30 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
     ui.cssTheme = themeSelect.value;
     saveUI();
     onSettingChanged('refresh');
+  });
+
+  // ── Social CSS Theme selector (populated from swap/socialthemes/) ──
+  const socialThemeRowR = createRowShell('Social CSS Theme', 'Load a custom CSS theme for social/hub tabs from swap/socialthemes/');
+  const socialThemeSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
+  socialThemeRowR.control.appendChild(socialThemeSelect);
+  socialThemeRowR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Social Themes Folder', onClick: () => ipcRenderer.invoke('open-social-themes-folder') }));
+  themeGroup.appendChild(socialThemeRowR.row);
+
+  ipcRenderer.invoke('list-social-themes').then((themes: Array<{ id: string; label: string }>) => {
+    socialThemeSelect.innerHTML = '';
+    for (const t of themes) {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.label;
+      if (t.id === ui.socialCssTheme) opt.selected = true;
+      socialThemeSelect.appendChild(opt);
+    }
+  });
+
+  // Applies live to open tabs — no refresh needed
+  socialThemeSelect.addEventListener('change', () => {
+    ui.socialCssTheme = socialThemeSelect.value;
+    saveUI();
   });
 
   const loadingGroup = createGroup(body, 'Loading Screen');
@@ -719,7 +751,7 @@ export function buildDiscordSection(body: HTMLElement, discordConf: any): void {
 }
 
 export function buildChatSection(body: HTMLElement, gameConf: any, translatorConf: any): void {
-  const game = { ...DEFAULT_CONFIG.game, ...gameConf };
+  const game = gameConf;
 
   function saveGame(): void {
     ipcRenderer.invoke('set-config', 'game', game);
@@ -748,6 +780,24 @@ export function buildChatSection(body: HTMLElement, gameConf: any, translatorCon
   }
 
   const tlGroup = createGroup(body, 'Translator');
+
+  // Live preview — the .kcc-translation line tracks the --kcc-tl-* vars, so it
+  // restyles in real time (even while dragging inside the color picker).
+  // Built before the rows so their handlers can refresh the tag text.
+  const pvShell = createRowShell('Preview', 'How translations appear in chat', { block: true });
+  const pvBox = document.createElement('div');
+  pvBox.className = 'kcc-tl-preview';
+  const pvChat = document.createElement('div');
+  pvChat.textContent = 'Player_One: bonjour tout le monde';
+  const pvTl = document.createElement('div');
+  pvTl.className = 'kcc-translation';
+  const refreshPreview = (): void => {
+    pvTl.textContent = '\u{1F310} Player_One: hello everyone' + (tl.showLanguageTag ? ' [FR]' : '');
+  };
+  refreshPreview();
+  pvBox.appendChild(pvChat);
+  pvBox.appendChild(pvTl);
+  pvShell.control.appendChild(pvBox);
 
   tlGroup.appendChild(createToggleRow({
     label: 'Chat Translator',
@@ -796,8 +846,40 @@ export function buildChatSection(body: HTMLElement, gameConf: any, translatorCon
       tl.showLanguageTag = v;
       saveTL();
       updateTranslatorConfig({ showLanguageTag: v });
+      refreshPreview();
     },
   }));
+
+  tlGroup.appendChild(createColorRow({
+    label: 'Translation Color',
+    desc: 'Text color of translated messages',
+    value: tl.textColor, defaultValue: DEFAULT_CONFIG.translator.textColor, instant: true,
+    onInput: (v) => updateTranslatorConfig({ textColor: v }),
+    onChange: (v) => {
+      tl.textColor = v;
+      saveTL();
+      updateTranslatorConfig({ textColor: v });
+    },
+  }));
+
+  tlGroup.appendChild(createSelectRow({
+    label: 'Translation Style',
+    desc: 'Font style of translated messages', instant: true,
+    options: [
+      { value: 'normal', label: 'Normal' },
+      { value: 'italic', label: 'Italic' },
+      { value: 'bold', label: 'Bold' },
+      { value: 'bold-italic', label: 'Bold + Italic' },
+    ],
+    value: tl.textStyle,
+    onChange: (v) => {
+      tl.textStyle = v;
+      saveTL();
+      updateTranslatorConfig({ textStyle: v });
+    },
+  }));
+
+  tlGroup.appendChild(pvShell.row);
 
   // Custom skip words — messages made entirely of these (plus built-in skip terms) won't be translated.
   tlGroup.appendChild(createTextRow({

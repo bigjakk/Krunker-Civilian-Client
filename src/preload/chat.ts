@@ -26,40 +26,73 @@ let _con: SavedConsole | null = null;
 const SCROLL_BOTTOM_THRESHOLD = 30; // px from bottom to consider "at bottom"
 const USER_SCROLL_WINDOW = 200; // ms after a wheel that 'scroll' counts as user-driven
 
+// Messages KCC removes on purpose (e.g. "Text & Voice Chat" notices). Their
+// removal fires a later observer batch whose removedNodes look identical to a
+// Krunker history prune — without this marker the history block would
+// re-insert them at the top of the list.
+const kccRemovedNodes = new WeakSet<Node>();
+
 function isChatMessage(node: Node): node is HTMLElement {
     return node.nodeType === 1 && (node as HTMLElement).id?.startsWith('chatMsg_');
 }
 
+// Krunker only displays the active channel's messages (the globe toggle);
+// Better Chat shows both channels at once and labels them instead.
+const MERGE_CSS = '#chatList > * { display: block !important; }';
+let mergeStyle: HTMLStyleElement | null = null;
+
+function syncMergeCss(): void {
+    if (betterChatEnabled && !mergeStyle && document.head) {
+        mergeStyle = document.createElement('style');
+        mergeStyle.id = 'kcc-chatMerge';
+        mergeStyle.textContent = MERGE_CSS;
+        document.head.appendChild(mergeStyle);
+    } else if (!betterChatEnabled && mergeStyle) {
+        mergeStyle.remove();
+        mergeStyle = null;
+    }
+}
+
 function isTeamMode(): boolean {
-    const modeEl = document.getElementById('gameModeLabel') || document.getElementById('subGameMode');
-    if (!modeEl) return false;
-    return TEAM_MODES.has(modeEl.textContent?.trim() || '');
+    try {
+        return TEAM_MODES.has((window as any).getGameActivity?.()?.mode ?? '');
+    } catch { /* game API unavailable */ }
+    return false;
 }
 
 function handleMutations(mutations: MutationRecord[]): void {
+    // Whether this batch changed scrollHeight after Krunker's own
+    // scroll-to-bottom already ran (history re-inserted above the viewport,
+    // or a [T]/[M] tag re-wrapping a line) — the follow pin must be redone.
+    let needsRePin = false;
+
     // ── Chat history: re-insert removed messages ──
     if (historyMax > 0 && chatList && observer) {
         const removed: HTMLElement[] = [];
         for (const mut of mutations) {
             if (reInsertGuard) break;
             for (const node of mut.removedNodes) {
-                if (isChatMessage(node)) removed.push(node);
+                if (isChatMessage(node) && !kccRemovedNodes.has(node)) removed.push(node);
             }
         }
         if (removed.length > 0) {
+            needsRePin = true;
             reInsertGuard = true;
             observer.disconnect();
-            const heightBefore = chatList.scrollHeight;
             const firstLive = chatList.firstChild;
             for (const node of removed) {
                 chatList.insertBefore(node, firstLive);
             }
+            // The restored list matches what savedScrollTop was recorded
+            // against; only the top-trim below shifts the anchor, so subtract
+            // exactly that (and skip the layout reads when not paused).
+            const heightRestored = scrollPaused ? chatList.scrollHeight : 0;
             while (chatList.children.length > historyMax) {
                 chatList.removeChild(chatList.firstChild!);
             }
-            // Re-inserting happens above the viewport, so shift the saved anchor
-            // by the net height change to keep the user pinned to the same line.
-            if (scrollPaused) savedScrollTop += chatList.scrollHeight - heightBefore;
+            if (scrollPaused) {
+                savedScrollTop = Math.max(0, savedScrollTop - (heightRestored - chatList.scrollHeight));
+            }
             observer.observe(chatList, { childList: true });
             reInsertGuard = false;
         }
@@ -76,13 +109,16 @@ function handleMutations(mutations: MutationRecord[]): void {
 
                 // Remove "Text & Voice Chat" system messages
                 if (chatMsg.textContent?.includes('Text & Voice Chat')) {
+                    kccRemovedNodes.add(node);
                     node.remove();
                     continue;
                 }
 
-                // Only tag in team modes with proper chat messages
+                // Only tag in team modes with proper chat messages. The
+                // sender name sits outside .chatMsg, so match the LRM-wrapped
+                // "name:" on the whole .chatItem.
                 if (!teamMode) continue;
-                if (!chatMsg.innerHTML.includes('\u202E:')) continue;
+                if (!node.querySelector('.chatItem')?.textContent?.includes('\u200E:')) continue;
                 if (!node.dataset.tab) continue;
 
                 const isTeam = node.dataset.tab === '1';
@@ -91,16 +127,24 @@ function handleMutations(mutations: MutationRecord[]): void {
                 tag.style.color = isTeam ? '#00FF00' : '#FF0000';
                 tag.textContent = isTeam ? '[T]' : '[M]';
                 chatMsg.insertBefore(tag, chatMsg.firstChild);
+                needsRePin = true;
             }
         }
     }
 
     // Krunker force-scrolls #chatList to the bottom on every new message. When
-    // the user has scrolled up, undo that and hold their position; otherwise
-    // follow the latest message. (This runs before the resulting scroll event,
-    // so the restored position is what updatePauseState sees.)
+    // the user has scrolled up, undo that and hold their position. When
+    // following, Krunker's own scroll already landed at the bottom — repeating
+    // it here cost a forced-layout scrollHeight read per message; only re-pin
+    // when this handler changed scrollHeight after Krunker's scroll.
+    // (This runs before the resulting scroll event, so the restored position
+    // is what updatePauseState sees.)
     if (chatList) {
-        chatList.scrollTop = scrollPaused ? savedScrollTop : chatList.scrollHeight;
+        if (scrollPaused) {
+            chatList.scrollTop = savedScrollTop;
+        } else if (needsRePin) {
+            chatList.scrollTop = chatList.scrollHeight;
+        }
     }
 }
 
@@ -146,9 +190,23 @@ function resumeChatScroll(): void {
     pinToBottom();
 }
 
+// Krunker's old chat switched the send channel with Tab; the new UI only has
+// the globe button. Restore the shortcut by driving Krunker's own switcher.
+// Document-level capture so it survives Krunker re-mounting the input.
+function handleChatTab(e: KeyboardEvent): void {
+    if (!betterChatEnabled || e.key !== 'Tab' || e.repeat) return;
+    if ((e.target as HTMLElement | null)?.id !== 'chatInput') return;
+    e.preventDefault();
+    try {
+        (window as any).switchChat?.(document.getElementById('chatSwitch'));
+    } catch { /* game API unavailable */ }
+}
+
 function tryAttach(): boolean {
     chatList = document.getElementById('chatList');
     if (!chatList) return false;
+
+    document.addEventListener('keydown', handleChatTab, true);
 
     observer = new MutationObserver(handleMutations);
     observer.observe(chatList, { childList: true });
@@ -168,6 +226,7 @@ function tryAttach(): boolean {
         if (document.pointerLockElement) resumeChatScroll();
     });
 
+    syncMergeCss();
     _con?.log('[KCC-Chat] Observer attached to #chatList');
     return true;
 }
@@ -188,7 +247,13 @@ function updateChatClamp(): void {
     const root = document.documentElement;
     const list = chatList ?? document.getElementById('chatList');
     const menu = document.getElementById('menuItemContainer');
-    if (!list || !menu || menu.offsetHeight === 0) {
+    // In-game detection must be layout-free: this runs on a 250ms safety tick,
+    // and the old `menu.offsetHeight === 0` check forced a layout flush every
+    // tick mid-combat just to conclude "menu hidden, do nothing". #uiBase only
+    // carries onMenu on the menu screen; the offsetHeight fallback then runs
+    // solely while the menu is actually up.
+    const uiBase = document.getElementById('uiBase');
+    if (!list || !menu || !uiBase?.classList.contains('onMenu') || menu.offsetHeight === 0) {
         // Menu hidden (in-game) — let Krunker manage the chat normally.
         list?.classList.remove('kcc-chat-clamped');
         root.style.removeProperty('--kcc-chat-max');
@@ -258,6 +323,7 @@ export function initChat(options: { betterChat: boolean; chatHistorySize: number
 
 export function setBetterChat(enabled: boolean): void {
     betterChatEnabled = enabled;
+    syncMergeCss();
 }
 
 export function setChatHistorySize(size: number): void {

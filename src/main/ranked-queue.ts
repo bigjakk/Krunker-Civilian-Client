@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { QUEUE_NOTIFICATION_AUDIO } from './ranked-queue-audio';
+import { devWindowIcon } from './platform';
 
 export const DEFAULT_RANKED_AUDIO_URL = `data:audio/mpeg;base64,${QUEUE_NOTIFICATION_AUDIO}`;
 
@@ -606,6 +607,7 @@ export function openRankedQueue(
         autoHideMenuBar: true,
         backgroundColor: '#141414',
         title: 'Ranked Queue',
+        icon: devWindowIcon(),
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,

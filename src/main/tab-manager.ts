@@ -2,6 +2,7 @@ import { BrowserWindow, WebContentsView, View, Menu, clipboard, ipcMain, shell }
 import { TAB_BAR_DATA_URL } from './tab-bar-html';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog } from './logger';
+import { devWindowIcon } from './platform';
 
 const KRUNKER_SOCIAL = 'https://krunker.io/social.html';
 const TAB_BAR_HEIGHT = 40;
@@ -45,6 +46,7 @@ export class TabManager {
     private getSavedTabs: () => string[];
     private saveTabs: (urls: string[]) => void;
     private isRememberEnabled: () => boolean;
+    private getSocialThemeCSS: () => string;
     private tabSaveTimer: ReturnType<typeof setTimeout> | null = null;
     private restoredTabs = false;
 
@@ -59,6 +61,7 @@ export class TabManager {
         getSavedTabs: () => string[],
         saveTabs: (urls: string[]) => void,
         isRememberEnabled: () => boolean,
+        getSocialThemeCSS: () => string,
     ) {
         this.mainWin = win;
         this.ses = ses;
@@ -70,6 +73,7 @@ export class TabManager {
         this.getSavedTabs = getSavedTabs;
         this.saveTabs = saveTabs;
         this.isRememberEnabled = isRememberEnabled;
+        this.getSocialThemeCSS = getSocialThemeCSS;
 
         // ── Tab bar view (shared between both modes) ──
         this.tabBarView = new WebContentsView({
@@ -122,6 +126,7 @@ export class TabManager {
             backgroundColor: '#000000',
             autoHideMenuBar: true,
             title: 'KCC - Tabs',
+            icon: devWindowIcon(),
             show: false,
             webPreferences: {
                 nodeIntegration: false,
@@ -263,6 +268,7 @@ export class TabManager {
         wc.on('did-finish-load', () => {
             wc.insertCSS(ALL_CLIENT_CSS).catch(() => {});
             wc.insertCSS(HIDE_ADS_CSS).catch(() => {});
+            this.applySocialTheme(wc);
             wc.executeJavaScript(CONSENT_DISMISS_JS).catch(() => {});
             wc.send('main_did-finish-load-tab');
             this.updateTabInfo(tabId, { loading: false });
@@ -333,6 +339,30 @@ export class TabManager {
         });
 
         return view;
+    }
+
+    // ── Social CSS theme (swap/socialthemes/) ──
+    // Injected as a <style> tag rather than insertCSS so @import rules work.
+    private applySocialTheme(wc: Electron.WebContents, css: string = this.getSocialThemeCSS()): void {
+        wc.executeJavaScript(`(() => {
+            const css = ${JSON.stringify(css)};
+            let s = document.getElementById('kcc-social-theme');
+            if (!css) { if (s) s.remove(); return; }
+            if (!s) {
+                s = document.createElement('style');
+                s.id = 'kcc-social-theme';
+                document.head.appendChild(s);
+            }
+            s.textContent = css;
+        })()`).catch(() => {});
+    }
+
+    /** Re-apply the selected theme to every open tab (live swap from settings) */
+    refreshSocialTheme(): void {
+        const css = this.getSocialThemeCSS();
+        for (const tab of this.tabs) {
+            if (!tab.view.webContents.isDestroyed()) this.applySocialTheme(tab.view.webContents, css);
+        }
     }
 
     // ── Switch active tab ──

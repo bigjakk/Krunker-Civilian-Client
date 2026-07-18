@@ -71,6 +71,25 @@ linux:
       Keywords: krunker;fps;game;
       StartupWMClass: krunker-civilian-client
 
+# macOS (arm64): signed with the Developer ID Application cert from the local
+# keychain (electron-builder auto-discovery) + hardened runtime, as notarization
+# requires. scripts/dist-mac.sh drives packaging (--dir), builds the DMG with
+# hdiutil, then notarizes + staples it via notarytool. Falls back to ad-hoc
+# signing when no identity is present (contributors without the cert).
+mac:
+  target:
+    - target: dmg
+      arch: [arm64]
+  category: public.app-category.action-games
+  icon: build/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+
+dmg:
+  artifactName: "${productName}-${version}-mac-${arch}.${ext}"
+
 publish:
   provider: github
   owner: bigjakk

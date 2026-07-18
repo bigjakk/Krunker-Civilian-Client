@@ -1,20 +1,20 @@
-import { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, safeStorage, session, shell, webContents } from 'electron';
+import { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, powerSaveBlocker, safeStorage, session, shell, webContents } from 'electron';
 import { join, extname } from 'path';
 import { existsSync, mkdirSync, promises as fsp, readFileSync, statSync } from 'fs';
 import { get as httpsGet } from 'https';
 import { execFile } from 'child_process';
 import * as os from 'os';
 import { Socket } from 'net';
-import { detectPlatform, applyPlatformFlags, getValidAngleBackends } from './platform';
+import { detectPlatform, applyPlatformFlags, getValidAngleBackends, devWindowIcon } from './platform';
 import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount, DEFAULT_CONFIG } from './config';
 import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper } from './swapper';
 import { UserscriptManager } from './userscripts';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog, getLogPath, closeLogStreams } from './logger';
-import { checkForUpdate, downloadUpdate, installUpdate, checkForUpdateNotice } from './updater';
+import { checkForUpdate, downloadUpdate, installUpdate, checkForUpdateNotice, RELEASES_URL } from './updater';
 import { showUpdateWindow, showUpdatePrompt, showUpdateAvailableNotice } from './update-window';
 import { DiscordRPC } from './discord-rpc';
-import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS } from './css-themes';
+import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS, GAME_THEMES_DIR, SOCIAL_THEMES_DIR } from './css-themes';
 import { TabManager } from './tab-manager';
 import { openRankedQueue, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
 import { takeScreenshot, openScreenshotsFolder } from './screenshot';
@@ -183,6 +183,19 @@ const BUNNY_URL_RE = /user-assets\.krunker\.io\/(?:60585\/|(?:61806|61814|61815|
 const EMPTY_RESPONSE_URL = 'data:,';
 let hideBunnies = false;
 
+// ── Turf Wars clan banner blocklist ──
+// EnvRankBanner props (wall/pole banner variants) placed on official maps to
+// show the owning clan. Blocking model.obj drops the whole prop, clan overlay
+// included — same empty-redirect trick as the bunnies.
+const TURF_BANNER_URL_PATTERNS = [
+  '*://user-assets.krunker.io/64295/model.obj*',
+  '*://user-assets.krunker.io/64300/model.obj*',
+  '*://user-assets.krunker.io/64301/model.obj*',
+  '*://user-assets.krunker.io/64303/model.obj*',
+];
+const TURF_BANNER_URL_RE = /user-assets\.krunker\.io\/(?:64295|64300|64301|64303)\/model\.obj/;
+let hideTurfBanners = false;
+
 // ── Escape pointer lock fix ──
 const ESCAPE_POINTERLOCK_FIX_JS = `
 document.addEventListener('keydown', function(e) {
@@ -242,13 +255,27 @@ function saveWindowState(win: BrowserWindow): void {
 app.whenReady().then(async () => {
   electronLog.log('[KCC] App ready');
 
+  // macOS: opt out of App Nap / timer coalescing for the whole app lifetime.
+  // Finder/LaunchServices-launched instances get app-role scheduling (App Nap
+  // eligibility, coalesced timers, E-core steering for lower-QoS threads) that
+  // degrades input/present pacing — the same build launched as a terminal child
+  // consistently felt better (2026-07-08 investigation; probe-invisible, i.e.
+  // below the page: present-to-glass level). prevent-app-suspension maps to
+  // NSActivityUserInitiated. Held until process exit by design; no matching stop().
+  if (process.platform === 'darwin') {
+    powerSaveBlocker.start('prevent-app-suspension');
+    electronLog.log('[KCC] App Nap / timer coalescing opt-out active (darwin)');
+  }
+
   // ── Update check ──
-  // NSIS installs self-update in place. Portable and AppImage builds can't, so they get
-  // a notice with a link to download the new version manually. Dev builds are skipped.
+  // Only Windows NSIS self-installs: the Setup.exe swaps the app while it's closed.
+  // macOS, Linux (AppImage), and Windows-portable can't swap a running app, so they
+  // show a notice linking the release page for a manual download. Dev builds skip.
   const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR;
   const isAppImage = !!process.env.APPIMAGE;
   const isDev = !app.isPackaged;
   const isNsisInstall = !isDev && process.platform === 'win32' && !isPortable && !isAppImage;
+
   if (isDev) {
     electronLog.log('[KCC] Skipping update check (dev mode)');
   } else if (isNsisInstall) {
@@ -258,7 +285,6 @@ app.whenReady().then(async () => {
       if (update) {
         electronLog.log(`[KCC] Update available: v${update.version}`);
 
-        // Ask user before downloading
         const accepted = await showUpdatePrompt(update.version, appVersion);
         if (!accepted) {
           electronLog.log('[KCC] User skipped update');
@@ -276,18 +302,35 @@ app.whenReady().then(async () => {
           try {
             await downloadUpdate(update.downloadUrl, installerPath, (pct) => {
               if (!cancelled && !updateWin.isDestroyed()) {
-                sendProgress(`Downloading update... ${pct}%`, pct);
+                // At 100% the bytes are down but downloadUpdate is still hashing the file,
+                // so show "Verifying" + an indeterminate sweep instead of a stuck 100%.
+                sendProgress(pct >= 100 ? 'Verifying download...' : `Downloading update... ${pct}%`, pct >= 100 ? -1 : pct);
               }
             }, update.sha256);
 
-            if (!cancelled) {
-              sendProgress('Installing update...', 100);
+            // Re-check right before installing: `cancelled` can flip during the
+            // download await (the window's close button is the cancel path).
+            if (!cancelled && !updateWin.isDestroyed()) {
+              sendProgress('Installing update...', -1);
               installUpdate(installerPath);
-              return; // app.quit() called by installUpdate
+              return; // installUpdate spawns the installer and quits the app
             }
           } catch (err) {
-            electronLog.error('[KCC] Update download failed:', err);
+            electronLog.error('[KCC] Update download/install failed:', err);
             if (!updateWin.isDestroyed()) updateWin.close();
+            // The user accepted this update — surface the failure instead of silently
+            // launching the old version, which would just repeat the prompt next launch.
+            const detail = (err as Error).message || String(err);
+            const { response } = await dialog.showMessageBox({
+              type: 'error',
+              title: 'Update failed',
+              message: `The update to v${update.version} could not be installed.`,
+              detail: `${detail}\n\nYou can download it manually from the releases page — the current version keeps working in the meantime.`,
+              buttons: ['Open Releases Page', 'Continue'],
+              defaultId: 1,
+              cancelId: 1,
+            });
+            if (response === 0) await shell.openExternal(RELEASES_URL).catch(() => {});
           }
         }
       } else {
@@ -297,8 +340,8 @@ app.whenReady().then(async () => {
       electronLog.error('[KCC] Update check failed:', err);
     }
   } else {
-    // Portable / AppImage / other packaged builds: can't self-install — just notify
-    // and link to the release page so the user can grab the right download.
+    // macOS (DMG) / Linux (AppImage) / Windows portable: can't self-install — just
+    // notify and link to the release page so the user can grab the right download.
     try {
       electronLog.log('[KCC] Checking for updates (notify-only)...');
       const notice = await checkForUpdateNotice(appVersion);
@@ -306,8 +349,7 @@ app.whenReady().then(async () => {
         electronLog.log(`[KCC] Update available (notify-only): v${notice.version}`);
         const downloading = await showUpdateAvailableNotice(notice.version, appVersion);
         if (downloading) {
-          // User chose to grab the update manually — open the release page and quit
-          // instead of launching the old version.
+          // Open the release page and quit instead of launching the old version.
           electronLog.log('[KCC] User chose to download update; opening release page and quitting');
           await shell.openExternal(notice.releaseUrl).catch(() => {});
           app.quit();
@@ -340,8 +382,8 @@ async function launchApp(): Promise<void> {
   // ── Resource swapper ──
   const swapperConfig = config.get('swapper');
   const swapDir = swapperConfig.path || join(app.getPath('userData'), 'Krunker Civilian Client', 'swapper');
-  // Ensure swap subdirectories exist (themes/, backgrounds/)
-  for (const sub of ['themes', 'backgrounds']) {
+  // Ensure swap subdirectories exist (themes/, backgrounds/, socialthemes/)
+  for (const sub of [GAME_THEMES_DIR, 'backgrounds', SOCIAL_THEMES_DIR]) {
     const dir = join(swapDir, sub);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
@@ -359,12 +401,15 @@ async function launchApp(): Promise<void> {
   // The broad *://*.krunker.io/* pattern lets the swapper intercept any krunker asset.
   // swapper.getRedirect() returns null before its async scan completes, so swapped
   // resources simply pass through until the scan finishes — no re-registration needed.
-  hideBunnies = config.get('game')?.hideBunnies ?? false;
+  const gameConf = config.get('game');
+  hideBunnies = gameConf?.hideBunnies ?? false;
+  hideTurfBanners = gameConf?.hideTurfBanners ?? false;
   // *://* matches only http/https — wss needs an explicit pattern so the
   // webRequest handler fires on WebSocket upgrades for direct-ping detection.
   const requestFilterUrls = [
     ...BLOCKED_URL_PATTERNS,
     ...BUNNY_URL_PATTERNS,
+    ...TURF_BANNER_URL_PATTERNS,
     '*://*.krunker.io/*',
     'wss://*.krunker.io/*',
   ];
@@ -384,6 +429,10 @@ async function launchApp(): Promise<void> {
     }
     // Bunny NPC block — redirect to empty body (matches Glorp's SetUri(null))
     if (hideBunnies && BUNNY_URL_RE.test(details.url)) {
+      return callback({ redirectURL: EMPTY_RESPONSE_URL });
+    }
+    // Turf Wars clan banner block — same empty-body redirect
+    if (hideTurfBanners && TURF_BANNER_URL_RE.test(details.url)) {
       return callback({ redirectURL: EMPTY_RESPONSE_URL });
     }
     // Check swapper next — redirect matching assets to local files
@@ -436,6 +485,7 @@ async function launchApp(): Promise<void> {
     y: savedWindow.y,
     frame: true,
     backgroundColor: '#000000',
+    icon: devWindowIcon(),
     webPreferences: {
       preload: join(__dirname, '..', 'preload', 'index.js'),
       session: ses,
@@ -589,6 +639,9 @@ async function launchApp(): Promise<void> {
   const preloadPath = join(__dirname, '..', 'preload', 'index.js');
   let tabMode: 'same' | 'new' = getGameConf().socialTabBehaviour === 'Same Window' ? 'same' : 'new';
   let sessionTabs: string[] = [];
+  // Tracked separately from config because set-config defers the actual write
+  let socialTheme = config.get('ui')?.socialCssTheme || 'disabled';
+  const socialThemeCSS = () => getThemeCSS(socialTheme, swapDir, SOCIAL_THEMES_DIR);
   let tabManager = new TabManager(
     win, ses, preloadPath, tabMode, isGameURL,
     () => config.get('tabWindow'),
@@ -596,6 +649,7 @@ async function launchApp(): Promise<void> {
     () => sessionTabs,
     (urls) => { sessionTabs = urls; },
     () => config.get('game.rememberTabs') ?? false,
+    socialThemeCSS,
   );
 
   // Intercept in-page navigation (e.g. window.location = '/social.html')
@@ -659,12 +713,10 @@ async function launchApp(): Promise<void> {
     electronLog.log(`[KCC] CSS theme: id=${themeId}, css=${themeCSS ? themeCSS.length + ' chars' : 'none'}`);
     if (themeCSS) {
       // Use <style> tag via executeJavaScript so @import rules work (insertCSS doesn't support them).
-      // Encode as base64 to avoid any escaping issues with template literals.
-      const b64 = Buffer.from(themeCSS).toString('base64');
       win.webContents.executeJavaScript(`(() => {
         const s = document.createElement('style');
         s.id = 'kcc-user-theme';
-        s.textContent = atob('${b64}');
+        s.textContent = ${JSON.stringify(themeCSS)};
         document.head.appendChild(s);
       })()`).catch((err) => electronLog.warn('[KCC] Theme inject failed:', err));
     }
@@ -749,6 +801,7 @@ async function launchApp(): Promise<void> {
       cachedGameConf = null;
       const newGame = value as any;
       hideBunnies = newGame?.hideBunnies ?? false;
+      hideTurfBanners = newGame?.hideTurfBanners ?? false;
       // Switch tab mode if socialTabBehaviour changed
       if (newGame?.socialTabBehaviour) {
         const newMode: 'same' | 'new' = newGame.socialTabBehaviour === 'Same Window' ? 'same' : 'new';
@@ -762,8 +815,17 @@ async function launchApp(): Promise<void> {
             () => sessionTabs,
             (urls) => { sessionTabs = urls; },
             () => config.get('game.rememberTabs') ?? false,
+            socialThemeCSS,
           );
         }
+      }
+    }
+    if (key === 'ui') {
+      // Social CSS theme swaps live on open tabs
+      const next = (value as any)?.socialCssTheme || 'disabled';
+      if (next !== socialTheme) {
+        socialTheme = next;
+        tabManager.refreshSocialTheme();
       }
     }
     pendingConfigWrites.set(key, value);
@@ -788,7 +850,8 @@ async function launchApp(): Promise<void> {
   });
   ipcMain.handle('get-swap-dir', () => swapDir);
   ipcMain.handle('open-swap-folder', () => shell.openPath(swapDir));
-  ipcMain.handle('open-themes-folder', () => shell.openPath(join(swapDir, 'themes')));
+  ipcMain.handle('open-themes-folder', () => shell.openPath(join(swapDir, GAME_THEMES_DIR)));
+  ipcMain.handle('open-social-themes-folder', () => shell.openPath(join(swapDir, SOCIAL_THEMES_DIR)));
   ipcMain.handle('open-backgrounds-folder', () => shell.openPath(join(swapDir, 'backgrounds')));
   ipcMain.handle('open-screenshots-folder', () => openScreenshotsFolder());
 
@@ -873,6 +936,7 @@ async function launchApp(): Promise<void> {
 
   // ── CSS theme & loading background IPC handlers ──
   ipcMain.handle('list-themes', () => listThemes(swapDir));
+  ipcMain.handle('list-social-themes', () => listThemes(swapDir, SOCIAL_THEMES_DIR));
   ipcMain.handle('get-theme-css', (_e, themeId: string) => getThemeCSS(themeId, swapDir));
   ipcMain.handle('list-loading-themes', () => listLoadingThemes(swapDir));
   ipcMain.handle('get-loading-screen-css', (_e, loadingTheme: string, backgroundUrl: string) => {
@@ -925,6 +989,7 @@ async function launchApp(): Promise<void> {
   ipcMain.handle('open-electron-log', () => {
     shell.openPath(getLogPath());
   });
+  ipcMain.handle('open-client-folder', () => shell.openPath(app.getPath('userData')));
   ipcMain.handle('reset-swapper', async () => {
     try {
       const entries = await fsp.readdir(swapDir, { withFileTypes: true });

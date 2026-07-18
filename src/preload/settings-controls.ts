@@ -310,6 +310,49 @@ export function createTextRow(opts: {
   return { row, input };
 }
 
+// ── Color input ──
+// Native color picker. `onInput` fires continuously while the picker is open
+// (live preview); `onChange` fires once on commit — persist there. Passing
+// `defaultValue` adds a reset button beside the swatch.
+export function createColorRow(opts: {
+  label: string;
+  desc: string;
+  value: string;
+  defaultValue?: string;
+  onChange: (value: string) => void;
+  onInput?: (value: string) => void;
+  safety?: number;
+  instant?: boolean;
+  refreshOnly?: boolean;
+  restart?: boolean;
+}): HTMLElement {
+  const { row, control } = createRowShell(opts.label, escapeHtml(opts.desc), opts);
+  const input = document.createElement('input');
+  input.type = 'color';
+  input.className = 'kcc-color';
+  input.value = opts.value;
+  if (opts.onInput) input.addEventListener('input', () => opts.onInput!(input.value));
+  input.addEventListener('change', () => {
+    opts.onChange(input.value);
+    if (opts.restart) onSettingChanged('restart');
+    else if (opts.refreshOnly) onSettingChanged('refresh');
+  });
+  if (opts.defaultValue !== undefined) {
+    const def = opts.defaultValue;
+    control.appendChild(makeButton({
+      icon: 'restart_alt',
+      title: 'Reset to default',
+      onClick: () => {
+        if (input.value === def) return;
+        input.value = def;
+        input.dispatchEvent(new Event('change'));
+      },
+    }));
+  }
+  control.appendChild(input);
+  return row;
+}
+
 // ── Button row ──
 // A row whose control slot holds one or more action buttons. Returns the row plus
 // the control element so callers can inject extra controls (e.g. a select).

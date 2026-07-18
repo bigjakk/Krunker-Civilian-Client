@@ -265,6 +265,7 @@ function buildManageSection(body: HTMLElement): void {
   }));
 
   const clientGrid = makeSection('Client');
+  clientGrid.appendChild(makeActionBtn('folder_open', 'Client Folder', () => ipcRenderer.invoke('open-client-folder')));
   clientGrid.appendChild(makeActionBtn('folder', 'Swapper Folder', () => ipcRenderer.invoke('open-swap-folder')));
   clientGrid.appendChild(makeActionBtn('description', 'Electron Logs', () => ipcRenderer.invoke('open-electron-log')));
   clientGrid.appendChild(makeActionBtn('refresh', 'Restart Client', () => ipcRenderer.invoke('restart-client')));
@@ -341,8 +342,10 @@ function renderSettings(searchQuery?: string): void {
   const allConf = data.config;
   const platformInfo = data.platform;
   const version = data.version;
-  const gameConf = allConf.game;
-  const uiConfRaw = allConf.ui;
+  // Shared across every section builder — each one posts the whole game/ui
+  // object, so they must mutate one copy or later writes clobber earlier ones.
+  const gameConf = { ...DEFAULT_CONFIG.game, ...allConf.game };
+  const uiConfRaw = { ...DEFAULT_CONFIG.ui, ...allConf.ui };
   const isWindows = platformInfo && platformInfo.isWindows;
   const binds = { ...DEFAULT_CONFIG.keybinds, ...allConf.keybinds };
   const bag: SettingsBag = {
