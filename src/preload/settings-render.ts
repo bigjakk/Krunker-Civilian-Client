@@ -343,7 +343,9 @@ function renderSettings(searchQuery?: string): void {
   const platformInfo = data.platform;
   const version = data.version;
   const gameConf = allConf.game;
-  const uiConfRaw = allConf.ui;
+  // Shared across every section builder — each one's saveUI() posts the whole
+  // ui object, so they must mutate one copy or later writes clobber earlier ones.
+  const uiConfRaw = { ...DEFAULT_CONFIG.ui, ...allConf.ui };
   const isWindows = platformInfo && platformInfo.isWindows;
   const binds = { ...DEFAULT_CONFIG.keybinds, ...allConf.keybinds };
   const bag: SettingsBag = {

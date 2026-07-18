@@ -53,7 +53,7 @@ export function buildGeneralSection(
     onChange: (v) => { game.rememberTabs = v; ipcRenderer.invoke('set-config', 'game', game); },
   }));
 
-  const ui = { ...DEFAULT_CONFIG.ui, ...uiConfRaw };
+  const ui = uiConfRaw;
 
   function saveUI(): void {
     ipcRenderer.invoke('set-config', 'ui', ui);
@@ -133,7 +133,7 @@ export function buildGameSection(
   body: HTMLElement, gameConf: any, uiConfRaw: any, bag: SettingsBag,
 ): void {
   const game = { ...DEFAULT_CONFIG.game, ...gameConf };
-  const ui = { ...DEFAULT_CONFIG.ui, ...uiConfRaw };
+  const ui = uiConfRaw;
 
   function saveGame(): void {
     ipcRenderer.invoke('set-config', 'game', game);
@@ -467,7 +467,7 @@ export function buildSwapperSection(body: HTMLElement, swapperConf: any): void {
 }
 
 export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void {
-  const ui = { ...DEFAULT_CONFIG.ui, ...uiConfRaw };
+  const ui = uiConfRaw;
 
   function saveUI(): void {
     ipcRenderer.invoke('set-config', 'ui', ui);
