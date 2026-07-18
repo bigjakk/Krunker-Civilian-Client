@@ -1,6 +1,6 @@
 // ── Menu tweaks ──
-// Two opt-in main-menu features: hiding promotional popups, and the "Classic
-// Social" menu item. Both are pure DOM/Krunker-global code (no IPC).
+// Main-menu features: hiding promotional popups, the "Classic Social" menu
+// item, and the Mod Manager opener. All pure DOM/Krunker-global code (no IPC).
 
 // ── Hide menu popups ──
 // Bundle/claim popups need clearPops(), not CSS — Krunker renders them via
@@ -127,5 +127,41 @@ export function setClassicSocial(enabled: boolean): void {
         _classicSocialPoll = null;
       }
     }
+  }, 500);
+}
+
+// ── Mod Manager button (ranked menu) ──
+// The ranked/comp menu (#mMenuHolComp) has no mod UI. This appends a button to
+// its icon row (#compBtnLst) that opens the Mod Manager window (windows[3])
+// via showWindow(4), matching the row's native buttons (Loadout/Customize/
+// Settings are showWindow calls too). The row lives inside the comp holder, so
+// Krunker shows/hides it with the rest of the ranked menu.
+function injectModManagerBtn(): boolean {
+  if (document.getElementById('kccModManagerBtn')) return true;
+  const btnList = document.getElementById('compBtnLst');
+  if (!btnList) return false;
+
+  const btn = document.createElement('div');
+  btn.id = 'kccModManagerBtn';
+  btn.className = 'compMenBtnS';
+  btn.title = 'Mod Manager';
+  btn.style.backgroundColor = '#3489eb';
+  btn.setAttribute('onmouseenter', 'SOUND.play("tick_0",.1)');
+  btn.innerHTML =
+    '<span class="material-icons" style="color:#fff;font-size:40px;vertical-align:middle;margin-bottom:12px">extension</span>';
+  btn.addEventListener('click', () => {
+    (window as any).playSelect?.();
+    (window as any).showWindow?.(4);
+  });
+
+  btnList.appendChild(btn);
+  return true;
+}
+
+export function initModManagerButton(): void {
+  if (injectModManagerBtn()) return;
+  let attempts = 0;
+  const poll = window.setInterval(() => {
+    if (injectModManagerBtn() || ++attempts > 60) clearInterval(poll);
   }, 500);
 }
