@@ -713,12 +713,10 @@ async function launchApp(): Promise<void> {
     electronLog.log(`[KCC] CSS theme: id=${themeId}, css=${themeCSS ? themeCSS.length + ' chars' : 'none'}`);
     if (themeCSS) {
       // Use <style> tag via executeJavaScript so @import rules work (insertCSS doesn't support them).
-      // Encode as base64 to avoid any escaping issues with template literals.
-      const b64 = Buffer.from(themeCSS).toString('base64');
       win.webContents.executeJavaScript(`(() => {
         const s = document.createElement('style');
         s.id = 'kcc-user-theme';
-        s.textContent = atob('${b64}');
+        s.textContent = ${JSON.stringify(themeCSS)};
         document.head.appendChild(s);
       })()`).catch((err) => electronLog.warn('[KCC] Theme inject failed:', err));
     }
