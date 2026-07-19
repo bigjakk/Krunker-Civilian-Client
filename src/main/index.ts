@@ -525,7 +525,7 @@ async function launchApp(): Promise<void> {
   };
   // A fast page load would reduce the splash to a flash — hold the reveal until
   // the splash has been on screen for a minimum time.
-  const MIN_SPLASH_DISPLAY_MS = 4000;
+  const MIN_SPLASH_DISPLAY_MS = 3000;
   const revealAfterMinimum = (): void => {
     const wait = Math.max(0, MIN_SPLASH_DISPLAY_MS - splashElapsed());
     if (wait > 0) setTimeout(revealMainWindow, wait);
