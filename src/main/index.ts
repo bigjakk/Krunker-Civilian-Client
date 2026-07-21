@@ -145,6 +145,42 @@ app.setAppUserModelId('com.krunkercivilian.client');
 // ── Resource swapper protocol (must register before app.ready) ──
 initSwapperProtocol();
 
+app.setAsDefaultProtocolClient('kcc');
+
+let pendingProtocolUrl: string | null = null;
+let mainWindowForProtocol: BrowserWindow | null = null;
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const kccUrl = argv.find((arg: string) => typeof arg === 'string' && arg.startsWith('kcc://'));
+    if (kccUrl) {
+      if (mainWindowForProtocol && !mainWindowForProtocol.isDestroyed()) {
+        mainWindowForProtocol.show();
+        if (mainWindowForProtocol.isMinimized()) mainWindowForProtocol.restore();
+        mainWindowForProtocol.focus();
+        mainWindowForProtocol.webContents.send('kcc-protocol', kccUrl);
+      } else {
+        pendingProtocolUrl = kccUrl;
+      }
+    }
+  });
+}
+
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  if (url.startsWith('kcc://')) {
+    if (mainWindowForProtocol && !mainWindowForProtocol.isDestroyed()) {
+      mainWindowForProtocol.show();
+      mainWindowForProtocol.focus();
+      mainWindowForProtocol.webContents.send('kcc-protocol', url);
+    } else {
+      pendingProtocolUrl = url;
+    }
+  }
+});
+
 // ── Ad-blocking URL patterns (matched in C++ layer, never hits JS for non-matches) ──
 const BLOCKED_URL_PATTERNS = [
   '*://*.pollfish.com/*',
@@ -330,7 +366,7 @@ app.whenReady().then(async () => {
               defaultId: 1,
               cancelId: 1,
             });
-            if (response === 0) await shell.openExternal(RELEASES_URL).catch(() => {});
+            if (response === 0) await shell.openExternal(RELEASES_URL).catch(() => { });
           }
         }
       } else {
@@ -351,7 +387,7 @@ app.whenReady().then(async () => {
         if (downloading) {
           // Open the release page and quit instead of launching the old version.
           electronLog.log('[KCC] User chose to download update; opening release page and quitting');
-          await shell.openExternal(notice.releaseUrl).catch(() => {});
+          await shell.openExternal(notice.releaseUrl).catch(() => { });
           app.quit();
           return;
         }
@@ -417,8 +453,8 @@ async function launchApp(): Promise<void> {
   ses.webRequest.onBeforeRequest({ urls: requestFilterUrls }, (details, callback) => {
     // Direct ping: detect game-server WebSocket (lobby-* host) and start TCP timing.
     if (details.resourceType === 'webSocket'
-        && details.url.includes('lobby-')
-        && config.get('ui')?.directServerPing) {
+      && details.url.includes('lobby-')
+      && config.get('ui')?.directServerPing) {
       try {
         const u = new URL(details.url);
         const port = u.port ? parseInt(u.port) : (u.protocol === 'wss:' ? 443 : 80);
@@ -499,6 +535,12 @@ async function launchApp(): Promise<void> {
 
   if (savedWindow.fullscreen) win.setFullScreen(true);
   else if (savedWindow.maximized) win.maximize();
+
+  mainWindowForProtocol = win;
+  if (pendingProtocolUrl) {
+    win.webContents.send('kcc-protocol', pendingProtocolUrl);
+    pendingProtocolUrl = null;
+  }
 
   // ── No application menu (prevents Escape/Alt interception) ──
   Menu.setApplicationMenu(null);
