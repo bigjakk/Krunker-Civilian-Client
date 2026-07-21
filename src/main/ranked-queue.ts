@@ -183,7 +183,7 @@ body {
   background: var(--card);
   border: 1px solid var(--bd);
   border-radius: 14px;
-  max-width: 480px;
+  max-width: 560px;
   width: 90vw;
   padding: 28px 32px 32px;
   box-shadow: 0 24px 64px rgba(0,0,0,0.7);
@@ -193,7 +193,18 @@ body {
 }
 .overlay.active .popup { transform: scale(1); }
 .popup h2 { font-size: 24px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
-.popup-content { margin-top: 18px; }
+.popup-content { margin-top: 18px; display: flex; gap: 18px; }
+.map-thumb {
+  display: none;
+  width: 150px;
+  flex: none;
+  object-fit: cover;
+  border: 1px solid var(--bd2);
+  border-radius: 10px;
+  background: var(--input);
+}
+.map-thumb.visible { display: block; }
+.popup-info { flex: 1; min-width: 0; }
 .region-found {
   font-size: 16px;
   font-weight: 600;
@@ -291,6 +302,7 @@ const regionCheckboxes = document.getElementById('regionCheckboxes');
 const matchPopupOverlay = document.getElementById('matchPopupOverlay');
 const countdownTimer = document.getElementById('countDownTimer');
 const foundRegion = document.getElementById('foundRegion');
+const foundMapImg = document.getElementById('foundMapImg');
 const queueButton = document.getElementById('queueButton');
 const closeButton = document.getElementById('closeButton');
 
@@ -477,10 +489,17 @@ function matchFound(map, region) {
     region = region.slice(2);
     const regionName = regions[region] || region;
     let foundMapName = 'unknown';
+    let foundMapImage = '';
     for (const [mapName, mapData] of Object.entries(maps)) {
-        if (mapData.number === parseInt(map, 10)) { foundMapName = mapName; break; }
+        if (mapData.number === parseInt(map, 10)) { foundMapName = mapName; foundMapImage = mapData.image; break; }
     }
     foundRegion.textContent = regionName + ', ' + foundMapName;
+    if (foundMapImage) {
+        foundMapImg.classList.add('visible');
+        foundMapImg.src = foundMapImage;
+    } else {
+        foundMapImg.classList.remove('visible');
+    }
 
     const duration = 60;
     const startTime = Date.now();
@@ -525,6 +544,9 @@ closeButton.onclick = () => {
     stopNotificationSound();
     if (countdownInterval) clearInterval(countdownInterval);
 };
+
+// Map thumbnail: hide if the image fails to load
+foundMapImg.onerror = () => foundMapImg.classList.remove('visible');
 
 // Region checkbox changes
 for (const sel of regionCheckboxes.querySelectorAll('input')) {
@@ -577,9 +599,12 @@ ${header}  <div class="queue-body">
     <div id="closeButton">✕</div>
     <h2>Match Found</h2>
     <div class="popup-content">
-      <div class="region-found" id="foundRegion">Region: </div>
-      <div id="matchFoundMessage">Open the client and rejoin the game from the ranked menu.</div>
-      <div class="countdown-large" id="countDownTimer">00:00:60</div>
+      <img id="foundMapImg" class="map-thumb" alt="">
+      <div class="popup-info">
+        <div class="region-found" id="foundRegion">Region: </div>
+        <div id="matchFoundMessage">Open the client and rejoin the game from the ranked menu.</div>
+        <div class="countdown-large" id="countDownTimer">00:00:60</div>
+      </div>
     </div>
   </div>
 </div>
