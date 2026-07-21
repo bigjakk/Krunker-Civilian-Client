@@ -17,6 +17,7 @@ import { startHidePopups, setClassicSocial, initModManagerButton } from './menu-
 import { initBanlog } from './banlog';
 import { installGameSocketTap } from './game-socket';
 import { installSoundHook, setHeadshotSoundMode } from './headshot-sound';
+import { initKccProtocol } from './protocol';
 
 
 _console.log('[KCC] Preload script loaded');
@@ -75,6 +76,8 @@ window.addEventListener('wheel', (e: WheelEvent) => {
     getPath: () => ipcRenderer.invoke('userscripts-get-dir'),
   },
 };
+
+initKccProtocol();
 
 // ── Direct Server Ping Display (TCP RTT from main, overrides #pingText + #menuPingText) ──
 // Locks the textContent setter on first value arrival so Krunker's writes become
