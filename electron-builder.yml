@@ -11,6 +11,10 @@ afterPack: "./scripts/afterPack-linux.js"
 # binary (input-priority + frame-pacing patches) instead of re-resolving stock from CDN.
 # CI / cross-compile must override on CLI: --electronDist=./node_modules/electron/dist-{linux,win}
 electronDist: "./node_modules/electron/dist"
+protocols:
+  - name: KCC Protocol
+    schemes:
+      - kcc
 files:
   - dist/**/*
   - node_modules/electron-store/**/*
