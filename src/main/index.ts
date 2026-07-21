@@ -12,7 +12,7 @@ import { UserscriptManager } from './userscripts';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog, getLogPath, closeLogStreams } from './logger';
 import { checkForUpdate, downloadUpdate, installUpdate, checkForUpdateNotice, RELEASES_URL } from './updater';
-import { showUpdateWindow, showUpdatePrompt, showUpdateAvailableNotice } from './update-window';
+import { createSplash, splashStatus, splashPrompt, splashAlive, splashElapsed, getSplash, onSplashUserClosed, closeSplash } from './splash';
 import { DiscordRPC } from './discord-rpc';
 import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS, GAME_THEMES_DIR, SOCIAL_THEMES_DIR } from './css-themes';
 import { TabManager } from './tab-manager';
@@ -303,6 +303,12 @@ app.whenReady().then(async () => {
     electronLog.log('[KCC] App Nap / timer coalescing opt-out active (darwin)');
   }
 
+  // ── Branded splash ──
+  // Shows the poster art through the update check and the initial game load, and
+  // hosts the update prompts/progress so startup is one uniform window. Closing it
+  // before the main window exists quits the app (window-all-closed).
+  createSplash(appVersion);
+
   // ── Update check ──
   // Only Windows NSIS self-installs: the Setup.exe swaps the app while it's closed.
   // macOS, Linux (AppImage), and Windows-portable can't swap a running app, so they
@@ -317,47 +323,45 @@ app.whenReady().then(async () => {
   } else if (isNsisInstall) {
     try {
       electronLog.log('[KCC] Checking for updates...');
+      splashStatus('Checking for updates...', -1);
       const update = await checkForUpdate(appVersion);
+      if (!splashAlive()) return; // user closed the splash — app is quitting
       if (update) {
         electronLog.log(`[KCC] Update available: v${update.version}`);
 
-        const accepted = await showUpdatePrompt(update.version, appVersion);
-        if (!accepted) {
+        const choice = await splashPrompt('install', update.version, appVersion);
+        if (choice === 'closed') return; // app is quitting
+        if (choice === 'secondary') {
           electronLog.log('[KCC] User skipped update');
         } else {
-          const { window: updateWin, sendProgress } = showUpdateWindow();
-          sendProgress(`Update available (v${update.version})`, 0);
-
           const tempDir = join(app.getPath('temp'), 'kcc-update');
           if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true });
           const installerPath = join(tempDir, `KCC-${update.version}-Setup.exe`);
 
-          let cancelled = false;
-          updateWin.on('closed', () => { cancelled = true; });
-
           try {
+            splashStatus('Downloading update... 0%', 0);
             await downloadUpdate(update.downloadUrl, installerPath, (pct) => {
-              if (!cancelled && !updateWin.isDestroyed()) {
-                // At 100% the bytes are down but downloadUpdate is still hashing the file,
-                // so show "Verifying" + an indeterminate sweep instead of a stuck 100%.
-                sendProgress(pct >= 100 ? 'Verifying download...' : `Downloading update... ${pct}%`, pct >= 100 ? -1 : pct);
-              }
+              // At 100% the bytes are down but downloadUpdate is still hashing the file,
+              // so show "Verifying" + an indeterminate sweep instead of a stuck 100%.
+              // splashStatus no-ops once the splash is gone.
+              splashStatus(pct >= 100 ? 'Verifying download...' : `Downloading update... ${pct}%`, pct >= 100 ? -1 : pct);
             }, update.sha256);
 
-            // Re-check right before installing: `cancelled` can flip during the
-            // download await (the window's close button is the cancel path).
-            if (!cancelled && !updateWin.isDestroyed()) {
-              sendProgress('Installing update...', -1);
-              installUpdate(installerPath);
-              return; // installUpdate spawns the installer and quits the app
-            }
+            // Closing the splash mid-download is the cancel path (it also quits
+            // the app via window-all-closed, since no other window exists yet).
+            if (!splashAlive()) return;
+            splashStatus('Installing update...', -1);
+            installUpdate(installerPath);
+            return; // installUpdate spawns the installer and quits the app
           } catch (err) {
             electronLog.error('[KCC] Update download/install failed:', err);
-            if (!updateWin.isDestroyed()) updateWin.close();
+            const splashWin = getSplash();
+            if (!splashWin) return; // splash gone — app is quitting
+            splashStatus('Update failed');
             // The user accepted this update — surface the failure instead of silently
             // launching the old version, which would just repeat the prompt next launch.
             const detail = (err as Error).message || String(err);
-            const { response } = await dialog.showMessageBox({
+            const { response } = await dialog.showMessageBox(splashWin, {
               type: 'error',
               title: 'Update failed',
               message: `The update to v${update.version} could not be installed.`,
@@ -380,11 +384,14 @@ app.whenReady().then(async () => {
     // notify and link to the release page so the user can grab the right download.
     try {
       electronLog.log('[KCC] Checking for updates (notify-only)...');
+      splashStatus('Checking for updates...', -1);
       const notice = await checkForUpdateNotice(appVersion);
+      if (!splashAlive()) return; // user closed the splash — app is quitting
       if (notice) {
         electronLog.log(`[KCC] Update available (notify-only): v${notice.version}`);
-        const downloading = await showUpdateAvailableNotice(notice.version, appVersion);
-        if (downloading) {
+        const choice = await splashPrompt('notice', notice.version, appVersion);
+        if (choice === 'closed') return; // app is quitting
+        if (choice === 'primary') {
           // Open the release page and quit instead of launching the old version.
           electronLog.log('[KCC] User chose to download update; opening release page and quitting');
           await shell.openExternal(notice.releaseUrl).catch(() => { });
@@ -399,15 +406,17 @@ app.whenReady().then(async () => {
     }
   }
 
+  if (!splashAlive()) return; // user closed the splash — app is quitting
+  splashStatus('Loading Krunker...', -1);
   await launchApp();
 });
 
 async function launchApp(): Promise<void> {
   electronLog.log('[KCC] Starting initialization');
 
-  // Invariant: create the main window before any `await` below. The update-notice flow
-  // closes its dialog and then calls this; if no window exists when that dialog's
-  // 'closed' event fires, the window-all-closed handler would quit the app instead.
+  // Invariant: the splash window is still open here and stays open until the main
+  // window's first page load finishes. At least one window must exist at every point
+  // of startup — window-all-closed quits the app.
 
   // ── Session: persistent partition ──
   const ses = session.fromPartition('persist:krunker');
@@ -520,6 +529,7 @@ async function launchApp(): Promise<void> {
     x: savedWindow.x,
     y: savedWindow.y,
     frame: true,
+    show: false,
     backgroundColor: '#000000',
     icon: devWindowIcon(),
     webPreferences: {
@@ -533,8 +543,42 @@ async function launchApp(): Promise<void> {
     },
   });
 
-  if (savedWindow.fullscreen) win.setFullScreen(true);
-  else if (savedWindow.maximized) win.maximize();
+  // Created hidden: the splash covers the initial page load. Saved maximize/
+  // fullscreen state is applied at reveal time — maximize() on a hidden window
+  // would show it immediately.
+  let revealed = false;
+  let revealFallback: ReturnType<typeof setTimeout> | null = null;
+  const revealMainWindow = (): void => {
+    if (revealed) return;
+    revealed = true;
+    if (revealFallback) clearTimeout(revealFallback);
+    if (!win.isDestroyed()) {
+      if (savedWindow.fullscreen) win.setFullScreen(true);
+      else if (savedWindow.maximized) win.maximize();
+      win.show();
+    }
+    closeSplash();
+  };
+  // A fast page load would reduce the splash to a flash — hold the reveal until
+  // the splash has been on screen for a minimum time.
+  const MIN_SPLASH_DISPLAY_MS = 3000;
+  const revealAfterMinimum = (): void => {
+    const wait = Math.max(0, MIN_SPLASH_DISPLAY_MS - splashElapsed());
+    if (wait > 0) setTimeout(revealMainWindow, wait);
+    else revealMainWindow();
+  };
+  // Reveal when the first load finishes (krunker's own loading screen takes over),
+  // when it fails (offline — show the error rather than hanging on the splash),
+  // or after a hard cap so a stalled load can't keep the window hidden forever.
+  win.webContents.once('did-finish-load', revealAfterMinimum);
+  win.webContents.on('did-fail-load', (_event, errorCode, _desc, _url, isMainFrame) => {
+    // -3 = ERR_ABORTED (superseded navigation) — not a real failure
+    if (isMainFrame && errorCode !== -3) revealAfterMinimum();
+  });
+  revealFallback = setTimeout(revealMainWindow, 15000);
+  // If the user closes the splash early, show the window immediately, whatever
+  // state it's in — no minimum hold on an explicit dismiss.
+  onSplashUserClosed(revealMainWindow);
 
   mainWindowForProtocol = win;
   if (pendingProtocolUrl) {
