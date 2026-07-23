@@ -110,6 +110,8 @@ export interface AppConfig {
     skyZenith: string;
     skyHorizon: string;
     skyImage: string;
+    socialMusic: string;
+    socialMusicVolume: number;
     loadingTheme: string;
     backgroundUrl: string;
     showChangelog: boolean;
@@ -232,6 +234,8 @@ export const DEFAULT_CONFIG: AppConfig = {
     skyZenith: '#1E5AA8',
     skyHorizon: '#9FD0F0',
     skyImage: 'disabled',
+    socialMusic: '',
+    socialMusicVolume: 40,
     loadingTheme: 'disabled',
     backgroundUrl: '',
     showChangelog: true,

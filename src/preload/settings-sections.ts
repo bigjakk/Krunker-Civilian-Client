@@ -14,6 +14,7 @@ import {
   createGroup, createColorRow,
 } from './settings-controls';
 import { setClassicSocial, startHidePopups, stopHidePopups } from './menu-tweaks';
+import { updateSocialMusicConfig } from './social-music';
 import { initHPCounter, destroyHPCounter } from './competitive';
 import { setHeadshotSoundMode } from './headshot-sound';
 import type { HeadshotSoundMode } from './headshot-sound';
@@ -29,6 +30,15 @@ export interface SettingsBag {
   binds: Record<string, Keybind>;
   saveBinds: () => void;
   isWindows: boolean;
+}
+
+// Music preview outlives a single panel build — see buildAppearanceSection.
+let musicPreview: HTMLAudioElement | null = null;
+
+function stopMusicPreview(): void {
+  if (!musicPreview) return;
+  musicPreview.pause();
+  musicPreview = null;
 }
 
 export function buildGeneralSection(
@@ -577,6 +587,61 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
     saveUI();
     onSettingChanged('refresh');
   });
+
+  // ── Social Hub Music ──
+  const musicGroup = createGroup(body, 'Social Hub Music');
+
+  const applyMusic = (): void => {
+    saveUI();
+    updateSocialMusicConfig({
+      source: ui.socialMusic || '',
+      volume: ui.socialMusicVolume ?? 40,
+    });
+  };
+
+  const musicR = createTextRow({
+    label: 'Music Source',
+    desc: 'Loops while the social hub is open, and fades out when you close it. Use a direct audio file link ending in .mp3, .ogg, or .wav — page links (Pixabay, YouTube, etc.) will not work. The easiest way is to download the file and pick it with the browse button (local files must be under 30 MB). Leave blank to disable.',
+    value: ui.socialMusic || '',
+    placeholder: 'https://example.com/track.mp3  or  C:\\path\\to\\file.mp3',
+    onChange: (v) => { ui.socialMusic = v; applyMusic(); },
+  });
+  const musicInput = musicR.input;
+  const musicControl = musicR.row.querySelector('.kcc-row-control') as HTMLElement;
+  musicControl.appendChild(makeButton({ icon: 'folder_open', title: 'Browse for Audio File', onClick: async () => {
+    const path: string = await ipcRenderer.invoke('pick-audio-file');
+    if (path) { musicInput.value = path; ui.socialMusic = path; applyMusic(); }
+  } }));
+
+  // renderSettings() rebuilds this panel from scratch each time it opens, so the
+  // element is module-scoped: otherwise a preview left running would keep
+  // playing against a discarded closure, with no button left to stop it.
+  stopMusicPreview();
+  const resetMusicBtn = (failed?: boolean): void => {
+    musicPreview = null;
+    musicPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+    if (failed) showToast('Couldn\'t load that music. Use a direct audio file link (.mp3/.ogg/.wav) or download it and pick the file — page links won\'t work.');
+  };
+  const musicPlayBtn = makeButton({ icon: 'play_arrow', title: 'Preview Music', onClick: async () => {
+    if (musicPreview) { stopMusicPreview(); resetMusicBtn(); return; }
+    const url: string = await ipcRenderer.invoke('resolve-social-music', musicInput.value.trim());
+    if (!url) { resetMusicBtn(true); return; }
+    musicPreview = new Audio(url);
+    musicPreview.volume = Math.min(1, Math.max(0, (ui.socialMusicVolume ?? 40) / 100));
+    musicPlayBtn.innerHTML = '<span class="material-icons">stop</span>';
+    musicPreview.onended = () => resetMusicBtn();
+    musicPreview.onerror = () => resetMusicBtn(true);
+    musicPreview.play().catch(() => resetMusicBtn(true));
+  } });
+  musicControl.appendChild(musicPlayBtn);
+  musicGroup.appendChild(musicR.row);
+
+  musicGroup.appendChild(createNumberRow({
+    label: 'Music Volume',
+    desc: 'Playback volume (0-100)',
+    min: 0, max: 100, value: ui.socialMusicVolume ?? 40, instant: true,
+    onChange: (v) => { ui.socialMusicVolume = v; applyMusic(); },
+  }));
 
   const loadingGroup = createGroup(body, 'Loading Screen');
 

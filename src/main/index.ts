@@ -30,25 +30,48 @@ const AUDIO_MIME: Record<string, string> = {
   '.aac': 'audio/aac',
 };
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
+// Music is a full-length track, not a short sting, so it gets a larger ceiling.
+const MAX_MUSIC_BYTES = 30 * 1024 * 1024;
+
+/**
+ * Read a local audio file as a base64 data URL ('' if unreadable, not a known
+ * audio type, or over maxBytes). Data URLs keep this on the same path the
+ * ranked match sound already uses: no privileged scheme to register, and no
+ * range-request handling to get right.
+ *
+ * The extension allowlist matters — this inlines file contents into a renderer,
+ * so it must never read a path that isn't audio.
+ */
+function audioFileToDataUrl(path: string, maxBytes: number): string {
+  try {
+    const mime = AUDIO_MIME[extname(path).toLowerCase()];
+    if (!mime) throw new Error('unsupported audio type');
+    const stat = statSync(path);
+    if (!stat.isFile()) throw new Error('not a file');
+    if (stat.size > maxBytes) {
+      electronLog.warn(`[KCC] Audio file too large (${stat.size} bytes, max ${maxBytes}): ${path}`);
+      return '';
+    }
+    return `data:${mime};base64,${readFileSync(path).toString('base64')}`;
+  } catch (err) {
+    electronLog.warn(`[KCC] Audio file invalid (${path}):`, err);
+    return '';
+  }
+}
 
 function resolveRankedAudioUrl(setting: string): string {
   const s = (setting || '').trim();
   if (!s) return DEFAULT_RANKED_AUDIO_URL;
   if (/^https?:\/\//i.test(s)) return s;
-  try {
-    const stat = statSync(s);
-    if (!stat.isFile()) throw new Error('not a file');
-    if (stat.size > MAX_AUDIO_BYTES) {
-      electronLog.warn(`[KCC] Ranked match sound too large (${stat.size} bytes), using default`);
-      return DEFAULT_RANKED_AUDIO_URL;
-    }
-    const mime = AUDIO_MIME[extname(s).toLowerCase()] || 'audio/mpeg';
-    const b64 = readFileSync(s).toString('base64');
-    return `data:${mime};base64,${b64}`;
-  } catch (err) {
-    electronLog.warn(`[KCC] Ranked match sound invalid (${s}):`, err);
-    return DEFAULT_RANKED_AUDIO_URL;
-  }
+  return audioFileToDataUrl(s, MAX_AUDIO_BYTES) || DEFAULT_RANKED_AUDIO_URL;
+}
+
+/** Resolve the social-music setting to a playable URL ('' = no music). */
+function resolveSocialMusicUrl(setting: string): string {
+  const s = (setting || '').trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s;
+  return audioFileToDataUrl(s, MAX_MUSIC_BYTES);
 }
 
 // ── App version for API calls ──
@@ -825,6 +848,14 @@ async function launchApp(): Promise<void> {
     win.webContents.send('main_did-finish-load');
   });
 
+  // Window focus gates social-hub music — see social-music.ts. Guarded because
+  // blur can arrive while the window is being torn down.
+  const sendFocus = (focused: boolean): void => {
+    if (!win.isDestroyed()) win.webContents.send('kcc-window-focus', focused);
+  };
+  win.on('focus', () => sendFocus(true));
+  win.on('blur', () => sendFocus(false));
+
   // ── IPC handlers ──
   // 'accounts' is intentionally excluded — it holds encrypted credential blobs.
   // The renderer must go through the dedicated alt-* handlers (alt-list returns
@@ -1014,6 +1045,8 @@ async function launchApp(): Promise<void> {
   });
 
   ipcMain.handle('resolve-ranked-sound', (_e, setting: string) => resolveRankedAudioUrl(setting));
+
+  ipcMain.handle('resolve-social-music', (_e, setting: string) => resolveSocialMusicUrl(setting));
 
   // ── Discord Rich Presence IPC handler ──
   ipcMain.on('discord-update', (_e, activity: any) => {

@@ -14,6 +14,7 @@ import { DEFAULT_CONFIG } from '../main/config-defaults';
 import { savedConsole as _console, setVerbose } from './saved-console';
 import { initAltManagerButton } from './alt-manager';
 import { startHidePopups, setClassicSocial, initModManagerButton } from './menu-tweaks';
+import { initSocialMusic } from './social-music';
 import { initBanlog } from './banlog';
 import { installGameSocketTap } from './game-socket';
 import { installSkyHook } from './sky';
@@ -187,6 +188,13 @@ ipcRenderer.on('main_did-finish-load', () => {
     if (uiConf?.menuTimer ?? true) setMenuTimer(true);
     if (isGamePage && uiConf?.classicSocial) setClassicSocial(true);
     if (isGamePage) initModManagerButton();
+
+    if (isGamePage) {
+      initSocialMusic({
+        source: uiConf?.socialMusic ?? '',
+        volume: uiConf?.socialMusicVolume ?? 40,
+      });
+    }
 
     // ── Direct server ping (TCP RTT to the game server, replaces Krunker's display) ──
     if (isGamePage && uiConf?.directServerPing) {
