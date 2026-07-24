@@ -523,6 +523,36 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
     saveUI();
   });
 
+  // ── Sky ──
+  // Applies on the next map load; the map being played is already built.
+  const skyGroup = createGroup(body, 'Sky');
+
+  skyGroup.appendChild(createToggleRow({
+    label: 'Sky Override',
+    desc: 'Recolour the in-game sky gradient',
+    checked: ui.skyOverride ?? DEFAULT_CONFIG.ui.skyOverride,
+    refreshOnly: true,
+    onChange: (v) => { ui.skyOverride = v; saveUI(); },
+  }));
+
+  skyGroup.appendChild(createColorRow({
+    label: 'Sky Top',
+    desc: 'Colour directly overhead',
+    value: ui.skyZenith || DEFAULT_CONFIG.ui.skyZenith,
+    defaultValue: DEFAULT_CONFIG.ui.skyZenith,
+    refreshOnly: true,
+    onChange: (v) => { ui.skyZenith = v; saveUI(); },
+  }));
+
+  skyGroup.appendChild(createColorRow({
+    label: 'Sky Horizon',
+    desc: 'Colour at the horizon',
+    value: ui.skyHorizon || DEFAULT_CONFIG.ui.skyHorizon,
+    defaultValue: DEFAULT_CONFIG.ui.skyHorizon,
+    refreshOnly: true,
+    onChange: (v) => { ui.skyHorizon = v; saveUI(); },
+  }));
+
   const loadingGroup = createGroup(body, 'Loading Screen');
 
   // ── Loading Screen Background ──

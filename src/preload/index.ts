@@ -16,6 +16,7 @@ import { initAltManagerButton } from './alt-manager';
 import { startHidePopups, setClassicSocial, initModManagerButton } from './menu-tweaks';
 import { initBanlog } from './banlog';
 import { installGameSocketTap } from './game-socket';
+import { installSkyHook } from './sky';
 import { installSoundHook, setHeadshotSoundMode } from './headshot-sound';
 import { initKccProtocol } from './protocol';
 
@@ -24,6 +25,9 @@ _console.log('[KCC] Preload script loaded');
 
 // ── Game socket tap: wrap window.WebSocket before the game socket opens (read-only) ──
 installGameSocketTap();
+
+// ── Sky override: wrap window.fetch before the map config request goes out ──
+installSkyHook();
 
 // preventDefault on wheel events avoids Chromium 100+ pacing frame production to vsync during scroll gestures (FPS would tank from 1000+ to refresh rate). Skip when target is inside a real scrollable element so menus still scroll.
 window.addEventListener('wheel', (e: WheelEvent) => {

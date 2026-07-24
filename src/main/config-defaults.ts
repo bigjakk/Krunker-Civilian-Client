@@ -100,6 +100,9 @@ export interface AppConfig {
     classicSocial: boolean;
     cssTheme: string;
     socialCssTheme: string;
+    skyOverride: boolean;
+    skyZenith: string;
+    skyHorizon: string;
     loadingTheme: string;
     backgroundUrl: string;
     showChangelog: boolean;
@@ -218,6 +221,9 @@ export const DEFAULT_CONFIG: AppConfig = {
     classicSocial: false,
     cssTheme: 'disabled',
     socialCssTheme: 'disabled',
+    skyOverride: false,
+    skyZenith: '#1E5AA8',
+    skyHorizon: '#9FD0F0',
     loadingTheme: 'disabled',
     backgroundUrl: '',
     showChangelog: true,

@@ -1025,6 +1025,14 @@ async function launchApp(): Promise<void> {
   ipcMain.handle('list-social-themes', () => listThemes(swapDir, SOCIAL_THEMES_DIR));
   ipcMain.handle('get-theme-css', (_e, themeId: string) => getThemeCSS(themeId, swapDir));
   ipcMain.handle('list-loading-themes', () => listLoadingThemes(swapDir));
+  ipcMain.handle('get-sky-config', () => {
+    const uiConf = config.get('ui');
+    return {
+      enabled: uiConf?.skyOverride ?? DEFAULT_CONFIG.ui.skyOverride,
+      zenith: uiConf?.skyZenith || DEFAULT_CONFIG.ui.skyZenith,
+      horizon: uiConf?.skyHorizon || DEFAULT_CONFIG.ui.skyHorizon,
+    };
+  });
   ipcMain.handle('get-loading-screen-css', (_e, loadingTheme: string, backgroundUrl: string) => {
     return getLoadingScreenCSS(loadingTheme, backgroundUrl, swapDir);
   });
