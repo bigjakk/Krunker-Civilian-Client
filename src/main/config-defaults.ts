@@ -10,6 +10,12 @@
 // Shared here because both processes need the same number.
 export const SKY_SENTINEL_ID = 9900001;
 
+// Payload of the 'resolve-social-music' IPC: a remote URL passes straight through,
+// a local file comes back as raw bytes for the renderer to wrap in a Blob. Declared
+// here because main and both preload consumers have to agree on it — ipcRenderer
+// .invoke is typed `any`, so a mismatch is otherwise silent until runtime.
+export type SocialMusicSource = { url: string } | { bytes: Uint8Array; mime: string } | null;
+
 export interface Keybind {
   key: string;
   ctrl: boolean;

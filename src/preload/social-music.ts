@@ -1,20 +1,9 @@
-// ── Menu music ──
-// Background music while the in-game social hub or Market & Trading menu is open,
-// each surface toggled independently.
-//
-// Both are popups: Krunker reuses #genericPop for every popup and tags it per type
-// (`socialModal` / `exchangeModal` here, `claimPop` elsewhere — see menu-tweaks). A
-// MutationObserver scoped to that one element tracks open/close; only main-frame
-// childList+subtree observers break the WebGL engine, which this is not.
-//
-// Playback is gated on the hub being open AND the window actually being looked
-// at (document visible + window focused), so alt-tabbing away doesn't leave
-// music playing. Window focus comes from main over 'kcc-window-focus'.
-//
-// Losing focus hard-pauses and keeps position, so coming back resumes where you
-// left off; closing the hub fades out and rewinds.
+// Background music while the social hub or Market menu is open. Krunker reuses
+// #genericPop for every popup and tags it per type, so a MutationObserver scoped to
+// that one element tracks open/close — narrow enough not to hang the WebGL engine.
 
 import { ipcRenderer } from 'electron';
+import type { SocialMusicSource } from '../main/config-defaults';
 import { savedConsole as _console } from './saved-console';
 
 export interface SocialMusicConfig {
@@ -36,6 +25,9 @@ let volume = 0.4;
 let enableSocial = true;
 let enableMarket = false;
 let resolvedUrl: string | null = null; // null = not resolved yet
+let objectUrl = '';                    // Blob URL for a local file, revoked on change
+let resolving: Promise<string> | null = null;
+let resolveToken: object | null = null; // identity of the read allowed to cache
 
 let audio: HTMLAudioElement | null = null;
 let loadedUrl: string | null = null;
@@ -43,7 +35,6 @@ let fadeTimer: number | null = null;
 
 // ── Gate ──
 let hubOpen = false;
-let visible = true;
 let windowFocused = true;
 let trackFailed = false; // source is unplayable; don't retry until it changes
 
@@ -51,15 +42,49 @@ function clampVolume(v: number): number {
   return Math.min(1, Math.max(0, (Number(v) || 0) / 100));
 }
 
-async function resolveUrl(): Promise<string> {
-  if (resolvedUrl !== null) return resolvedUrl;
-  try {
-    resolvedUrl = (await ipcRenderer.invoke('resolve-social-music', source)) as string;
-  } catch (err) {
-    _console.warn('[KCC-Music] failed to resolve source:', err);
-    resolvedUrl = '';
+/** Drop the resolved URL so the next play re-resolves, freeing any Blob behind it. */
+function clearResolved(): void {
+  resolving = null; // any read still in flight is now stale
+  resolveToken = null;
+  resolvedUrl = null;
+  loadedUrl = null;
+  if (objectUrl) {
+    URL.revokeObjectURL(objectUrl);
+    objectUrl = '';
   }
-  return resolvedUrl;
+}
+
+function resolveUrl(): Promise<string> {
+  if (resolvedUrl !== null) return Promise.resolve(resolvedUrl);
+  // Rapid focus flips call play() again mid-read and join the same promise; two
+  // reads would orphan a Blob.
+  if (resolving) return resolving;
+  const token = {};
+  resolveToken = token;
+  resolving = (async (): Promise<string> => {
+    let url = '';
+    let isBlob = false;
+    try {
+      const src = (await ipcRenderer.invoke('resolve-social-music', source)) as SocialMusicSource;
+      if (src && 'url' in src) {
+        url = src.url;
+      } else if (src && 'bytes' in src) {
+        url = URL.createObjectURL(new Blob([src.bytes as unknown as BlobPart], { type: src.mime }));
+        isBlob = true;
+      }
+    } catch (err) {
+      _console.warn('[KCC-Music] failed to resolve source:', err);
+    }
+    if (resolveToken !== token) { // superseded mid-read — don't cache a stale track
+      if (isBlob) URL.revokeObjectURL(url);
+      return '';
+    }
+    if (isBlob) objectUrl = url;
+    resolvedUrl = url;
+    resolving = null;
+    return url;
+  })();
+  return resolving;
 }
 
 // ── Playback ──
@@ -138,13 +163,13 @@ function fadeOut(): void {
 // ── Gate evaluation ──
 
 function gateOpen(): boolean {
-  return hubOpen && visible && windowFocused && !trackFailed;
+  return hubOpen && windowFocused && !trackFailed;
 }
 
 function applyGate(): void {
   // Looking away pauses outright rather than fading: the fade is the "you
   // closed the hub" gesture, and resuming mid-track is what you want on return.
-  if (!visible || !windowFocused) {
+  if (!windowFocused) {
     pauseNow();
     return;
   }
@@ -214,11 +239,6 @@ function attachHubObserver(): boolean {
 
 // ── Environment listeners ──
 
-function onVisibility(): void {
-  visible = document.visibilityState === 'visible';
-  applyGate();
-}
-
 function onWindowFocus(_e: unknown, focused: boolean): void {
   windowFocused = !!focused;
   applyGate();
@@ -229,14 +249,12 @@ let listenersBound = false;
 function bindListeners(): void {
   if (listenersBound) return;
   listenersBound = true;
-  document.addEventListener('visibilitychange', onVisibility);
   ipcRenderer.on('kcc-window-focus', onWindowFocus);
 }
 
 function unbindListeners(): void {
   if (!listenersBound) return;
   listenersBound = false;
-  document.removeEventListener('visibilitychange', onVisibility);
   ipcRenderer.off('kcc-window-focus', onWindowFocus);
 }
 
@@ -245,7 +263,6 @@ function unbindListeners(): void {
 export function updateSocialMusicConfig(cfg: SocialMusicConfig): void {
   const nextSource = (cfg.source || '').trim();
   const sourceChanged = nextSource !== source;
-  const togglesChanged = cfg.onSocial !== enableSocial || cfg.onMarket !== enableMarket;
   source = nextSource;
   volume = clampVolume(cfg.volume);
   enableSocial = cfg.onSocial;
@@ -255,38 +272,25 @@ export function updateSocialMusicConfig(cfg: SocialMusicConfig): void {
   if (!source) {
     hubOpen = false;
     pauseNow();
-    resolvedUrl = null;
-    loadedUrl = null;
+    clearResolved();
     return;
   }
   if (sourceChanged) {
-    // Dropping loadedUrl makes the next play reassign src, which starts the new
-    // track from the beginning.
-    resolvedUrl = null;
-    loadedUrl = null;
+    clearResolved(); // dropping loadedUrl makes the next play start the new track over
     trackFailed = false;
   }
-  if (sourceChanged || togglesChanged) {
-    // Re-check the live DOM: toggling a surface, or swapping the track while a
-    // surface is open, must take effect now — the observer won't fire because
-    // nothing on the page changed. evaluateHub flips hubOpen (and gates) for a
-    // toggle change; a track swap with the surface still open leaves hubOpen put,
-    // so that case needs the explicit applyGate to reload src.
-    const wasOpen = hubOpen;
-    evaluateHub();
-    if (sourceChanged && hubOpen && wasOpen) applyGate();
-  }
+  // Re-read the live DOM: a toggle or a track swap changes nothing on the page, so
+  // the observer won't fire for either.
+  evaluateHub();
+  applyGate();
 }
 
-// Preload re-runs per document, so module state is normally fresh here; the
-// teardown is defensive against 'main_did-finish-load' arriving twice for one
-// document, which would otherwise stack observers and listeners.
+// Teardown first, in case 'main_did-finish-load' arrives twice for one document —
+// that would otherwise stack observers and listeners.
 export function initSocialMusic(cfg: SocialMusicConfig): void {
   destroySocialMusic();
 
-  // Gate state and listeners first: updateSocialMusicConfig re-evaluates the live
-  // DOM and may start playback immediately if a surface is already open.
-  visible = document.visibilityState === 'visible';
+  // Before updateSocialMusicConfig, which may start playback immediately.
   windowFocused = document.hasFocus();
   bindListeners();
   updateSocialMusicConfig(cfg);
@@ -305,6 +309,7 @@ function destroySocialMusic(): void {
   hubOpen = false;
   trackFailed = false;
   pauseNow();
+  clearResolved();
   unbindListeners();
   hubObserver?.disconnect();
   hubObserver = null;

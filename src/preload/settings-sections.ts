@@ -6,6 +6,7 @@
 import { ipcRenderer } from 'electron';
 import type { Keybind } from '../main/config';
 import { DEFAULT_CONFIG } from '../main/config-defaults';
+import type { SocialMusicSource } from '../main/config-defaults';
 import { setDeathAnimBlock, setMenuTimer, setWatermark, showToast } from './utils';
 import {
   createKeybindRow, createSimpleKeyRow, createToggleRow, createSelectRow,
@@ -32,13 +33,17 @@ export interface SettingsBag {
   isWindows: boolean;
 }
 
-// Music preview outlives a single panel build — see buildAppearanceSection.
+// Module-scoped so it can be stopped from outside the panel that created it.
 let musicPreview: HTMLAudioElement | null = null;
+let musicPreviewUrl = ''; // Blob URL while previewing a local file
 
-function stopMusicPreview(): void {
-  if (!musicPreview) return;
-  musicPreview.pause();
+export function stopMusicPreview(): void {
+  if (musicPreview) musicPreview.pause();
   musicPreview = null;
+  if (musicPreviewUrl) {
+    URL.revokeObjectURL(musicPreviewUrl);
+    musicPreviewUrl = '';
+  }
 }
 
 export function buildGeneralSection(
@@ -631,18 +636,22 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
     if (path) { musicInput.value = path; ui.socialMusic = path; applyMusic(); }
   } }));
 
-  // renderSettings() rebuilds this panel from scratch each time it opens, so the
-  // element is module-scoped: otherwise a preview left running would keep
-  // playing against a discarded closure, with no button left to stop it.
-  stopMusicPreview();
+  stopMusicPreview(); // this panel is rebuilt on every open
   const resetMusicBtn = (failed?: boolean): void => {
-    musicPreview = null;
+    stopMusicPreview();
     musicPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
     if (failed) showToast('Couldn\'t load that music. Use a direct audio file link (.mp3/.ogg/.wav) or download it and pick the file — page links won\'t work.');
   };
   const musicPlayBtn = makeButton({ icon: 'play_arrow', title: 'Preview Music', onClick: async () => {
-    if (musicPreview) { stopMusicPreview(); resetMusicBtn(); return; }
-    const url: string = await ipcRenderer.invoke('resolve-social-music', musicInput.value.trim());
+    if (musicPreview) { resetMusicBtn(); return; }
+    const src = (await ipcRenderer.invoke('resolve-social-music', musicInput.value.trim())) as SocialMusicSource;
+    let url = '';
+    if (src && 'url' in src) {
+      url = src.url;
+    } else if (src && 'bytes' in src) {
+      musicPreviewUrl = URL.createObjectURL(new Blob([src.bytes as unknown as BlobPart], { type: src.mime }));
+      url = musicPreviewUrl;
+    }
     if (!url) { resetMusicBtn(true); return; }
     musicPreview = new Audio(url);
     musicPreview.volume = Math.min(1, Math.max(0, (ui.socialMusicVolume ?? 40) / 100));

@@ -1,12 +1,12 @@
 import { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, powerSaveBlocker, safeStorage, session, shell, webContents } from 'electron';
 import { join, extname } from 'path';
-import { existsSync, mkdirSync, promises as fsp, readFileSync, statSync } from 'fs';
+import { existsSync, mkdirSync, promises as fsp } from 'fs';
 import { get as httpsGet } from 'https';
 import { execFile } from 'child_process';
 import * as os from 'os';
 import { Socket } from 'net';
 import { detectPlatform, applyPlatformFlags, getValidAngleBackends, devWindowIcon } from './platform';
-import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount, DEFAULT_CONFIG } from './config';
+import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount, DEFAULT_CONFIG, SocialMusicSource } from './config';
 import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper, filePathToSwapURL } from './swapper';
 import { listSkyImages, resolveSkyImage, SKIES_DIR, SKY_TEXTURE_RE } from './sky-textures';
 import { UserscriptManager } from './userscripts';
@@ -30,48 +30,40 @@ const AUDIO_MIME: Record<string, string> = {
   '.aac': 'audio/aac',
 };
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
-// Music is a full-length track, not a short sting, so it gets a larger ceiling.
 const MAX_MUSIC_BYTES = 30 * 1024 * 1024;
 
-/**
- * Read a local audio file as a base64 data URL ('' if unreadable, not a known
- * audio type, or over maxBytes). Data URLs keep this on the same path the
- * ranked match sound already uses: no privileged scheme to register, and no
- * range-request handling to get right.
- *
- * The extension allowlist matters — this inlines file contents into a renderer,
- * so it must never read a path that isn't audio.
- */
-function audioFileToDataUrl(path: string, maxBytes: number): string {
+/** The extension allowlist is load-bearing — this inlines file bytes into a renderer. */
+async function readAudio(path: string, maxBytes: number): Promise<{ bytes: Buffer; mime: string } | null> {
   try {
     const mime = AUDIO_MIME[extname(path).toLowerCase()];
     if (!mime) throw new Error('unsupported audio type');
-    const stat = statSync(path);
+    const stat = await fsp.stat(path);
     if (!stat.isFile()) throw new Error('not a file');
     if (stat.size > maxBytes) {
       electronLog.warn(`[KCC] Audio file too large (${stat.size} bytes, max ${maxBytes}): ${path}`);
-      return '';
+      return null;
     }
-    return `data:${mime};base64,${readFileSync(path).toString('base64')}`;
+    return { bytes: await fsp.readFile(path), mime };
   } catch (err) {
     electronLog.warn(`[KCC] Audio file invalid (${path}):`, err);
-    return '';
+    return null;
   }
 }
 
-function resolveRankedAudioUrl(setting: string): string {
+async function resolveRankedAudioUrl(setting: string): Promise<string> {
   const s = (setting || '').trim();
   if (!s) return DEFAULT_RANKED_AUDIO_URL;
   if (/^https?:\/\//i.test(s)) return s;
-  return audioFileToDataUrl(s, MAX_AUDIO_BYTES) || DEFAULT_RANKED_AUDIO_URL;
+  const a = await readAudio(s, MAX_AUDIO_BYTES);
+  return a ? `data:${a.mime};base64,${a.bytes.toString('base64')}` : DEFAULT_RANKED_AUDIO_URL;
 }
 
-/** Resolve the social-music setting to a playable URL ('' = no music). */
-function resolveSocialMusicUrl(setting: string): string {
+/** Local files come back as raw bytes for a Blob; base64 would add a third again. */
+async function resolveSocialMusic(setting: string): Promise<SocialMusicSource> {
   const s = (setting || '').trim();
-  if (!s) return '';
-  if (/^https?:\/\//i.test(s)) return s;
-  return audioFileToDataUrl(s, MAX_MUSIC_BYTES);
+  if (!s) return null;
+  if (/^https?:\/\//i.test(s)) return { url: s };
+  return await readAudio(s, MAX_MUSIC_BYTES);
 }
 
 // ── App version for API calls ──
@@ -1024,9 +1016,9 @@ async function launchApp(): Promise<void> {
   });
 
   // ── Ranked queue IPC handler ──
-  ipcMain.on('open-ranked-queue', (_e, token: string, region: string, allRegions: boolean) => {
+  ipcMain.on('open-ranked-queue', async (_e, token: string, region: string, allRegions: boolean) => {
     const mm = config.get('matchmaker');
-    const audioUrl = resolveRankedAudioUrl(mm?.rankedMatchSound || '');
+    const audioUrl = await resolveRankedAudioUrl(mm?.rankedMatchSound || '');
     const showHeader = config.get('ui')?.watermark ?? true;
     openRankedQueue(token, region, allRegions, audioUrl, showHeader);
   });
@@ -1046,7 +1038,7 @@ async function launchApp(): Promise<void> {
 
   ipcMain.handle('resolve-ranked-sound', (_e, setting: string) => resolveRankedAudioUrl(setting));
 
-  ipcMain.handle('resolve-social-music', (_e, setting: string) => resolveSocialMusicUrl(setting));
+  ipcMain.handle('resolve-social-music', (_e, setting: string) => resolveSocialMusic(setting));
 
   // ── Discord Rich Presence IPC handler ──
   ipcMain.on('discord-update', (_e, activity: any) => {
@@ -1066,8 +1058,8 @@ async function launchApp(): Promise<void> {
   ipcMain.handle('get-theme-css', (_e, themeId: string) => getThemeCSS(themeId, swapDir));
   ipcMain.handle('list-loading-themes', () => listLoadingThemes(swapDir));
   ipcMain.handle('list-sky-images', () => listSkyImages(swapDir));
-  // The image is resolved here, not in the preload: a selected-but-missing file has
-  // to fall back to the gradient rather than leave a blank dome.
+  // Sync: the preload reads this once at top level, before wrapping fetch. The image
+  // resolves here so a selected-but-missing file falls back to the gradient.
   ipcMain.handle('get-sky-config', () => {
     const uiConf = config.get('ui');
     return {

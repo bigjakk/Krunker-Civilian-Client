@@ -21,7 +21,7 @@ import {
   type SettingsBag,
   buildGeneralSection, buildGameSection, buildKeystrokesRows, buildPerformanceSection,
   buildSwapperSection, buildAppearanceSection, buildMatchmakerSection, buildDiscordSection,
-  buildChatSection,
+  buildChatSection, stopMusicPreview,
 } from './settings-sections';
 import { buildAccountsSection } from './alt-manager';
 import { getInstances, setScriptEnabled } from './userscripts';
@@ -90,6 +90,15 @@ export function hookSettings(): void {
     if (!isClientTab()) return;
     const query = (document.getElementById('settSearch') as HTMLInputElement | null)?.value?.trim() ?? '';
     renderSettings(query.length > 0 ? query : undefined);
+  }
+
+  // Closing the settings window is neither a tab change nor a search, so none of the
+  // hooks below fire — without this a running music preview plays on over the game.
+  const holder = document.getElementById('windowHolder');
+  if (holder) {
+    new MutationObserver(() => {
+      if (!holder.style.display || holder.style.display === 'none') stopMusicPreview();
+    }).observe(holder, { attributes: true, attributeFilter: ['style'] });
   }
 
   const origShowWindow = w.showWindow.bind(w);
