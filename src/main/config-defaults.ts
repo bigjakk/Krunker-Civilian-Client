@@ -112,6 +112,8 @@ export interface AppConfig {
     skyImage: string;
     socialMusic: string;
     socialMusicVolume: number;
+    socialMusicOnSocial: boolean;
+    socialMusicOnMarket: boolean;
     loadingTheme: string;
     backgroundUrl: string;
     showChangelog: boolean;
@@ -236,6 +238,8 @@ export const DEFAULT_CONFIG: AppConfig = {
     skyImage: 'disabled',
     socialMusic: '',
     socialMusicVolume: 40,
+    socialMusicOnSocial: true,
+    socialMusicOnMarket: false,
     loadingTheme: 'disabled',
     backgroundUrl: '',
     showChangelog: true,

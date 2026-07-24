@@ -1,8 +1,9 @@
-// ── Social hub music ──
-// Background music while the new in-game social hub is open.
+// ── Menu music ──
+// Background music while the in-game social hub or Market & Trading menu is open,
+// each surface toggled independently.
 //
-// The hub is a popup: Krunker reuses #genericPop for every popup and tags it per
-// type (`socialModal` here, `claimPop` elsewhere — see menu-tweaks). A
+// Both are popups: Krunker reuses #genericPop for every popup and tags it per type
+// (`socialModal` / `exchangeModal` here, `claimPop` elsewhere — see menu-tweaks). A
 // MutationObserver scoped to that one element tracks open/close; only main-frame
 // childList+subtree observers break the WebGL engine, which this is not.
 //
@@ -19,16 +20,21 @@ import { savedConsole as _console } from './saved-console';
 export interface SocialMusicConfig {
   source: string;
   volume: number; // 0-100
+  onSocial: boolean;
+  onMarket: boolean;
 }
+
+type Surface = 'social' | 'market';
 
 const FADE_MS = 1200;
 const FADE_STEP_MS = 50;
 const POLL_MS = 500;
 const POLL_MAX = 60;
-const HUB_CLASS = 'socialModal';
 
 let source = '';
 let volume = 0.4;
+let enableSocial = true;
+let enableMarket = false;
 let resolvedUrl: string | null = null; // null = not resolved yet
 
 let audio: HTMLAudioElement | null = null;
@@ -162,17 +168,25 @@ let hubObserver: MutationObserver | null = null;
 let evalTimer: number | null = null;
 let hubPoll: number | null = null;
 
-function hubIsOpen(gp: HTMLElement): boolean {
+function openSurface(gp: HTMLElement): Surface | null {
   // getClientRects() is empty when the element or any ancestor is display:none,
   // and unlike offsetParent it still reports correctly for position:fixed popups.
-  if (!gp.getClientRects().length) return false;
-  return gp.classList.contains(HUB_CLASS) || !!gp.querySelector('.social-root');
+  if (!gp.getClientRects().length) return null;
+  if (gp.classList.contains('socialModal') || gp.querySelector('.social-root')) return 'social';
+  if (gp.classList.contains('exchangeModal') || gp.querySelector('.market-container')) return 'market';
+  return null;
+}
+
+function enabledFor(surface: Surface | null): boolean {
+  if (surface === 'social') return enableSocial;
+  if (surface === 'market') return enableMarket;
+  return false;
 }
 
 function evaluateHub(): void {
   const gp = document.getElementById('genericPop');
   if (!gp) return;
-  setHubOpen(hubIsOpen(gp));
+  setHubOpen(enabledFor(openSurface(gp)));
 }
 
 // Class and style land as separate mutations; coalesce so one open doesn't
@@ -231,8 +245,11 @@ function unbindListeners(): void {
 export function updateSocialMusicConfig(cfg: SocialMusicConfig): void {
   const nextSource = (cfg.source || '').trim();
   const sourceChanged = nextSource !== source;
+  const togglesChanged = cfg.onSocial !== enableSocial || cfg.onMarket !== enableMarket;
   source = nextSource;
   volume = clampVolume(cfg.volume);
+  enableSocial = cfg.onSocial;
+  enableMarket = cfg.onMarket;
   if (audio && fadeTimer === null) audio.volume = volume;
 
   if (!source) {
@@ -248,7 +265,16 @@ export function updateSocialMusicConfig(cfg: SocialMusicConfig): void {
     resolvedUrl = null;
     loadedUrl = null;
     trackFailed = false;
-    applyGate(); // swap tracks immediately if the hub is open right now
+  }
+  if (sourceChanged || togglesChanged) {
+    // Re-check the live DOM: toggling a surface, or swapping the track while a
+    // surface is open, must take effect now — the observer won't fire because
+    // nothing on the page changed. evaluateHub flips hubOpen (and gates) for a
+    // toggle change; a track swap with the surface still open leaves hubOpen put,
+    // so that case needs the explicit applyGate to reload src.
+    const wasOpen = hubOpen;
+    evaluateHub();
+    if (sourceChanged && hubOpen && wasOpen) applyGate();
   }
 }
 
@@ -257,11 +283,13 @@ export function updateSocialMusicConfig(cfg: SocialMusicConfig): void {
 // document, which would otherwise stack observers and listeners.
 export function initSocialMusic(cfg: SocialMusicConfig): void {
   destroySocialMusic();
-  updateSocialMusicConfig(cfg); // sets state without starting (hubOpen is false)
 
+  // Gate state and listeners first: updateSocialMusicConfig re-evaluates the live
+  // DOM and may start playback immediately if a surface is already open.
   visible = document.visibilityState === 'visible';
   windowFocused = document.hasFocus();
   bindListeners();
+  updateSocialMusicConfig(cfg);
 
   if (attachHubObserver()) return;
   let attempts = 0;

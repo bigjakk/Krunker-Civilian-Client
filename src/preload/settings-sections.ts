@@ -588,20 +588,38 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
     onSettingChanged('refresh');
   });
 
-  // ── Social Hub Music ──
-  const musicGroup = createGroup(body, 'Social Hub Music');
+  // ── Menu Music ──
+  const musicGroup = createGroup(body, 'Menu Music');
 
   const applyMusic = (): void => {
     saveUI();
     updateSocialMusicConfig({
       source: ui.socialMusic || '',
       volume: ui.socialMusicVolume ?? 40,
+      onSocial: ui.socialMusicOnSocial ?? DEFAULT_CONFIG.ui.socialMusicOnSocial,
+      onMarket: ui.socialMusicOnMarket ?? DEFAULT_CONFIG.ui.socialMusicOnMarket,
     });
   };
 
+  musicGroup.appendChild(createToggleRow({
+    label: 'Play in Social Hub',
+    desc: 'Loop the music while the social hub is open',
+    checked: ui.socialMusicOnSocial ?? DEFAULT_CONFIG.ui.socialMusicOnSocial,
+    instant: true,
+    onChange: (v) => { ui.socialMusicOnSocial = v; applyMusic(); },
+  }));
+
+  musicGroup.appendChild(createToggleRow({
+    label: 'Play in Market',
+    desc: 'Loop the music while the Market & Trading menu is open',
+    checked: ui.socialMusicOnMarket ?? DEFAULT_CONFIG.ui.socialMusicOnMarket,
+    instant: true,
+    onChange: (v) => { ui.socialMusicOnMarket = v; applyMusic(); },
+  }));
+
   const musicR = createTextRow({
     label: 'Music Source',
-    desc: 'Loops while the social hub is open, and fades out when you close it. Use a direct audio file link ending in .mp3, .ogg, or .wav — page links (Pixabay, YouTube, etc.) will not work. The easiest way is to download the file and pick it with the browse button (local files must be under 30 MB). Leave blank to disable.',
+    desc: 'Loops while an enabled menu (above) is open, and fades out when you close it. Use a direct audio file link ending in .mp3, .ogg, or .wav — page links (Pixabay, YouTube, etc.) will not work. The easiest way is to download the file and pick it with the browse button (local files must be under 30 MB). Leave blank to disable.',
     value: ui.socialMusic || '',
     placeholder: 'https://example.com/track.mp3  or  C:\\path\\to\\file.mp3',
     onChange: (v) => { ui.socialMusic = v; applyMusic(); },

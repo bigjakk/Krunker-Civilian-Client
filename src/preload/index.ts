@@ -193,6 +193,8 @@ ipcRenderer.on('main_did-finish-load', () => {
       initSocialMusic({
         source: uiConf?.socialMusic ?? '',
         volume: uiConf?.socialMusicVolume ?? 40,
+        onSocial: uiConf?.socialMusicOnSocial ?? true,
+        onMarket: uiConf?.socialMusicOnMarket ?? false,
       });
     }
 
