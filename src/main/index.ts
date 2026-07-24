@@ -1060,9 +1060,9 @@ async function launchApp(): Promise<void> {
   ipcMain.handle('list-sky-images', () => listSkyImages(swapDir));
   // Sync: the preload reads this once at top level, before wrapping fetch. The image
   // resolves here so a selected-but-missing file falls back to the gradient.
-  ipcMain.handle('get-sky-config', () => {
+  ipcMain.on('get-sky-config', (e) => {
     const uiConf = config.get('ui');
-    return {
+    e.returnValue = {
       enabled: uiConf?.skyOverride ?? DEFAULT_CONFIG.ui.skyOverride,
       zenith: uiConf?.skyZenith || DEFAULT_CONFIG.ui.skyZenith,
       horizon: uiConf?.skyHorizon || DEFAULT_CONFIG.ui.skyHorizon,

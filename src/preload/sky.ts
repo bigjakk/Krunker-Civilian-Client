@@ -1,10 +1,5 @@
-// ── Sky override ──
-// Krunker fetches map config from gapi.svc.krunker.io/maps/<id> with fetch(), and
-// re-fetches it on every match join. Every render field lives under `data`, so
-// rewriting the dome fields there recolours the sky without touching the renderer.
-//
-// Scope is the dome only. fog, ambient, light and fogD are visibility knobs and
-// stay stock.
+// Sky override. Krunker re-fetches map config from gapi.svc.krunker.io/maps/<id> on
+// every match join; rewriting the dome fields under `data` recolours the sky.
 
 import { ipcRenderer } from 'electron';
 import { SKY_SENTINEL_ID } from '../main/config-defaults';
@@ -20,16 +15,12 @@ interface SkyConfig {
   useImage: boolean;
 }
 
-let installed = false;
-
 /** '#RRGGBB' -> 0xRRGGBB. sky/fog/ambient/light hold the int form of the same value. */
 function toInt(hex: string): number {
   return parseInt(hex.slice(1), 16);
 }
 
 function patchDome(data: Record<string, unknown>, sky: SkyConfig): void {
-  // An image replaces the gradient. skyDomeTexA alone renders fully lit — no
-  // emissive companion needed.
   data.skyDome = true;
   data.skyDomeTex = sky.useImage;
 
@@ -37,8 +28,7 @@ function patchDome(data: Record<string, unknown>, sky: SkyConfig): void {
     data.skyDomeTexA = SKY_SENTINEL_ID;
     // Maps that ship their own emissive sky texture keep rendering it over ours
     data.skyDomeEmisTex = 0;
-    // The dome tints its texture by the gradient colours, so they have to go
-    // neutral or the picture comes through colour-cast.
+    // The dome tints its texture by the gradient colours, so they go neutral
     data.skyDomeCol0 = WHITE;
     data.skyDomeCol1 = WHITE;
     data.skyDomeCol2 = WHITE;
@@ -54,10 +44,16 @@ function patchDome(data: Record<string, unknown>, sky: SkyConfig): void {
 
 /** Wrap window.fetch once, at preload top level — the map fetch lands ~2.8s in. */
 export function installSkyHook(): void {
-  if (installed) return;
+  // The sky controls are refreshOnly, so one read holds for the life of the document.
+  let sky: SkyConfig | undefined;
+  try {
+    sky = ipcRenderer.sendSync('get-sky-config');
+  } catch (err) {
+    _console.warn('[KCC-Sky] config read failed:', err);
+    return;
+  }
+  if (!sky?.enabled) return;
   const origFetch = window.fetch;
-  if (!origFetch) return;
-  installed = true;
 
   window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     const res = await origFetch.call(window, input, init);
@@ -66,12 +62,6 @@ export function installSkyHook(): void {
         : input instanceof URL ? input.href
           : (input as Request).url;
       if (!MAP_URL_RE.test(url) || !res.ok) return res;
-
-      // Read config per map load rather than caching it: this path has just
-      // finished waiting on the network, so one IPC round-trip costs nothing and
-      // a settings change needs no invalidation.
-      const sky: SkyConfig = await ipcRenderer.invoke('get-sky-config');
-      if (!sky.enabled) return res;
 
       // clone() so the original body stays unread if anything below throws
       const map = await res.clone().json();
@@ -86,11 +76,7 @@ export function installSkyHook(): void {
 
       _console.log(`[KCC-Sky] dome replaced on ${url}`);
       // NB: Response.url is not settable via the constructor — comes back ''
-      return new Response(JSON.stringify(map), {
-        status: res.status,
-        statusText: res.statusText,
-        headers: res.headers,
-      });
+      return new Response(JSON.stringify(map), { status: res.status, statusText: res.statusText });
     } catch (err) {
       _console.warn('[KCC-Sky] patch failed, passing through:', err);
       return res;
