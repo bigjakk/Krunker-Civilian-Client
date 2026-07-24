@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, promises as fsp } from 'fs';
-import { join } from 'path';
+import { join, resolve, sep } from 'path';
+import { pathToFileURL } from 'url';
 import { protocol, net, Session } from 'electron';
 import { electronLog } from './logger';
 
@@ -10,7 +11,7 @@ const TARGET_DOMAIN = 'krunker.io';
  * Convert a native file path to a proper kcc-swap:// URL.
  * Windows paths like C:\foo\bar become kcc-swap://C/foo/bar
  */
-function filePathToSwapURL(filePath: string): string {
+export function filePathToSwapURL(filePath: string): string {
   const forwardSlash = filePath.replace(/\\/g, '/');
   // Windows drive letter: C:/foo → kcc-swap://C/foo
   const match = forwardSlash.match(/^([A-Za-z]):\/(.*)/);
@@ -31,25 +32,28 @@ export function initSwapperProtocol(): void {
   }]);
 }
 
-/**
- * Register the file protocol handler on the given session.
- * Must be called AFTER app.ready.
- */
-export function registerSwapperFileProtocol(ses: Session): void {
+/** Must be called AFTER app.ready. */
+export function registerSwapperFileProtocol(ses: Session, swapDir: string): void {
+  // Windows paths are case-insensitive, and a drive letter can reach us in either case
+  const norm = (p: string): string => process.platform === 'win32' ? p.toLowerCase() : p;
+  const root = norm(resolve(swapDir));
   ses.protocol.handle(PROTOCOL_NAME, async (request) => {
     const url = new URL(request.url);
-    // Reconstruct the file path from the URL
-    // Windows: kcc-swap://C/foo/bar → C:/foo/bar
-    // Unix:    kcc-swap:///home/foo  → /home/foo
-    let filePath: string;
-    if (url.hostname) {
-      // Windows drive letter is the hostname
-      filePath = `${url.hostname}:${url.pathname}`;
-    } else {
-      filePath = url.pathname;
+    // Windows drive letter rides as the hostname: kcc-swap://C/foo → C:/foo
+    const raw = url.hostname ? `${url.hostname}:${url.pathname}` : url.pathname;
+    const filePath = resolve(decodeURIComponent(raw));
+    // The ACAO below makes these readable cross-origin, so anything outside the
+    // swap dir would be an arbitrary local-file read for any script on the page.
+    if (norm(filePath) !== root && !norm(filePath).startsWith(root + sep)) {
+      electronLog.warn(`[KCC] Blocked swap request outside swap dir: ${filePath}`);
+      return new Response('Forbidden', { status: 403 });
     }
     try {
-      return await net.fetch(`file://${filePath}`);
+      const res = await net.fetch(pathToFileURL(filePath).href);
+      // WebGL texture uploads need a CORS-clean image; file:// carries no ACAO
+      const headers = new Headers(res.headers);
+      headers.set('access-control-allow-origin', '*');
+      return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
     } catch (err) {
       electronLog.warn(`[KCC] Swap file fetch failed for ${filePath}:`, err);
       return new Response('Not found', { status: 404 });

@@ -7,14 +7,17 @@
 // stay stock.
 
 import { ipcRenderer } from 'electron';
+import { SKY_SENTINEL_ID } from '../main/config-defaults';
 import { savedConsole as _console } from './saved-console';
 
 const MAP_URL_RE = /gapi\.svc\.krunker\.io\/maps\/\d/;
+const WHITE = '#FFFFFF';
 
 interface SkyConfig {
   enabled: boolean;
   zenith: string;
   horizon: string;
+  useImage: boolean;
 }
 
 let installed = false;
@@ -25,8 +28,24 @@ function toInt(hex: string): number {
 }
 
 function patchDome(data: Record<string, unknown>, sky: SkyConfig): void {
+  // An image replaces the gradient. skyDomeTexA alone renders fully lit — no
+  // emissive companion needed.
   data.skyDome = true;
-  data.skyDomeTex = false;
+  data.skyDomeTex = sky.useImage;
+
+  if (sky.useImage) {
+    data.skyDomeTexA = SKY_SENTINEL_ID;
+    // Maps that ship their own emissive sky texture keep rendering it over ours
+    data.skyDomeEmisTex = 0;
+    // The dome tints its texture by the gradient colours, so they have to go
+    // neutral or the picture comes through colour-cast.
+    data.skyDomeCol0 = WHITE;
+    data.skyDomeCol1 = WHITE;
+    data.skyDomeCol2 = WHITE;
+    data.sky = toInt(WHITE);
+    return;
+  }
+
   data.skyDomeCol0 = sky.zenith;
   data.skyDomeCol1 = sky.horizon;
   data.skyDomeCol2 = sky.horizon; // stock maps set Col2 === Col1

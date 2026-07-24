@@ -553,6 +553,31 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
     onChange: (v) => { ui.skyHorizon = v; saveUI(); },
   }));
 
+  // ── Sky Image (populated from swap/skies/) ──
+  // The image is wrapped around a dome, so flat photos distort badly.
+  const skyImgR = createRowShell('Sky Image', 'Use an image from swap/skies/ instead of the gradient. Panoramic (equirectangular) images work best — ordinary photos will stretch');
+  const skyImgSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
+  skyImgR.control.appendChild(skyImgSelect);
+  skyImgR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Skies Folder', onClick: () => ipcRenderer.invoke('open-skies-folder') }));
+  skyGroup.appendChild(skyImgR.row);
+
+  ipcRenderer.invoke('list-sky-images').then((images: Array<{ id: string; label: string }>) => {
+    skyImgSelect.innerHTML = '';
+    for (const img of images) {
+      const opt = document.createElement('option');
+      opt.value = img.id;
+      opt.textContent = img.label;
+      if (img.id === ui.skyImage) opt.selected = true;
+      skyImgSelect.appendChild(opt);
+    }
+  });
+
+  skyImgSelect.addEventListener('change', () => {
+    ui.skyImage = skyImgSelect.value;
+    saveUI();
+    onSettingChanged('refresh');
+  });
+
   const loadingGroup = createGroup(body, 'Loading Screen');
 
   // ── Loading Screen Background ──

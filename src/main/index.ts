@@ -7,7 +7,8 @@ import * as os from 'os';
 import { Socket } from 'net';
 import { detectPlatform, applyPlatformFlags, getValidAngleBackends, devWindowIcon } from './platform';
 import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount, DEFAULT_CONFIG } from './config';
-import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper } from './swapper';
+import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper, filePathToSwapURL } from './swapper';
+import { listSkyImages, resolveSkyImage, SKIES_DIR, SKY_TEXTURE_RE } from './sky-textures';
 import { UserscriptManager } from './userscripts';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog, getLogPath, closeLogStreams } from './logger';
@@ -421,17 +422,16 @@ async function launchApp(): Promise<void> {
   // ── Session: persistent partition ──
   const ses = session.fromPartition('persist:krunker');
 
-  // ── Register swapper file protocol on this session ──
-  registerSwapperFileProtocol(ses);
-
   // ── Resource swapper ──
   const swapperConfig = config.get('swapper');
   const swapDir = swapperConfig.path || join(app.getPath('userData'), 'Krunker Civilian Client', 'swapper');
-  // Ensure swap subdirectories exist (themes/, backgrounds/, socialthemes/)
-  for (const sub of [GAME_THEMES_DIR, 'backgrounds', SOCIAL_THEMES_DIR]) {
+  // Ensure swap subdirectories exist (themes/, backgrounds/, socialthemes/, skies/)
+  for (const sub of [GAME_THEMES_DIR, 'backgrounds', SOCIAL_THEMES_DIR, SKIES_DIR]) {
     const dir = join(swapDir, sub);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
+
+  registerSwapperFileProtocol(ses, swapDir);
 
   const swapper = swapperConfig.enabled ? new ResourceSwapper(swapDir) : null;
   electronLog.log(`[KCC] Resource swapper: ${swapper ? 'enabled' : 'disabled'} (${swapDir})`);
@@ -479,6 +479,12 @@ async function launchApp(): Promise<void> {
     // Turf Wars clan banner block — same empty-body redirect
     if (hideTurfBanners && TURF_BANNER_URL_RE.test(details.url)) {
       return callback({ redirectURL: EMPTY_RESPONSE_URL });
+    }
+    // Sky dome texture — redirect the sentinel asset to the user's local image.
+    // Config is read here rather than cached: this fires once per map load.
+    if (SKY_TEXTURE_RE.test(details.url)) {
+      const skyFile = resolveSkyImage(config.get('ui')?.skyImage || '', swapDir);
+      if (skyFile) return callback({ redirectURL: filePathToSwapURL(skyFile) });
     }
     // Check swapper next — redirect matching assets to local files
     if (swapper) {
@@ -939,6 +945,7 @@ async function launchApp(): Promise<void> {
   ipcMain.handle('open-themes-folder', () => shell.openPath(join(swapDir, GAME_THEMES_DIR)));
   ipcMain.handle('open-social-themes-folder', () => shell.openPath(join(swapDir, SOCIAL_THEMES_DIR)));
   ipcMain.handle('open-backgrounds-folder', () => shell.openPath(join(swapDir, 'backgrounds')));
+  ipcMain.handle('open-skies-folder', () => shell.openPath(join(swapDir, SKIES_DIR)));
   ipcMain.handle('open-screenshots-folder', () => openScreenshotsFolder());
 
   // ── Ping regions IPC handler (TCP connect timing, cached 60s) ──
@@ -1025,12 +1032,16 @@ async function launchApp(): Promise<void> {
   ipcMain.handle('list-social-themes', () => listThemes(swapDir, SOCIAL_THEMES_DIR));
   ipcMain.handle('get-theme-css', (_e, themeId: string) => getThemeCSS(themeId, swapDir));
   ipcMain.handle('list-loading-themes', () => listLoadingThemes(swapDir));
+  ipcMain.handle('list-sky-images', () => listSkyImages(swapDir));
+  // The image is resolved here, not in the preload: a selected-but-missing file has
+  // to fall back to the gradient rather than leave a blank dome.
   ipcMain.handle('get-sky-config', () => {
     const uiConf = config.get('ui');
     return {
       enabled: uiConf?.skyOverride ?? DEFAULT_CONFIG.ui.skyOverride,
       zenith: uiConf?.skyZenith || DEFAULT_CONFIG.ui.skyZenith,
       horizon: uiConf?.skyHorizon || DEFAULT_CONFIG.ui.skyHorizon,
+      useImage: resolveSkyImage(uiConf?.skyImage || '', swapDir) !== null,
     };
   });
   ipcMain.handle('get-loading-screen-css', (_e, loadingTheme: string, backgroundUrl: string) => {

@@ -4,6 +4,12 @@
 // sandboxed and can't pull Node modules, but it can import this for the single
 // source of truth on defaults. config.ts wraps DEFAULT_CONFIG in the actual Store.
 
+// Sky dome textures are referenced by user-asset ID. This one is deliberately not a
+// real asset: the preload writes it into the map config, and main redirects the
+// resulting texture request to a local file, so it never reaches the network.
+// Shared here because both processes need the same number.
+export const SKY_SENTINEL_ID = 9900001;
+
 export interface Keybind {
   key: string;
   ctrl: boolean;
@@ -103,6 +109,7 @@ export interface AppConfig {
     skyOverride: boolean;
     skyZenith: string;
     skyHorizon: string;
+    skyImage: string;
     loadingTheme: string;
     backgroundUrl: string;
     showChangelog: boolean;
@@ -224,6 +231,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     skyOverride: false,
     skyZenith: '#1E5AA8',
     skyHorizon: '#9FD0F0',
+    skyImage: 'disabled',
     loadingTheme: 'disabled',
     backgroundUrl: '',
     showChangelog: true,
