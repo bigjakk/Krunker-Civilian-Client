@@ -489,13 +489,14 @@ export function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfR
   // Applies on the next map load; the map being played is already built.
   const skyGroup = createGroup(body, 'Sky');
 
-  skyGroup.appendChild(createToggleRow({
+  const skyToggle = createToggleRow({
     label: 'Sky Override',
     desc: 'Recolour the in-game sky gradient',
     checked: ui.skyOverride ?? DEFAULT_CONFIG.ui.skyOverride,
     refreshOnly: true,
     onChange: (v) => { ui.skyOverride = v; saveUI(); },
-  }));
+  });
+  skyGroup.appendChild(skyToggle);
 
   skyGroup.appendChild(createColorRow({
     label: 'Sky Top',
@@ -517,13 +518,12 @@ export function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfR
 
   // ── Sky Image (populated from swap/skies/) ──
   // The image is wrapped around a dome, so flat photos distort badly.
-  const skyImgR = createRowShell('Sky Image', 'Use an image from swap/skies/ instead of the gradient. Panoramic (equirectangular) images work best — ordinary photos will stretch');
+  const skyImgR = createRowShell('Sky Image', 'Use an image instead of the gradient — browse for one, or drop files into swap/skies/. Panoramic (equirectangular) images work best — ordinary photos will stretch');
   const skyImgSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
   skyImgR.control.appendChild(skyImgSelect);
-  skyImgR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Skies Folder', onClick: () => ipcRenderer.invoke('open-skies-folder') }));
-  skyGroup.appendChild(skyImgR.row);
 
-  ipcRenderer.invoke('list-sky-images').then((images: Array<{ id: string; label: string }>) => {
+  const populateSkies = async (): Promise<void> => {
+    const images: Array<{ id: string; label: string }> = await ipcRenderer.invoke('list-sky-images');
     skyImgSelect.innerHTML = '';
     for (const img of images) {
       const opt = document.createElement('option');
@@ -532,7 +532,30 @@ export function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfR
       if (img.id === ui.skyImage) opt.selected = true;
       skyImgSelect.appendChild(opt);
     }
-  });
+  };
+
+  skyImgR.control.appendChild(makeButton({ icon: 'folder_open', title: 'Browse for Image', onClick: async () => {
+    let id: string;
+    try {
+      id = await ipcRenderer.invoke('pick-sky-image');
+    } catch {
+      showToast('Couldn\'t add that sky image. Pick a .png, .jpg, or .webp file.');
+      return;
+    }
+    if (!id) return;
+    ui.skyImage = id;
+    // The override is off by default, so without this the pick would do nothing
+    ui.skyOverride = true;
+    const cb = skyToggle.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    if (cb) cb.checked = true;
+    saveUI();
+    await populateSkies();
+    onSettingChanged('refresh');
+  } }));
+  skyImgR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Skies Folder', onClick: () => ipcRenderer.invoke('open-skies-folder') }));
+  skyGroup.appendChild(skyImgR.row);
+
+  populateSkies();
 
   skyImgSelect.addEventListener('change', () => {
     ui.skyImage = skyImgSelect.value;

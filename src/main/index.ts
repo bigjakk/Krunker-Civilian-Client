@@ -1,5 +1,5 @@
 import { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, powerSaveBlocker, safeStorage, session, shell, webContents } from 'electron';
-import { join, extname } from 'path';
+import { join, extname, basename, dirname, resolve as resolvePath } from 'path';
 import { existsSync, mkdirSync, promises as fsp } from 'fs';
 import { get as httpsGet } from 'https';
 import { execFile } from 'child_process';
@@ -8,7 +8,7 @@ import { Socket } from 'net';
 import { detectPlatform, applyPlatformFlags, getValidAngleBackends, devWindowIcon } from './platform';
 import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount, DEFAULT_CONFIG, SocialMusicSource } from './config';
 import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper, filePathToSwapURL } from './swapper';
-import { listSkyImages, resolveSkyImage, SKIES_DIR, SKY_TEXTURE_RE } from './sky-textures';
+import { listSkyImages, resolveSkyImage, SKIES_DIR, SKY_TEXTURE_RE, SKY_IMAGE_EXTS } from './sky-textures';
 import { UserscriptManager } from './userscripts';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog, getLogPath, closeLogStreams } from './logger';
@@ -1034,6 +1034,28 @@ async function launchApp(): Promise<void> {
     });
     if (result.canceled || result.filePaths.length === 0) return '';
     return result.filePaths[0];
+  });
+
+  // Copies the pick in rather than storing its path: kcc-swap only serves files under the swap dir.
+  ipcMain.handle('pick-sky-image', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Sky Image',
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: SKY_IMAGE_EXTS }],
+    });
+    if (result.canceled || result.filePaths.length === 0) return '';
+    const src = result.filePaths[0];
+    const ext = extname(src);
+    // The dialog filter is advisory — the file name box opens anything typed into it
+    if (!SKY_IMAGE_EXTS.includes(ext.slice(1).toLowerCase())) throw new Error(`Not a sky image: ${src}`);
+    const destDir = join(swapDir, SKIES_DIR);
+    if (dirname(resolvePath(src)) === resolvePath(destDir)) return `swap:${basename(src)}`;
+    mkdirSync(destDir, { recursive: true });
+    const stem = basename(src, ext);
+    let name = `${stem}${ext}`;
+    for (let n = 1; existsSync(join(destDir, name)); n++) name = `${stem} (${n})${ext}`;
+    await fsp.copyFile(src, join(destDir, name));
+    return `swap:${name}`;
   });
 
   ipcMain.handle('resolve-ranked-sound', (_e, setting: string) => resolveRankedAudioUrl(setting));

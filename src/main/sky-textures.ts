@@ -8,7 +8,8 @@ import { SKY_SENTINEL_ID } from './config-defaults';
 export const SKIES_DIR = 'skies';
 
 // No .gif — this is a WebGL texture, not a CSS background (cf. css-themes.ts).
-const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+export const SKY_IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'webp'];
+const IMAGE_EXTS = new Set(SKY_IMAGE_EXTS.map((e) => `.${e}`));
 
 // Depending on the map, the dome asks for the base texture, the emissive variant
 // (texture_e.png), or both — serve the same image for either. The ?build= query is ignored.
