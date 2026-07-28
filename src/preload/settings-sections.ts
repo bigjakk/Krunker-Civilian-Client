@@ -457,8 +457,13 @@ export function buildPerformanceSection(
   }));
 }
 
-export function buildSwapperSection(body: HTMLElement, swapperConf: any): void {
+export function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfRaw: any): void {
   const swapEnabled = swapperConf ? swapperConf.enabled : DEFAULT_CONFIG.swapper.enabled;
+  const ui = uiConfRaw;
+
+  function saveUI(): void {
+    ipcRenderer.invoke('set-config', 'ui', ui);
+  }
 
   const group = createGroup(body);
 
@@ -479,6 +484,61 @@ export function buildSwapperSection(body: HTMLElement, swapperConf: any): void {
     desc: 'Place replacement assets here (textures/, sound/, models/)',
     buttons: [{ icon: 'folder', label: 'Swapper', title: 'Open Folder', onClick: () => ipcRenderer.invoke('open-swap-folder') }],
   }).row);
+
+  // ── Sky ──
+  // Applies on the next map load; the map being played is already built.
+  const skyGroup = createGroup(body, 'Sky');
+
+  skyGroup.appendChild(createToggleRow({
+    label: 'Sky Override',
+    desc: 'Recolour the in-game sky gradient',
+    checked: ui.skyOverride ?? DEFAULT_CONFIG.ui.skyOverride,
+    refreshOnly: true,
+    onChange: (v) => { ui.skyOverride = v; saveUI(); },
+  }));
+
+  skyGroup.appendChild(createColorRow({
+    label: 'Sky Top',
+    desc: 'Colour directly overhead',
+    value: ui.skyZenith || DEFAULT_CONFIG.ui.skyZenith,
+    defaultValue: DEFAULT_CONFIG.ui.skyZenith,
+    refreshOnly: true,
+    onChange: (v) => { ui.skyZenith = v; saveUI(); },
+  }));
+
+  skyGroup.appendChild(createColorRow({
+    label: 'Sky Horizon',
+    desc: 'Colour at the horizon',
+    value: ui.skyHorizon || DEFAULT_CONFIG.ui.skyHorizon,
+    defaultValue: DEFAULT_CONFIG.ui.skyHorizon,
+    refreshOnly: true,
+    onChange: (v) => { ui.skyHorizon = v; saveUI(); },
+  }));
+
+  // ── Sky Image (populated from swap/skies/) ──
+  // The image is wrapped around a dome, so flat photos distort badly.
+  const skyImgR = createRowShell('Sky Image', 'Use an image from swap/skies/ instead of the gradient. Panoramic (equirectangular) images work best — ordinary photos will stretch');
+  const skyImgSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
+  skyImgR.control.appendChild(skyImgSelect);
+  skyImgR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Skies Folder', onClick: () => ipcRenderer.invoke('open-skies-folder') }));
+  skyGroup.appendChild(skyImgR.row);
+
+  ipcRenderer.invoke('list-sky-images').then((images: Array<{ id: string; label: string }>) => {
+    skyImgSelect.innerHTML = '';
+    for (const img of images) {
+      const opt = document.createElement('option');
+      opt.value = img.id;
+      opt.textContent = img.label;
+      if (img.id === ui.skyImage) opt.selected = true;
+      skyImgSelect.appendChild(opt);
+    }
+  });
+
+  skyImgSelect.addEventListener('change', () => {
+    ui.skyImage = skyImgSelect.value;
+    saveUI();
+    onSettingChanged('refresh');
+  });
 }
 
 export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void {
@@ -536,61 +596,6 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
   socialThemeSelect.addEventListener('change', () => {
     ui.socialCssTheme = socialThemeSelect.value;
     saveUI();
-  });
-
-  // ── Sky ──
-  // Applies on the next map load; the map being played is already built.
-  const skyGroup = createGroup(body, 'Sky');
-
-  skyGroup.appendChild(createToggleRow({
-    label: 'Sky Override',
-    desc: 'Recolour the in-game sky gradient',
-    checked: ui.skyOverride ?? DEFAULT_CONFIG.ui.skyOverride,
-    refreshOnly: true,
-    onChange: (v) => { ui.skyOverride = v; saveUI(); },
-  }));
-
-  skyGroup.appendChild(createColorRow({
-    label: 'Sky Top',
-    desc: 'Colour directly overhead',
-    value: ui.skyZenith || DEFAULT_CONFIG.ui.skyZenith,
-    defaultValue: DEFAULT_CONFIG.ui.skyZenith,
-    refreshOnly: true,
-    onChange: (v) => { ui.skyZenith = v; saveUI(); },
-  }));
-
-  skyGroup.appendChild(createColorRow({
-    label: 'Sky Horizon',
-    desc: 'Colour at the horizon',
-    value: ui.skyHorizon || DEFAULT_CONFIG.ui.skyHorizon,
-    defaultValue: DEFAULT_CONFIG.ui.skyHorizon,
-    refreshOnly: true,
-    onChange: (v) => { ui.skyHorizon = v; saveUI(); },
-  }));
-
-  // ── Sky Image (populated from swap/skies/) ──
-  // The image is wrapped around a dome, so flat photos distort badly.
-  const skyImgR = createRowShell('Sky Image', 'Use an image from swap/skies/ instead of the gradient. Panoramic (equirectangular) images work best — ordinary photos will stretch');
-  const skyImgSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
-  skyImgR.control.appendChild(skyImgSelect);
-  skyImgR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Skies Folder', onClick: () => ipcRenderer.invoke('open-skies-folder') }));
-  skyGroup.appendChild(skyImgR.row);
-
-  ipcRenderer.invoke('list-sky-images').then((images: Array<{ id: string; label: string }>) => {
-    skyImgSelect.innerHTML = '';
-    for (const img of images) {
-      const opt = document.createElement('option');
-      opt.value = img.id;
-      opt.textContent = img.label;
-      if (img.id === ui.skyImage) opt.selected = true;
-      skyImgSelect.appendChild(opt);
-    }
-  });
-
-  skyImgSelect.addEventListener('change', () => {
-    ui.skyImage = skyImgSelect.value;
-    saveUI();
-    onSettingChanged('refresh');
   });
 
   // ── Menu Music ──

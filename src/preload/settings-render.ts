@@ -392,7 +392,7 @@ function renderSettings(searchQuery?: string): void {
     { key: 'General', label: 'General', icon: 'tune', build: (b) => buildGeneralSection(b, gameConf, uiConfRaw, bag) },
     { key: 'Game', label: 'Game', icon: 'sports_esports', build: (b) => buildGameSection(b, gameConf, uiConfRaw, bag) },
     { key: 'Performance', label: 'Performance', icon: 'speed', build: (b) => buildPerformanceSection(b, allConf.performance, allConf.advanced, isWindows) },
-    { key: 'Swapper', label: 'Swapper', icon: 'swap_horiz', build: (b) => buildSwapperSection(b, allConf.swapper) },
+    { key: 'Swapper', label: 'Swapper', icon: 'swap_horiz', build: (b) => buildSwapperSection(b, allConf.swapper, uiConfRaw) },
     { key: 'Appearance', label: 'Appearance', icon: 'palette', build: (b) => buildAppearanceSection(b, uiConfRaw) },
     { key: 'Matchmaker', label: 'Matchmaker', icon: 'travel_explore', build: (b) => buildMatchmakerSection(b, allConf.matchmaker, bag) },
     { key: 'Chat', label: 'Chat', icon: 'chat', build: (b) => buildChatSection(b, gameConf, allConf.translator) },
