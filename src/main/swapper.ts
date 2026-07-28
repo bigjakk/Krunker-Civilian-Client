@@ -13,13 +13,15 @@ const TARGET_DOMAIN = 'krunker.io';
  */
 export function filePathToSwapURL(filePath: string): string {
   const forwardSlash = filePath.replace(/\\/g, '/');
+  // Per segment, so #, ?, and % in a file name survive the handler's decodeURIComponent
+  const encode = (p: string): string => p.split('/').map(encodeURIComponent).join('/');
   // Windows drive letter: C:/foo → kcc-swap://C/foo
   const match = forwardSlash.match(/^([A-Za-z]):\/(.*)/);
   if (match) {
-    return `${PROTOCOL_NAME}://${match[1]}/${match[2]}`;
+    return `${PROTOCOL_NAME}://${match[1]}/${encode(match[2])}`;
   }
   // Unix absolute: /home/user/foo → kcc-swap:///home/user/foo
-  return `${PROTOCOL_NAME}://${forwardSlash}`;
+  return `${PROTOCOL_NAME}://${encode(forwardSlash)}`;
 }
 
 /**
@@ -41,7 +43,12 @@ export function registerSwapperFileProtocol(ses: Session, swapDir: string): void
     const url = new URL(request.url);
     // Windows drive letter rides as the hostname: kcc-swap://C/foo → C:/foo
     const raw = url.hostname ? `${url.hostname}:${url.pathname}` : url.pathname;
-    const filePath = resolve(decodeURIComponent(raw));
+    let filePath: string;
+    try {
+      filePath = resolve(decodeURIComponent(raw));
+    } catch {
+      return new Response('Bad request', { status: 400 });
+    }
     // The ACAO below makes these readable cross-origin, so anything outside the
     // swap dir would be an arbitrary local-file read for any script on the page.
     if (norm(filePath) !== root && !norm(filePath).startsWith(root + sep)) {
