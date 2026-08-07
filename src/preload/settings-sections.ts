@@ -400,19 +400,6 @@ export function buildPerformanceSection(
     },
   }));
 
-  fpsGroup.appendChild(createNumberRow({
-    label: 'CPU Throttle (Game)',
-    desc: 'Slows the game down during matches to reduce CPU/GPU load, heat, and fan noise — useful on laptops. 1 = off, 3 = heavy. Costs FPS and adds input delay',
-    min: 1, max: 3, step: 0.01, value: perf.throttleGame, instant: true, safety: 2,
-    onChange: (v) => { perf.throttleGame = v; savePerf(); },
-  }));
-
-  fpsGroup.appendChild(createNumberRow({
-    label: 'CPU Throttle (Menu)',
-    desc: 'Throttles menu screens to save power while not in a match. 1 = off, 3 = heavy',
-    min: 1, max: 3, step: 0.01, value: perf.throttleMenu, instant: true, safety: 1,
-    onChange: (v) => { perf.throttleMenu = v; savePerf(); },
-  }));
 
   const sysGroup = createGroup(body, 'System');
 

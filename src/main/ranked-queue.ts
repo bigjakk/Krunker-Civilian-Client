@@ -1,7 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { QUEUE_NOTIFICATION_AUDIO } from './ranked-queue-audio';
 import { devWindowIcon } from './platform';
-import { applyCpuThrottle, attachThrottleRecovery, menuThrottleRate } from './cpu-throttle';
 
 export const DEFAULT_RANKED_AUDIO_URL = `data:audio/mpeg;base64,${QUEUE_NOTIFICATION_AUDIO}`;
 
@@ -614,13 +613,6 @@ ${header}  <div class="queue-body">
 </html>`;
 }
 
-// Re-apply throttle to the open queue window (if any). No-op if not open.
-export function reapplyRankedQueueThrottle(rate: number): void {
-    if (queueWindow && !queueWindow.isDestroyed()) {
-        applyCpuThrottle(queueWindow.webContents, rate);
-    }
-}
-
 export function openRankedQueue(
     token: string,
     region: string,
@@ -651,9 +643,6 @@ export function openRankedQueue(
 
     queueWindow = win;
     win.on('closed', () => { queueWindow = null; });
-
-    // Throttle the queue UI — the user stares at it for minutes while waiting
-    attachThrottleRecovery(win.webContents, menuThrottleRate, true);
 
     const html = buildQueueHtml(token, region, allRegions, audioUrl, showHeader);
     win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
