@@ -5,7 +5,7 @@ import { get as httpsGet } from 'https';
 import { execFile } from 'child_process';
 import * as os from 'os';
 import { Socket } from 'net';
-import { detectPlatform, applyPlatformFlags, getValidAngleBackends, devWindowIcon } from './platform';
+import { detectPlatform, applyPlatformFlags, getValidAngleBackends, devWindowIcon, clampFrameCap } from './platform';
 import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount, DEFAULT_CONFIG, SocialMusicSource } from './config';
 import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper, filePathToSwapURL } from './swapper';
 import { listSkyImages, resolveSkyImage, SKIES_DIR, SKY_TEXTURE_RE, SKY_IMAGE_EXTS } from './sky-textures';
@@ -136,7 +136,7 @@ function stopServerPing(): void {
 // ── Platform flags (must run before app.ready) ──
 const platformInfo = detectPlatform();
 const advancedConfig = { ...DEFAULT_CONFIG.advanced, ...config.get('advanced') };
-const perfConfig = { ...config.get('performance') };
+const perfConfig = { ...DEFAULT_CONFIG.performance, ...config.get('performance') };
 
 // Self-heal angleBackend if a previous version's value is no longer valid for this platform (e.g. user picked 'vulkan', 'd3d9', etc., and we removed it).
 const validBackends = getValidAngleBackends(platformInfo);
@@ -147,6 +147,17 @@ if (advancedConfig.angleBackend && !validBackends.includes(advancedConfig.angleB
 }
 
 applyPlatformFlags(platformInfo, advancedConfig, perfConfig);
+
+// Live frame-cap changes are safe only in sessions launched without
+// CustomMaxPendingFrames (cap and deeper frame queue are mutually exclusive —
+// depth ≥ 2 decouples the renderer from the paced draw loop) and with the FPS
+// uncap active. Otherwise the new value persists and applies next restart.
+const launchFrameCap = clampFrameCap(perfConfig.frameCap);
+const capLiveAvailable = perfConfig.fpsUnlocked &&
+  (launchFrameCap > 0 || !perfConfig.higherMaxFps);
+if (launchFrameCap > 0) {
+  electronLog.log(`[KCC] FPS cap ${launchFrameCap}, live changes ${capLiveAvailable ? 'enabled' : 'need a restart'}`);
+}
 
 // ── User agent ──
 // Deliberately not a browser UA. Electron's default reports the true Chromium build, a
@@ -943,7 +954,14 @@ async function launchApp(): Promise<void> {
       const menuRate = menuThrottleRate();
       tabManager.applyCpuThrottleToAll(menuRate);
       reapplyRankedQueueThrottle(menuRate);
-      return;
+      // setFrameCap only exists on the frameCap-patched Electron builds
+      const capWin = win as BrowserWindow & { setFrameCap?: (fps: number) => void };
+      const capped = clampFrameCap((value as any)?.frameCap);
+      if (capLiveAvailable && typeof capWin.setFrameCap === 'function') {
+        capWin.setFrameCap(capped);
+        return false;
+      }
+      return capped !== launchFrameCap && perfConfig.fpsUnlocked;
     }
     // Invalidate caches immediately (not on flush) to prevent stale reads
     if (key === 'game') {

@@ -389,6 +389,18 @@ export function buildPerformanceSection(
   }));
 
   fpsGroup.appendChild(createNumberRow({
+    label: 'FPS Cap',
+    desc: 'Cap the frame rate at an exact value while Unlimited FPS is on. 0 = uncapped (enabling may need a restart)',
+    min: 0, max: 1000, step: 1, value: perf.frameCap, instant: true,
+    onChange: (v) => {
+      perf.frameCap = v;
+      ipcRenderer.invoke('set-config', 'performance', perf).then((needsRestart) => {
+        if (needsRestart) onSettingChanged('restart');
+      });
+    },
+  }));
+
+  fpsGroup.appendChild(createNumberRow({
     label: 'CPU Throttle (Game)',
     desc: 'Slows the game down during matches to reduce CPU/GPU load, heat, and fan noise — useful on laptops. 1 = off, 3 = heavy. Costs FPS and adds input delay',
     min: 1, max: 3, step: 0.01, value: perf.throttleGame, instant: true, safety: 2,

@@ -29,6 +29,12 @@ export function devWindowIcon(): string | undefined {
   return join(app.getAppPath(), 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 }
 
+/** 0 = uncapped; anything else lands in 30..1000. Mirrors the binary-side clamp. */
+export function clampFrameCap(raw: unknown): number {
+  const fps = Math.round(Number(raw ?? 0)) || 0;
+  return fps > 0 ? Math.min(1000, Math.max(30, fps)) : 0;
+}
+
 /** Canonical set of valid `angleBackend` values per platform. The settings UI dropdown must stay in sync. */
 export function getValidAngleBackends(info: PlatformInfo): readonly string[] {
   if (info.isWindows) return ['default', 'gl', 'd3d11', 'd3d11on12'];
@@ -63,11 +69,14 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     if (info.os === 'darwin') {
       disableFeatures('VSyncAlignedPresentationForScrolling', 'VSyncAlignedPresent');
     }
-    // Opt-in deeper compositor frame queue (depth 2 vs the patched default of 1).
-    // Read by the custom Electron's CustomMaxPendingFrames feature param. Off → not
-    // emitted → the binary keeps its compiled default of 1. Trades input latency on
-    // low-end machines for higher peak FPS on present-bound (capable) ones.
-    if (performance.higherMaxFps) enableFeatures('CustomMaxPendingFrames:count/2');
+    // Read by the custom Electron's CustomFrameCap feature param: paces swap-ack
+    // release per window, so the cap holds exact values above the display refresh.
+    const frameCap = clampFrameCap(performance.frameCap);
+    if (frameCap > 0) enableFeatures(`CustomFrameCap:fps/${frameCap}`);
+    // Opt-in deeper compositor frame queue (depth 2 vs the patched default of 1),
+    // read by the CustomMaxPendingFrames param. Suppressed under a cap: at depth ≥ 2
+    // the renderer decouples from the paced draw loop and the cap stops working.
+    if (performance.higherMaxFps && frameCap <= 0) enableFeatures('CustomMaxPendingFrames:count/2');
   }
 
   // ── Always-on platform flags ──

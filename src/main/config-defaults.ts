@@ -47,6 +47,7 @@ export interface AppConfig {
     higherMaxFps: boolean;
     throttleGame: number;
     throttleMenu: number;
+    frameCap: number;
     processPriority: string;
   };
   game: {
@@ -186,6 +187,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     higherMaxFps: false,
     throttleGame: 1,
     throttleMenu: 1,
+    frameCap: 0,
     processPriority: 'Normal',
   },
   game: {
