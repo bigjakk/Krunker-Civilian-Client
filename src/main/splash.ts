@@ -64,6 +64,17 @@ function buildSplashHTML(version: string): string {
     white-space: nowrap;
   }
   #buttons { display: none; gap: 8px; -webkit-app-region: no-drag; }
+  #skipRow {
+    display: none;
+    align-items: center; gap: 6px;
+    align-self: flex-end;
+    -webkit-app-region: no-drag;
+    font-size: 11px;
+    color: rgba(255,255,255,0.65);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.85);
+    cursor: pointer;
+  }
+  #skipRow input { cursor: pointer; accent-color: #2ee59d; margin: 0; }
   button {
     padding: 7px 16px;
     border: none; border-radius: 4px;
@@ -116,6 +127,7 @@ function buildSplashHTML(version: string): string {
       </div>
       <div id="version">v${version}</div>
     </div>
+    <label id="skipRow"><input type="checkbox" id="skipChk"><span>Don't ask again for this version</span></label>
     <div class="progress-container" id="progress">
       <div class="progress-bar" id="progressBar"></div>
     </div>
@@ -123,7 +135,8 @@ function buildSplashHTML(version: string): string {
   <script>
     document.getElementById('close').addEventListener('click', () => console.log('KCC_SPLASH:close'));
     document.getElementById('btnPrimary').addEventListener('click', () => console.log('KCC_SPLASH:primary'));
-    document.getElementById('btnSecondary').addEventListener('click', () => console.log('KCC_SPLASH:secondary'));
+    document.getElementById('btnSecondary').addEventListener('click', () =>
+      console.log('KCC_SPLASH:secondary' + (document.getElementById('skipChk').checked ? ':skip' : '')));
   </script>
 </body></html>`;
 }
@@ -147,10 +160,11 @@ function extractConsoleMessage(args: unknown[]): string {
 let splash: BrowserWindow | null = null;
 let splashCreatedAt = 0;
 let closedByApp = false;
-let pendingPrompt: ((choice: 'primary' | 'secondary' | 'closed') => void) | null = null;
+type PromptChoice = 'primary' | 'secondary' | 'secondary-skip' | 'closed';
+let pendingPrompt: ((choice: PromptChoice) => void) | null = null;
 const userClosedCallbacks: Array<() => void> = [];
 
-function resolvePrompt(choice: 'primary' | 'secondary' | 'closed'): void {
+function resolvePrompt(choice: PromptChoice): void {
   const resolve = pendingPrompt;
   pendingPrompt = null;
   if (resolve) resolve(choice);
@@ -188,6 +202,8 @@ export function createSplash(version: string): void {
       resolvePrompt('primary');
     } else if (message === 'KCC_SPLASH:secondary') {
       resolvePrompt('secondary');
+    } else if (message === 'KCC_SPLASH:secondary:skip') {
+      resolvePrompt('secondary-skip');
     }
   });
 
@@ -234,8 +250,10 @@ export function splashStatus(message: string, percent?: number): void {
     const v = document.getElementById('version');
     const c = document.getElementById('progress');
     const p = document.getElementById('progressBar');
+    const k = document.getElementById('skipRow');
     if (s) s.textContent = ${JSON.stringify(message)};
     if (b) b.style.display = 'none';
+    if (k) k.style.display = 'none';
     if (v) v.style.display = '';
     if (c && p) {
       const pct = ${pct};
@@ -249,10 +267,11 @@ export function splashStatus(message: string, percent?: number): void {
 /**
  * Show an update prompt in the splash overlay. 'install' offers Skip / Update Now;
  * 'notice' (builds that can't self-install) offers Later / Download. Resolves
- * 'primary' (update/download), 'secondary' (skip/later), or 'closed' if the user
+ * 'primary' (update/download), 'secondary' (skip/later), 'secondary-skip' (skip
+ * with "don't ask again for this version" ticked), or 'closed' if the user
  * closed the splash — the caller should treat 'closed' as the app quitting.
  */
-export function splashPrompt(kind: 'install' | 'notice', newVersion: string, currentVersion: string): Promise<'primary' | 'secondary' | 'closed'> {
+export function splashPrompt(kind: 'install' | 'notice', newVersion: string, currentVersion: string): Promise<PromptChoice> {
   if (!splashAlive()) return Promise.resolve('closed');
 
   const message = kind === 'install'
@@ -270,6 +289,10 @@ export function splashPrompt(kind: 'install' | 'notice', newVersion: string, cur
     if (v) v.style.display = 'none';
     if (c) c.classList.remove('active', 'indeterminate');
     if (b) b.style.display = 'flex';
+    const k = document.getElementById('skipRow');
+    const kc = document.getElementById('skipChk');
+    if (k) k.style.display = 'flex';
+    if (kc) kc.checked = false;
     const bp = document.getElementById('btnPrimary');
     const bs = document.getElementById('btnSecondary');
     if (bp) bp.textContent = ${JSON.stringify(primaryLabel)};

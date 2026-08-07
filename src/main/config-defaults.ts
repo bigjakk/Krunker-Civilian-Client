@@ -126,6 +126,7 @@ export interface AppConfig {
     backgroundUrl: string;
     showChangelog: boolean;
     lastSeenVersion: string;
+    skippedUpdateVersion: string;
   };
   discord: {
     enabled: boolean;
@@ -254,6 +255,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     backgroundUrl: '',
     showChangelog: true,
     lastSeenVersion: '',
+    skippedUpdateVersion: '',
   },
   discord: {
     enabled: true,

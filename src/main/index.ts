@@ -343,13 +343,19 @@ app.whenReady().then(async () => {
       splashStatus('Checking for updates...', -1);
       const update = await checkForUpdate(appVersion);
       if (!splashAlive()) return; // user closed the splash — app is quitting
-      if (update) {
+      const skippedVer = config.get('ui')?.skippedUpdateVersion || '';
+      if (update && update.version === skippedVer) {
+        electronLog.log(`[KCC] Update v${update.version} available but skipped by user preference`);
+      } else if (update) {
         electronLog.log(`[KCC] Update available: v${update.version}`);
 
         const choice = await splashPrompt('install', update.version, appVersion);
         if (choice === 'closed') return; // app is quitting
-        if (choice === 'secondary') {
+        if (choice === 'secondary' || choice === 'secondary-skip') {
           electronLog.log('[KCC] User skipped update');
+          if (choice === 'secondary-skip') {
+            config.set('ui', { ...DEFAULT_CONFIG.ui, ...config.get('ui'), skippedUpdateVersion: update.version });
+          }
         } else {
           const tempDir = join(app.getPath('temp'), 'kcc-update');
           if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true });
@@ -404,10 +410,16 @@ app.whenReady().then(async () => {
       splashStatus('Checking for updates...', -1);
       const notice = await checkForUpdateNotice(appVersion);
       if (!splashAlive()) return; // user closed the splash — app is quitting
-      if (notice) {
+      const skippedVer = config.get('ui')?.skippedUpdateVersion || '';
+      if (notice && notice.version === skippedVer) {
+        electronLog.log(`[KCC] Update v${notice.version} available but skipped by user preference`);
+      } else if (notice) {
         electronLog.log(`[KCC] Update available (notify-only): v${notice.version}`);
         const choice = await splashPrompt('notice', notice.version, appVersion);
         if (choice === 'closed') return; // app is quitting
+        if (choice === 'secondary-skip') {
+          config.set('ui', { ...DEFAULT_CONFIG.ui, ...config.get('ui'), skippedUpdateVersion: notice.version });
+        }
         if (choice === 'primary') {
           // Open the release page and quit instead of launching the old version.
           electronLog.log('[KCC] User chose to download update; opening release page and quitting');
