@@ -17,7 +17,8 @@ import { createSplash, splashStatus, splashPrompt, splashAlive, splashElapsed, g
 import { DiscordRPC } from './discord-rpc';
 import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS, GAME_THEMES_DIR, SOCIAL_THEMES_DIR } from './css-themes';
 import { TabManager } from './tab-manager';
-import { openRankedQueue, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
+import { openRankedQueue, reapplyRankedQueueThrottle, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
+import { applyCpuThrottle, attachThrottleRecovery, menuThrottleRate } from './cpu-throttle';
 import { takeScreenshot, openScreenshotsFolder } from './screenshot';
 
 const AUDIO_MIME: Record<string, string> = {
@@ -742,6 +743,14 @@ async function launchApp(): Promise<void> {
     return cachedGameConf;
   }
 
+  // ── CPU throttle (trades frame rate for lower CPU/GPU load and heat) ──
+  let currentThrottleState: 'game' | 'menu' = 'menu';
+  const mainThrottleRate = (): number => {
+    const perf = config.get('performance');
+    return currentThrottleState === 'game' ? (perf?.throttleGame ?? 1) : (perf?.throttleMenu ?? 1);
+  };
+  attachThrottleRecovery(win.webContents, mainThrottleRate);
+
   // ── Tab Manager ──
   const preloadPath = join(__dirname, '..', 'preload', 'index.js');
   let tabMode: 'same' | 'new' = getGameConf().socialTabBehaviour === 'Same Window' ? 'same' : 'new';
@@ -834,6 +843,10 @@ async function launchApp(): Promise<void> {
 
     Promise.all(cssInjections).catch((err) => electronLog.warn('[KCC] CSS injection failed:', err));
 
+    // Every load starts on the menu screen
+    currentThrottleState = 'menu';
+    applyCpuThrottle(win.webContents, menuThrottleRate());
+
     win.webContents.executeJavaScript(ESCAPE_POINTERLOCK_FIX_JS).catch((err) => electronLog.warn('[KCC] Pointerlock fix inject failed:', err));
     win.webContents.executeJavaScript(CONSENT_DISMISS_JS).catch((err) => electronLog.warn('[KCC] Consent dismiss inject failed:', err));
     // Notify preload to start hooking settings (matches Crankshaft's timing)
@@ -911,6 +924,15 @@ async function launchApp(): Promise<void> {
       cachedKeybinds = null;
       return;
     }
+    // Immediate write so the throttle re-apply (and any recovery event) reads fresh rates
+    if (key === 'performance') {
+      config.set(key as any, value);
+      applyCpuThrottle(win.webContents, mainThrottleRate());
+      const menuRate = menuThrottleRate();
+      tabManager.applyCpuThrottleToAll(menuRate);
+      reapplyRankedQueueThrottle(menuRate);
+      return;
+    }
     // Invalidate caches immediately (not on flush) to prevent stale reads
     if (key === 'game') {
       cachedGameConf = null;
@@ -947,6 +969,10 @@ async function launchApp(): Promise<void> {
     if (!configWriteTimer) {
       configWriteTimer = setTimeout(flushPendingConfigWrites, 300);
     }
+  });
+  ipcMain.on('throttle-state', (_e, state: string) => {
+    currentThrottleState = (state === 'game') ? 'game' : 'menu';
+    applyCpuThrottle(win.webContents, mainThrottleRate());
   });
   ipcMain.handle('window-minimize', () => win.minimize());
   ipcMain.handle('window-maximize', () => {

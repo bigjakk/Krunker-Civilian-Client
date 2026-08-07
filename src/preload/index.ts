@@ -254,6 +254,27 @@ ipcRenderer.on('main_did-finish-load', () => {
       setWatermark(uiConf?.watermark ?? true, currentVersion);
     }
 
+    // ── CPU throttle game/menu state ──
+    if (isGamePage) {
+      let inGame = false;
+      const checkThrottleState = (uiBase: HTMLElement): void => {
+        const nowInGame = uiBase.className !== '' && !uiBase.classList.contains('onMenu');
+        if (nowInGame !== inGame) {
+          inGame = nowInGame;
+          ipcRenderer.send('throttle-state', inGame ? 'game' : 'menu');
+        }
+      };
+      const waitUiBase = setInterval(() => {
+        const uiBase = document.getElementById('uiBase');
+        if (!uiBase) return;
+        clearInterval(waitUiBase);
+        // Attribute-only observer on a targeted element — safe (unlike childList+subtree on the main frame)
+        new MutationObserver(() => checkThrottleState(uiBase))
+          .observe(uiBase, { attributes: true, attributeFilter: ['class'] });
+        checkThrottleState(uiBase);
+      }, 1000);
+    }
+
     // ── Changelog popup ──
     if (isGamePage && (uiConf?.showChangelog ?? true)) {
       checkChangelog(currentVersion, uiConf?.lastSeenVersion || '');

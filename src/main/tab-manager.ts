@@ -3,6 +3,7 @@ import { TAB_BAR_DATA_URL } from './tab-bar-html';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog } from './logger';
 import { devWindowIcon } from './platform';
+import { applyCpuThrottle, attachThrottleRecovery, menuThrottleRate } from './cpu-throttle';
 
 const KRUNKER_SOCIAL = 'https://krunker.io/social.html';
 const TAB_BAR_HEIGHT = 40;
@@ -84,6 +85,7 @@ export class TabManager {
             },
         });
         this.tabBarView.webContents.loadURL(TAB_BAR_DATA_URL);
+        attachThrottleRecovery(this.tabBarView.webContents, menuThrottleRate, true);
 
         // ── Container view (holds tab bar + active tab content) ──
         this.containerView = new View();
@@ -271,9 +273,13 @@ export class TabManager {
             this.applySocialTheme(wc);
             wc.executeJavaScript(CONSENT_DISMISS_JS).catch(() => {});
             wc.send('main_did-finish-load-tab');
+            // Always menu rate — tabs are social pages, never gameplay
+            applyCpuThrottle(wc, menuThrottleRate());
             this.updateTabInfo(tabId, { loading: false });
             this.startTitleWatcher(tabId, wc);
         });
+
+        attachThrottleRecovery(wc, menuThrottleRate);
 
         wc.on('did-start-loading', () => {
             this.updateTabInfo(tabId, { loading: true });
@@ -399,7 +405,7 @@ export class TabManager {
     private unfreezeTab(tab: TabInfo): void {
         const wc = tab.view.webContents;
         if (wc.isDestroyed()) return;
-        // Keep debugger attached for the tab's lifetime (freeze re-attaches it on demand).
+        // Keep debugger attached for the tab's lifetime — it's shared with the CPU throttle.
         // First activation: no debugger session yet, no-op and let title watcher restart.
         if (!wc.debugger.isAttached()) {
             this.startTitleWatcher(tab.id, wc);
@@ -410,6 +416,16 @@ export class TabManager {
             .finally(() => {
                 if (!wc.isDestroyed()) this.startTitleWatcher(tab.id, wc);
             });
+    }
+
+    // ── Re-apply CPU throttle to every live tab + the tab bar ──
+    applyCpuThrottleToAll(rate: number): void {
+        for (const tab of this.tabs) {
+            if (!tab.view.webContents.isDestroyed()) applyCpuThrottle(tab.view.webContents, rate);
+        }
+        if (!this.tabBarView.webContents.isDestroyed()) {
+            applyCpuThrottle(this.tabBarView.webContents, rate);
+        }
     }
 
     // ── Close a tab ──
