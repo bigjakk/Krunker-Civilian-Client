@@ -939,6 +939,8 @@ async function launchApp(): Promise<void> {
     pendingConfigWrites.clear();
   }
 
+  app.on('before-quit', flushPendingConfigWrites);
+
   ipcMain.handle('set-config', (_e, key: string, value: unknown) => {
     if (!ALLOWED_CONFIG_KEYS.has(key)) return;
     // Flush immediately for keys that have side effects
@@ -1212,6 +1214,7 @@ async function launchApp(): Promise<void> {
     }
   });
   ipcMain.handle('restart-client', () => {
+    flushPendingConfigWrites();
     app.relaunch();
     app.quit();
   });
