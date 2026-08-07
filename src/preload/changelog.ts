@@ -3,6 +3,7 @@
 
 import { ipcRenderer } from 'electron';
 import { escapeHtml } from './utils';
+import { renderMarkdown } from '../shared/markdown';
 
 function versionLessThan(a: string, b: string): boolean {
     const pa = a.split('.').map(Number);
@@ -17,43 +18,6 @@ function versionLessThan(a: string, b: string): boolean {
     return false;
 }
 
-function sanitizeUrl(url: string): string {
-    try {
-        const parsed = new URL(url);
-        if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return escapeHtml(url);
-    } catch { /* invalid URL */ }
-    return '#';
-}
-
-function renderMarkdown(md: string): string {
-    // Escape all HTML first, then apply markdown formatting to the safe text
-    const escaped = escapeHtml(md);
-    const html = escaped
-        .replace(/### (.+)/g, '<h3>$1</h3>')
-        .replace(/## (.+)/g, '<h2>$1</h2>')
-        .replace(/# (.+)/g, '<h1>$1</h1>')
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, text, url) =>
-            `<a href="${sanitizeUrl(url)}" target="_blank">${text}</a>`);
-
-    // Convert list items
-    const lines = html.split('\n');
-    let inList = false;
-    const out: string[] = [];
-    for (const line of lines) {
-        if (line.trimStart().startsWith('- ')) {
-            if (!inList) { out.push('<ul>'); inList = true; }
-            out.push('<li>' + line.trimStart().slice(2) + '</li>');
-        } else {
-            if (inList) { out.push('</ul>'); inList = false; }
-            out.push(line);
-        }
-    }
-    if (inList) out.push('</ul>');
-
-    return out.join('\n').replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
-}
 
 function showChangelogPopup(version: string, body: string): void {
     const host = document.createElement('div');

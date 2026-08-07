@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import { devWindowIcon } from './platform';
 import { SPLASH_POSTER } from './splash-image';
+import { escapeHtml, renderMarkdown } from '../shared/markdown';
 
 // Branded startup splash: shows the KCC poster art while the update check and
 // the initial game load run, and doubles as the update UI (status text, progress
@@ -64,6 +65,33 @@ function buildSplashHTML(version: string): string {
     white-space: nowrap;
   }
   #buttons { display: none; gap: 8px; -webkit-app-region: no-drag; }
+  #notes {
+    display: none;
+    -webkit-app-region: no-drag;
+    max-height: 176px;
+    overflow-y: auto;
+    background: rgba(8,10,14,0.6);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: rgba(255,255,255,0.78);
+  }
+  #notes h1, #notes h2, #notes h3 {
+    font-size: 12.5px; font-weight: 600;
+    color: #fff;
+    margin: 10px 0 4px;
+  }
+  #notes h1:first-child, #notes h2:first-child, #notes h3:first-child { margin-top: 0; }
+  #notes ul { padding-left: 16px; margin: 4px 0; }
+  #notes li { margin: 3px 0; }
+  #notes li::marker { color: rgba(46,229,157,0.8); }
+  #notes strong { color: #fff; }
+  #notes::-webkit-scrollbar { width: 8px; }
+  #notes::-webkit-scrollbar-track { background: transparent; }
+  #notes::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 4px; }
+  #notes::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
   #skipRow {
     display: none;
     align-items: center; gap: 6px;
@@ -119,6 +147,7 @@ function buildSplashHTML(version: string): string {
   <img id="poster" src="${SPLASH_POSTER}" alt="">
   <div id="close" title="Close">&#10005;</div>
   <div id="overlay">
+    <div id="notes"></div>
     <div id="row">
       <div id="status">Starting...</div>
       <div id="buttons">
@@ -251,9 +280,11 @@ export function splashStatus(message: string, percent?: number): void {
     const c = document.getElementById('progress');
     const p = document.getElementById('progressBar');
     const k = document.getElementById('skipRow');
+    const n = document.getElementById('notes');
     if (s) s.textContent = ${JSON.stringify(message)};
     if (b) b.style.display = 'none';
     if (k) k.style.display = 'none';
+    if (n) n.style.display = 'none';
     if (v) v.style.display = '';
     if (c && p) {
       const pct = ${pct};
@@ -266,12 +297,13 @@ export function splashStatus(message: string, percent?: number): void {
 
 /**
  * Show an update prompt in the splash overlay. 'install' offers Skip / Update Now;
- * 'notice' (builds that can't self-install) offers Later / Download. Resolves
+ * 'notice' (builds that can't self-install) offers Later / Download. Non-empty
+ * notes (release markdown) render in a card above the buttons. Resolves
  * 'primary' (update/download), 'secondary' (skip/later), 'secondary-skip' (skip
  * with "don't ask again for this version" ticked), or 'closed' if the user
  * closed the splash — the caller should treat 'closed' as the app quitting.
  */
-export function splashPrompt(kind: 'install' | 'notice', newVersion: string, currentVersion: string): Promise<PromptChoice> {
+export function splashPrompt(kind: 'install' | 'notice', newVersion: string, currentVersion: string, notes = ''): Promise<PromptChoice> {
   if (!splashAlive()) return Promise.resolve('closed');
 
   const message = kind === 'install'
@@ -279,6 +311,10 @@ export function splashPrompt(kind: 'install' | 'notice', newVersion: string, cur
     : `Update v${newVersion} is available. This build can't update itself — Download opens the releases page.`;
   const primaryLabel = kind === 'install' ? 'Update Now' : 'Download';
   const secondaryLabel = kind === 'install' ? 'Skip' : 'Later';
+  // Links render as plain text — the splash blocks all navigation.
+  const notesHtml = notes.trim()
+    ? `<h2>What's new in v${escapeHtml(newVersion)}</h2>` + renderMarkdown(notes, { links: false })
+    : '';
 
   splash!.webContents.executeJavaScript(`(() => {
     const s = document.getElementById('status');
@@ -293,6 +329,8 @@ export function splashPrompt(kind: 'install' | 'notice', newVersion: string, cur
     const kc = document.getElementById('skipChk');
     if (k) k.style.display = 'flex';
     if (kc) kc.checked = false;
+    const n = document.getElementById('notes');
+    if (n) { n.innerHTML = ${JSON.stringify(notesHtml)}; n.style.display = ${JSON.stringify(notesHtml ? 'block' : 'none')}; }
     const bp = document.getElementById('btnPrimary');
     const bs = document.getElementById('btnSecondary');
     if (bp) bp.textContent = ${JSON.stringify(primaryLabel)};

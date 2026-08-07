@@ -349,7 +349,7 @@ app.whenReady().then(async () => {
       } else if (update) {
         electronLog.log(`[KCC] Update available: v${update.version}`);
 
-        const choice = await splashPrompt('install', update.version, appVersion);
+        const choice = await splashPrompt('install', update.version, appVersion, update.notes);
         if (choice === 'closed') return; // app is quitting
         if (choice === 'secondary' || choice === 'secondary-skip') {
           electronLog.log('[KCC] User skipped update');
@@ -415,7 +415,7 @@ app.whenReady().then(async () => {
         electronLog.log(`[KCC] Update v${notice.version} available but skipped by user preference`);
       } else if (notice) {
         electronLog.log(`[KCC] Update available (notify-only): v${notice.version}`);
-        const choice = await splashPrompt('notice', notice.version, appVersion);
+        const choice = await splashPrompt('notice', notice.version, appVersion, notice.notes);
         if (choice === 'closed') return; // app is quitting
         if (choice === 'secondary-skip') {
           config.set('ui', { ...DEFAULT_CONFIG.ui, ...config.get('ui'), skippedUpdateVersion: notice.version });

@@ -10,6 +10,7 @@ export interface UpdateInfo {
   downloadUrl: string;
   fileSize: number;
   sha256: string;
+  notes: string;
 }
 
 /** Lightweight "an update exists" result for builds that can't self-install (portable, AppImage). */
@@ -17,6 +18,7 @@ export interface UpdateNotice {
   version: string;
   /** Link to the release page, where the user can pick the download for their platform. */
   releaseUrl: string;
+  notes: string;
 }
 
 export type ProgressCallback = (percent: number) => void;
@@ -31,6 +33,7 @@ interface GithubAsset {
 interface GithubRelease {
   tag_name: string;
   html_url: string;
+  body?: string;
   assets: GithubAsset[];
 }
 
@@ -186,6 +189,7 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
     downloadUrl: setupAsset.browser_download_url,
     fileSize: setupAsset.size,
     sha256,
+    notes: release.body || '',
   };
 }
 
@@ -215,7 +219,7 @@ export async function checkForUpdateNotice(currentVersion: string): Promise<Upda
   }
 
   electronLog.log('[KCC-Update] Update notice:', remoteVersion, '->', releaseUrl);
-  return { version: remoteVersion, releaseUrl };
+  return { version: remoteVersion, releaseUrl, notes: release.body || '' };
 }
 
 function verifyChecksum(filePath: string, expectedSha256: string): Promise<boolean> {
