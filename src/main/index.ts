@@ -1245,6 +1245,7 @@ async function launchApp(): Promise<void> {
     delete (clientSettings.game as Record<string, unknown>).lastServer;
     clientSettings.ui = { ...(clientSettings.ui as Record<string, unknown>) };
     delete (clientSettings.ui as Record<string, unknown>).lastSeenVersion;
+    delete (clientSettings.ui as Record<string, unknown>).skippedUpdateVersion;
 
     const payload = {
       app: 'Krunker-Civilian-Client',
