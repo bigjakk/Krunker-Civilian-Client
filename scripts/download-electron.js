@@ -6,8 +6,9 @@
  * The patched Electron fixes input starvation ("aim freeze") when --disable-frame-rate-limit
  * is active on modern Chromium. Without this, uncapped FPS causes 50-300ms input delays.
  * This build also bundles thegu5's frame-pacing patch so pending-frame limits are still
- * enforced under --disable-frame-rate-limit. The macOS (arm64) build additionally carries a
- * null-guard for the Chromium mac present-path crash (external_begin_frame_source() null deref).
+ * enforced under --disable-frame-rate-limit, plus the CustomFrameCap feature backing the
+ * exact FPS cap. The macOS (arm64) build additionally carries a null-guard for the Chromium
+ * mac present-path crash (external_begin_frame_source() null deref).
  *
  * Platform behavior:
  *   Windows:        patched Win   → dist/       (replaces stock)
@@ -29,12 +30,12 @@ const { execSync } = require('child_process');
 // ── Configuration ──────────────────────────────────────────────────────────
 const GITHUB_BASE = 'https://github.com';
 const REPO = 'bigjakk/Electron-Websocket-Fix';
-const RELEASE_TAG = 'v43.0.0';
+const RELEASE_TAG = 'v43.0.0-framecap';
 
 const PLATFORMS = {
-    win32: { asset: 'electron-v43.0.0-ws-frameThrottle-patched-windows-x64.zip' },
-    linux: { asset: 'electron-v43.0.0-ws-frameThrottle-patched-linux-x64.zip' },
-    darwin: { asset: 'electron-v43.0.0-ws-frameThrottle-patched-mac-arm64.zip' },
+    win32: { asset: 'electron-v43.0.0-ws-frameThrottle-frameCap2-patched-windows-x64.zip' },
+    linux: { asset: 'electron-v43.0.0-ws-frameThrottle-frameCap2-patched-linux-x64.zip' },
+    darwin: { asset: 'electron-v43.0.0-ws-frameThrottle-frameCap2-patched-mac-arm64.zip' },
 };
 
 const IS_WIN = process.platform === 'win32';
