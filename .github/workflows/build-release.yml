@@ -5,6 +5,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Build even if this version is already released (never publishes)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -43,7 +48,7 @@ jobs:
   build-desktop:
     name: Build Windows + Linux
     needs: version-check
-    if: needs.version-check.outputs.SKIP == 'false'
+    if: needs.version-check.outputs.SKIP == 'false' || inputs.force_build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -98,7 +103,7 @@ jobs:
   build-mac:
     name: Build macOS (arm64)
     needs: version-check
-    if: needs.version-check.outputs.SKIP == 'false'
+    if: needs.version-check.outputs.SKIP == 'false' || inputs.force_build
     runs-on: macos-latest
     outputs:
       SIGNED: ${{ steps.signing.outputs.enabled }}
