@@ -943,7 +943,7 @@ async function launchApp(): Promise<void> {
       const capped = clampFrameCap((value as any)?.frameCap);
       if (capLiveAvailable && typeof capWin.setFrameCap === 'function') {
         capWin.setFrameCap(capped);
-      } else if (capped !== launchFrameCap && perfConfig.fpsUnlocked) {
+      } else if (capped !== launchFrameCap && (value as any)?.fpsUnlocked) {
         frameCapNeedsRestart = true;
       }
     }

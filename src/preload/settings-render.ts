@@ -180,7 +180,7 @@ function reapplySearch(): void {
   panels.forEach((panel) => {
     let visible = 0;
     panel.querySelectorAll('.kcc-row').forEach((el) => {
-      const match = (el.textContent || '').toLowerCase().includes(query);
+      const match = !el.classList.contains('kcc-row-hidden') && (el.textContent || '').toLowerCase().includes(query);
       (el as HTMLElement).style.display = match ? '' : 'none';
       if (match) visible++;
     });

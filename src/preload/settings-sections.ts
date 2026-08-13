@@ -374,31 +374,67 @@ export function buildPerformanceSection(
 
   const fpsGroup = createGroup(body, 'Frame Rate');
 
-  fpsGroup.appendChild(createToggleRow({
-    label: 'Unlimited FPS',
-    desc: 'Uncap the frame rate (requires restart)',
-    checked: perf.fpsUnlocked, restart: true,
-    onChange: (v) => { perf.fpsUnlocked = v; savePerf(); },
-  }));
+  // Mode is derived from the two stored keys: vsync = !fpsUnlocked,
+  // custom = fpsUnlocked + frameCap > 0, unlimited = fpsUnlocked + frameCap 0.
+  const frameMode = (): 'vsync' | 'custom' | 'unlimited' => !perf.fpsUnlocked ? 'vsync' : (perf.frameCap > 0 ? 'custom' : 'unlimited');
+  let lastCustomCap = Math.min(1000, Math.max(30, Math.round(Number(perf.frameCap)) || 240));
+  // Re-clamp hand-edited configs so the slider shows what will be stored
+  if (frameMode() === 'custom') perf.frameCap = lastCustomCap;
 
-  fpsGroup.appendChild(createToggleRow({
-    label: 'Higher Max FPS',
-    desc: 'Lets powerful machines reach higher framerates. May cause input lag or stutter on low-end hardware. Recommended to keep disabled (requires restart)',
-    checked: perf.higherMaxFps, restart: true, safety: 4,
-    onChange: (v) => { perf.higherMaxFps = v; savePerf(); },
-  }));
+  const applyPerf = (crossedVsync: boolean): void => {
+    ipcRenderer.invoke('set-config', 'performance', perf).then((needsRestart) => {
+      if (needsRestart || crossedVsync) onSettingChanged('restart');
+    });
+  };
 
-  fpsGroup.appendChild(createNumberRow({
+  const capRow = createNumberRow({
     label: 'FPS Cap',
-    desc: 'Cap the frame rate at an exact value while Unlimited FPS is on. 0 = uncapped (enabling may need a restart)',
-    min: 0, max: 1000, step: 1, value: perf.frameCap, instant: true,
+    desc: 'Exact frame rate to hold. Applies live in most sessions (may need a restart)',
+    min: 30, max: 1000, step: 1, value: lastCustomCap, instant: true,
     onChange: (v) => {
       perf.frameCap = v;
-      ipcRenderer.invoke('set-config', 'performance', perf).then((needsRestart) => {
-        if (needsRestart) onSettingChanged('restart');
-      });
+      lastCustomCap = v;
+      applyPerf(false);
+    },
+  });
+
+  const higherMaxRow = createToggleRow({
+    label: 'Higher Max FPS',
+    desc: 'Lets powerful machines reach higher framerates. Only active while Frame Rate Limit is Unlimited. May cause input lag or stutter on low-end hardware. Recommended to keep disabled (requires restart)',
+    checked: perf.higherMaxFps, restart: true, safety: 4,
+    onChange: (v) => { perf.higherMaxFps = v; savePerf(); },
+  });
+
+  const higherMaxCheckbox = higherMaxRow.querySelector('input[type="checkbox"]') as HTMLInputElement;
+  const syncFrameRows = (): void => {
+    const mode = frameMode();
+    capRow.classList.toggle('kcc-row-hidden', mode !== 'custom');
+    higherMaxRow.classList.toggle('kcc-row-dim', mode !== 'unlimited');
+    higherMaxCheckbox.disabled = mode !== 'unlimited';
+  };
+
+  fpsGroup.appendChild(createSelectRow({
+    label: 'Frame Rate Limit',
+    desc: 'Vsync syncs to the monitor refresh rate; switching it on or off requires a restart. Custom Cap holds an exact frame rate',
+    options: [
+      { value: 'unlimited', label: 'Unlimited' },
+      { value: 'custom', label: 'Custom Cap' },
+      { value: 'vsync', label: 'Vsync' },
+    ],
+    value: frameMode(),
+    onChange: (mode) => {
+      const wasVsync = !perf.fpsUnlocked;
+      if (perf.frameCap > 0) lastCustomCap = perf.frameCap;
+      perf.fpsUnlocked = mode !== 'vsync';
+      // Vsync leaves frameCap untouched so switching back restores it
+      if (mode !== 'vsync') perf.frameCap = mode === 'custom' ? lastCustomCap : 0;
+      syncFrameRows();
+      applyPerf(wasVsync !== (mode === 'vsync'));
     },
   }));
+  fpsGroup.appendChild(capRow);
+  fpsGroup.appendChild(higherMaxRow);
+  syncFrameRows();
 
 
   const sysGroup = createGroup(body, 'System');
