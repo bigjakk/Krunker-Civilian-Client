@@ -400,7 +400,7 @@ export function buildPerformanceSection(
 
   const higherMaxRow = createToggleRow({
     label: 'Higher Max FPS',
-    desc: 'Lets powerful machines reach higher framerates. Only active while Frame Rate Limit is Unlimited. May cause input lag or stutter on low-end hardware. Recommended to keep disabled (requires restart)',
+    desc: 'Lets powerful machines reach higher framerates. Only active while FPS Limit is Unlimited. May cause input lag or stutter on low-end hardware. Recommended to keep disabled (requires restart)',
     checked: perf.higherMaxFps, restart: true, safety: 4,
     onChange: (v) => { perf.higherMaxFps = v; savePerf(); },
   });
@@ -414,7 +414,7 @@ export function buildPerformanceSection(
   };
 
   fpsGroup.appendChild(createSelectRow({
-    label: 'Frame Rate Limit',
+    label: 'FPS Limit',
     desc: 'Vsync syncs to the monitor refresh rate; switching it on or off requires a restart. Custom Cap holds an exact frame rate',
     options: [
       { value: 'unlimited', label: 'Unlimited' },
