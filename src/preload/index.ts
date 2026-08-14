@@ -14,8 +14,10 @@ import { DEFAULT_CONFIG } from '../main/config-defaults';
 import { savedConsole as _console, setVerbose } from './saved-console';
 import { initAltManagerButton } from './alt-manager';
 import { startHidePopups, setClassicSocial, initModManagerButton } from './menu-tweaks';
+import { initSocialMusic } from './social-music';
 import { initBanlog } from './banlog';
 import { installGameSocketTap } from './game-socket';
+import { installSkyHook } from './sky';
 import { installSoundHook, setHeadshotSoundMode } from './headshot-sound';
 import { initKccProtocol } from './protocol';
 
@@ -24,6 +26,9 @@ _console.log('[KCC] Preload script loaded');
 
 // ── Game socket tap: wrap window.WebSocket before the game socket opens (read-only) ──
 installGameSocketTap();
+
+// ── Sky override: wrap window.fetch before the map config request goes out ──
+installSkyHook();
 
 // preventDefault on wheel events avoids Chromium 100+ pacing frame production to vsync during scroll gestures (FPS would tank from 1000+ to refresh rate). Skip when target is inside a real scrollable element so menus still scroll.
 window.addEventListener('wheel', (e: WheelEvent) => {
@@ -183,6 +188,15 @@ ipcRenderer.on('main_did-finish-load', () => {
     if (uiConf?.menuTimer ?? true) setMenuTimer(true);
     if (isGamePage && uiConf?.classicSocial) setClassicSocial(true);
     if (isGamePage) initModManagerButton();
+
+    if (isGamePage) {
+      initSocialMusic({
+        source: uiConf?.socialMusic ?? '',
+        volume: uiConf?.socialMusicVolume ?? 40,
+        onSocial: uiConf?.socialMusicOnSocial ?? true,
+        onMarket: uiConf?.socialMusicOnMarket ?? false,
+      });
+    }
 
     // ── Direct server ping (TCP RTT to the game server, replaces Krunker's display) ──
     if (isGamePage && uiConf?.directServerPing) {

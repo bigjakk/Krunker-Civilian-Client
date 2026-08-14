@@ -21,7 +21,7 @@ import {
   type SettingsBag,
   buildGeneralSection, buildGameSection, buildKeystrokesRows, buildPerformanceSection,
   buildSwapperSection, buildAppearanceSection, buildMatchmakerSection, buildDiscordSection,
-  buildChatSection,
+  buildChatSection, stopMusicPreview,
 } from './settings-sections';
 import { buildAccountsSection } from './alt-manager';
 import { getInstances, setScriptEnabled } from './userscripts';
@@ -90,6 +90,15 @@ export function hookSettings(): void {
     if (!isClientTab()) return;
     const query = (document.getElementById('settSearch') as HTMLInputElement | null)?.value?.trim() ?? '';
     renderSettings(query.length > 0 ? query : undefined);
+  }
+
+  // Closing the settings window is neither a tab change nor a search, so none of the
+  // hooks below fire — without this a running music preview plays on over the game.
+  const holder = document.getElementById('windowHolder');
+  if (holder) {
+    new MutationObserver(() => {
+      if (!holder.style.display || holder.style.display === 'none') stopMusicPreview();
+    }).observe(holder, { attributes: true, attributeFilter: ['style'] });
   }
 
   const origShowWindow = w.showWindow.bind(w);
@@ -171,7 +180,7 @@ function reapplySearch(): void {
   panels.forEach((panel) => {
     let visible = 0;
     panel.querySelectorAll('.kcc-row').forEach((el) => {
-      const match = (el.textContent || '').toLowerCase().includes(query);
+      const match = !el.classList.contains('kcc-row-hidden') && (el.textContent || '').toLowerCase().includes(query);
       (el as HTMLElement).style.display = match ? '' : 'none';
       if (match) visible++;
     });
@@ -383,7 +392,7 @@ function renderSettings(searchQuery?: string): void {
     { key: 'General', label: 'General', icon: 'tune', build: (b) => buildGeneralSection(b, gameConf, uiConfRaw, bag) },
     { key: 'Game', label: 'Game', icon: 'sports_esports', build: (b) => buildGameSection(b, gameConf, uiConfRaw, bag) },
     { key: 'Performance', label: 'Performance', icon: 'speed', build: (b) => buildPerformanceSection(b, allConf.performance, allConf.advanced, isWindows) },
-    { key: 'Swapper', label: 'Swapper', icon: 'swap_horiz', build: (b) => buildSwapperSection(b, allConf.swapper) },
+    { key: 'Swapper', label: 'Swapper', icon: 'swap_horiz', build: (b) => buildSwapperSection(b, allConf.swapper, uiConfRaw) },
     { key: 'Appearance', label: 'Appearance', icon: 'palette', build: (b) => buildAppearanceSection(b, uiConfRaw) },
     { key: 'Matchmaker', label: 'Matchmaker', icon: 'travel_explore', build: (b) => buildMatchmakerSection(b, allConf.matchmaker, bag) },
     { key: 'Chat', label: 'Chat', icon: 'chat', build: (b) => buildChatSection(b, gameConf, allConf.translator) },

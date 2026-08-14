@@ -214,6 +214,8 @@ ${THEME_CSS}
 .kcc-row-block { flex-direction: column; align-items: stretch; }
 .kcc-row-block .kcc-row-control { margin-top: 6px; }
 .kcc-row-info { color: var(--kcc-text-muted); }
+.kcc-row-hidden { display: none; }
+.kcc-row-dim { opacity: 0.55; }
 
 /* flagged-row left edge (mirrors the strongest tag) */
 .kcc-row.kcc-flag-reload  { border-left-color: var(--kcc-blue); }

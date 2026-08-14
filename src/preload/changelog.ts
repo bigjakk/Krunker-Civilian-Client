@@ -3,6 +3,7 @@
 
 import { ipcRenderer } from 'electron';
 import { escapeHtml } from './utils';
+import { renderMarkdown } from '../shared/markdown';
 
 function versionLessThan(a: string, b: string): boolean {
     const pa = a.split('.').map(Number);
@@ -15,44 +16,6 @@ function versionLessThan(a: string, b: string): boolean {
         if (na > nb) return false;
     }
     return false;
-}
-
-function sanitizeUrl(url: string): string {
-    try {
-        const parsed = new URL(url);
-        if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return escapeHtml(url);
-    } catch { /* invalid URL */ }
-    return '#';
-}
-
-function renderMarkdown(md: string): string {
-    // Escape all HTML first, then apply markdown formatting to the safe text
-    const escaped = escapeHtml(md);
-    const html = escaped
-        .replace(/### (.+)/g, '<h3>$1</h3>')
-        .replace(/## (.+)/g, '<h2>$1</h2>')
-        .replace(/# (.+)/g, '<h1>$1</h1>')
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, text, url) =>
-            `<a href="${sanitizeUrl(url)}" target="_blank">${text}</a>`);
-
-    // Convert list items
-    const lines = html.split('\n');
-    let inList = false;
-    const out: string[] = [];
-    for (const line of lines) {
-        if (line.trimStart().startsWith('- ')) {
-            if (!inList) { out.push('<ul>'); inList = true; }
-            out.push('<li>' + line.trimStart().slice(2) + '</li>');
-        } else {
-            if (inList) { out.push('</ul>'); inList = false; }
-            out.push(line);
-        }
-    }
-    if (inList) out.push('</ul>');
-
-    return out.join('\n').replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
 }
 
 function showChangelogPopup(version: string, body: string): void {
@@ -78,9 +41,9 @@ function showChangelogPopup(version: string, body: string): void {
         }
         .modal {
             position: relative;
-            background: #1a1a1a;
+            background: #0f1116;
             border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 14px;
+            border-radius: 8px;
             width: min(560px, 90vw);
             max-height: 75vh;
             display: flex; flex-direction: column;
@@ -90,23 +53,23 @@ function showChangelogPopup(version: string, body: string): void {
         }
         .modal::before {
             content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-            background: linear-gradient(90deg, #42a5f5, #6ea8fe 50%, #42a5f5);
+            background: linear-gradient(90deg, #0fa96c, #2ee59d 50%, #0fa96c);
         }
         .header {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 20px 24px 16px;
+            padding: 16px 20px 12px;
             border-bottom: 1px solid rgba(255,255,255,0.06);
         }
         .title-wrap { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
         .title {
-            margin: 0; font-size: 1.15rem; font-weight: 600; color: #fff;
+            margin: 0; font-size: 1.05rem; font-weight: 600; color: #fff;
             letter-spacing: -0.01em;
         }
         .version-pill {
             font-size: 0.75rem; font-weight: 500;
             color: rgba(255,255,255,0.75);
-            background: rgba(66,165,245,0.12);
-            border: 1px solid rgba(66,165,245,0.25);
+            background: rgba(46,229,157,0.12);
+            border: 1px solid rgba(46,229,157,0.28);
             padding: 2px 8px; border-radius: 999px;
             letter-spacing: 0.02em;
         }
@@ -121,27 +84,27 @@ function showChangelogPopup(version: string, body: string): void {
         .close-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
         .body {
             overflow-y: auto; flex: 1; line-height: 1.55;
-            padding: 18px 24px 22px;
-            font-size: 0.9rem;
-            color: rgba(255,255,255,0.8);
+            padding: 14px 20px 18px;
+            font-size: 0.875rem;
+            color: rgba(255,255,255,0.78);
         }
         .body::-webkit-scrollbar { width: 8px; }
         .body::-webkit-scrollbar-track { background: transparent; }
         .body::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.1); border-radius: 4px;
+            background: rgba(255,255,255,0.14); border-radius: 4px;
         }
-        .body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+        .body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
         .body h1, .body h2, .body h3 {
             color: #fff; font-weight: 600; letter-spacing: -0.01em;
         }
-        .body h1 { font-size: 1.1rem; margin: 14px 0 8px; }
-        .body h2 { font-size: 1rem; margin: 12px 0 6px; }
-        .body h3 { font-size: 0.9rem; margin: 10px 0 4px; color: rgba(255,255,255,0.85); }
+        .body h1 { font-size: 1rem; margin: 12px 0 5px; }
+        .body h2 { font-size: 0.95rem; margin: 10px 0 4px; }
+        .body h3 { font-size: 0.85rem; margin: 8px 0 3px; color: rgba(255,255,255,0.85); }
         .body h1:first-child, .body h2:first-child, .body h3:first-child { margin-top: 0; }
-        .body ul { padding-left: 18px; margin: 6px 0; }
-        .body li { margin: 4px 0; }
-        .body li::marker { color: rgba(66,165,245,0.7); }
-        .body a { color: #6ea8fe; text-decoration: none; }
+        .body ul { padding-left: 16px; margin: 4px 0; }
+        .body li { margin: 3px 0; }
+        .body li::marker { color: rgba(46,229,157,0.8); }
+        .body a { color: #2ee59d; text-decoration: none; }
         .body a:hover { text-decoration: underline; }
         .body strong { color: #fff; font-weight: 600; }
         .body em { color: rgba(255,255,255,0.9); }

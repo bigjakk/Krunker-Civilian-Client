@@ -4,6 +4,18 @@
 // sandboxed and can't pull Node modules, but it can import this for the single
 // source of truth on defaults. config.ts wraps DEFAULT_CONFIG in the actual Store.
 
+// Sky dome textures are referenced by user-asset ID. This one is deliberately not a
+// real asset: the preload writes it into the map config, and main redirects the
+// resulting texture request to a local file, so it never reaches the network.
+// Shared here because both processes need the same number.
+export const SKY_SENTINEL_ID = 9900001;
+
+// Payload of the 'resolve-social-music' IPC: a remote URL passes straight through,
+// a local file comes back as raw bytes for the renderer to wrap in a Blob. Declared
+// here because main and both preload consumers have to agree on it — ipcRenderer
+// .invoke is typed `any`, so a mismatch is otherwise silent until runtime.
+export type SocialMusicSource = { url: string } | { bytes: Uint8Array; mime: string } | null;
+
 export interface Keybind {
   key: string;
   ctrl: boolean;
@@ -33,6 +45,7 @@ export interface AppConfig {
   performance: {
     fpsUnlocked: boolean;
     higherMaxFps: boolean;
+    frameCap: number;
     processPriority: string;
   };
   game: {
@@ -100,10 +113,19 @@ export interface AppConfig {
     classicSocial: boolean;
     cssTheme: string;
     socialCssTheme: string;
+    skyOverride: boolean;
+    skyZenith: string;
+    skyHorizon: string;
+    skyImage: string;
+    socialMusic: string;
+    socialMusicVolume: number;
+    socialMusicOnSocial: boolean;
+    socialMusicOnMarket: boolean;
     loadingTheme: string;
     backgroundUrl: string;
     showChangelog: boolean;
     lastSeenVersion: string;
+    skippedUpdateVersion: string;
   };
   discord: {
     enabled: boolean;
@@ -161,6 +183,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   performance: {
     fpsUnlocked: true,
     higherMaxFps: false,
+    frameCap: 0,
     processPriority: 'Normal',
   },
   game: {
@@ -218,10 +241,19 @@ export const DEFAULT_CONFIG: AppConfig = {
     classicSocial: false,
     cssTheme: 'disabled',
     socialCssTheme: 'disabled',
+    skyOverride: false,
+    skyZenith: '#1E5AA8',
+    skyHorizon: '#9FD0F0',
+    skyImage: 'disabled',
+    socialMusic: '',
+    socialMusicVolume: 40,
+    socialMusicOnSocial: true,
+    socialMusicOnMarket: false,
     loadingTheme: 'disabled',
     backgroundUrl: '',
     showChangelog: true,
     lastSeenVersion: '',
+    skippedUpdateVersion: '',
   },
   discord: {
     enabled: true,

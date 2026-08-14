@@ -6,6 +6,7 @@
 import { ipcRenderer } from 'electron';
 import type { Keybind } from '../main/config';
 import { DEFAULT_CONFIG } from '../main/config-defaults';
+import type { SocialMusicSource } from '../main/config-defaults';
 import { setDeathAnimBlock, setMenuTimer, setWatermark, showToast } from './utils';
 import {
   createKeybindRow, createSimpleKeyRow, createToggleRow, createSelectRow,
@@ -14,6 +15,7 @@ import {
   createGroup, createColorRow,
 } from './settings-controls';
 import { setClassicSocial, startHidePopups, stopHidePopups } from './menu-tweaks';
+import { updateSocialMusicConfig } from './social-music';
 import { initHPCounter, destroyHPCounter } from './competitive';
 import { setHeadshotSoundMode } from './headshot-sound';
 import type { HeadshotSoundMode } from './headshot-sound';
@@ -29,6 +31,19 @@ export interface SettingsBag {
   binds: Record<string, Keybind>;
   saveBinds: () => void;
   isWindows: boolean;
+}
+
+// Module-scoped so it can be stopped from outside the panel that created it.
+let musicPreview: HTMLAudioElement | null = null;
+let musicPreviewUrl = ''; // Blob URL while previewing a local file
+
+export function stopMusicPreview(): void {
+  if (musicPreview) musicPreview.pause();
+  musicPreview = null;
+  if (musicPreviewUrl) {
+    URL.revokeObjectURL(musicPreviewUrl);
+    musicPreviewUrl = '';
+  }
 }
 
 export function buildGeneralSection(
@@ -359,19 +374,68 @@ export function buildPerformanceSection(
 
   const fpsGroup = createGroup(body, 'Frame Rate');
 
-  fpsGroup.appendChild(createToggleRow({
-    label: 'Unlimited FPS',
-    desc: 'Uncap the frame rate (requires restart)',
-    checked: perf.fpsUnlocked, restart: true,
-    onChange: (v) => { perf.fpsUnlocked = v; savePerf(); },
-  }));
+  // Mode is derived from the two stored keys: vsync = !fpsUnlocked,
+  // custom = fpsUnlocked + frameCap > 0, unlimited = fpsUnlocked + frameCap 0.
+  const frameMode = (): 'vsync' | 'custom' | 'unlimited' => !perf.fpsUnlocked ? 'vsync' : (perf.frameCap > 0 ? 'custom' : 'unlimited');
+  let lastCustomCap = Math.min(1000, Math.max(30, Math.round(Number(perf.frameCap)) || 240));
+  // Re-clamp hand-edited configs so the slider shows what will be stored
+  if (frameMode() === 'custom') perf.frameCap = lastCustomCap;
 
-  fpsGroup.appendChild(createToggleRow({
+  const applyPerf = (crossedVsync: boolean): void => {
+    ipcRenderer.invoke('set-config', 'performance', perf).then((needsRestart) => {
+      if (needsRestart || crossedVsync) onSettingChanged('restart');
+    });
+  };
+
+  const capRow = createNumberRow({
+    label: 'FPS Cap',
+    desc: 'Exact frame rate to hold. Applies live in most sessions (may need a restart)',
+    min: 30, max: 1000, step: 1, value: lastCustomCap, instant: true,
+    onChange: (v) => {
+      perf.frameCap = v;
+      lastCustomCap = v;
+      applyPerf(false);
+    },
+  });
+
+  const higherMaxRow = createToggleRow({
     label: 'Higher Max FPS',
-    desc: 'Lets powerful machines reach higher framerates. May cause input lag or stutter on low-end hardware. Recommended to keep disabled (requires restart)',
+    desc: 'Lets powerful machines reach higher framerates. Only active while FPS Limit is Unlimited. May cause input lag or stutter on low-end hardware. Recommended to keep disabled (requires restart)',
     checked: perf.higherMaxFps, restart: true, safety: 4,
     onChange: (v) => { perf.higherMaxFps = v; savePerf(); },
+  });
+
+  const higherMaxCheckbox = higherMaxRow.querySelector('input[type="checkbox"]') as HTMLInputElement;
+  const syncFrameRows = (): void => {
+    const mode = frameMode();
+    capRow.classList.toggle('kcc-row-hidden', mode !== 'custom');
+    higherMaxRow.classList.toggle('kcc-row-dim', mode !== 'unlimited');
+    higherMaxCheckbox.disabled = mode !== 'unlimited';
+  };
+
+  fpsGroup.appendChild(createSelectRow({
+    label: 'FPS Limit',
+    desc: 'Vsync syncs to the monitor refresh rate; switching it on or off requires a restart. Custom Cap holds an exact frame rate',
+    options: [
+      { value: 'unlimited', label: 'Unlimited' },
+      { value: 'custom', label: 'Custom Cap' },
+      { value: 'vsync', label: 'Vsync' },
+    ],
+    value: frameMode(),
+    onChange: (mode) => {
+      const wasVsync = !perf.fpsUnlocked;
+      if (perf.frameCap > 0) lastCustomCap = perf.frameCap;
+      perf.fpsUnlocked = mode !== 'vsync';
+      // Vsync leaves frameCap untouched so switching back restores it
+      if (mode !== 'vsync') perf.frameCap = mode === 'custom' ? lastCustomCap : 0;
+      syncFrameRows();
+      applyPerf(wasVsync !== (mode === 'vsync'));
+    },
   }));
+  fpsGroup.appendChild(capRow);
+  fpsGroup.appendChild(higherMaxRow);
+  syncFrameRows();
+
 
   const sysGroup = createGroup(body, 'System');
 
@@ -442,8 +506,13 @@ export function buildPerformanceSection(
   }));
 }
 
-export function buildSwapperSection(body: HTMLElement, swapperConf: any): void {
+export function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfRaw: any): void {
   const swapEnabled = swapperConf ? swapperConf.enabled : DEFAULT_CONFIG.swapper.enabled;
+  const ui = uiConfRaw;
+
+  function saveUI(): void {
+    ipcRenderer.invoke('set-config', 'ui', ui);
+  }
 
   const group = createGroup(body);
 
@@ -464,6 +533,84 @@ export function buildSwapperSection(body: HTMLElement, swapperConf: any): void {
     desc: 'Place replacement assets here (textures/, sound/, models/)',
     buttons: [{ icon: 'folder', label: 'Swapper', title: 'Open Folder', onClick: () => ipcRenderer.invoke('open-swap-folder') }],
   }).row);
+
+  // ── Sky ──
+  // Applies on the next map load; the map being played is already built.
+  const skyGroup = createGroup(body, 'Sky');
+
+  const skyToggle = createToggleRow({
+    label: 'Sky Swapper',
+    desc: 'Replace the in-game sky with your own colours or image',
+    checked: ui.skyOverride ?? DEFAULT_CONFIG.ui.skyOverride,
+    refreshOnly: true,
+    onChange: (v) => { ui.skyOverride = v; saveUI(); },
+  });
+  skyGroup.appendChild(skyToggle);
+
+  skyGroup.appendChild(createColorRow({
+    label: 'Sky Top',
+    desc: 'Colour directly overhead',
+    value: ui.skyZenith || DEFAULT_CONFIG.ui.skyZenith,
+    defaultValue: DEFAULT_CONFIG.ui.skyZenith,
+    refreshOnly: true,
+    onChange: (v) => { ui.skyZenith = v; saveUI(); },
+  }));
+
+  skyGroup.appendChild(createColorRow({
+    label: 'Sky Horizon',
+    desc: 'Colour at the horizon',
+    value: ui.skyHorizon || DEFAULT_CONFIG.ui.skyHorizon,
+    defaultValue: DEFAULT_CONFIG.ui.skyHorizon,
+    refreshOnly: true,
+    onChange: (v) => { ui.skyHorizon = v; saveUI(); },
+  }));
+
+  // ── Sky Image (populated from swap/skies/) ──
+  // The image is wrapped around a dome, so flat photos distort badly.
+  const skyImgR = createRowShell('Sky Image', 'Use an image instead of the gradient — browse for one, or drop files into swap/skies/. Panoramic (equirectangular) images work best — ordinary photos will stretch');
+  const skyImgSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
+  skyImgR.control.appendChild(skyImgSelect);
+
+  const populateSkies = async (): Promise<void> => {
+    const images: Array<{ id: string; label: string }> = await ipcRenderer.invoke('list-sky-images');
+    skyImgSelect.innerHTML = '';
+    for (const img of images) {
+      const opt = document.createElement('option');
+      opt.value = img.id;
+      opt.textContent = img.label;
+      if (img.id === ui.skyImage) opt.selected = true;
+      skyImgSelect.appendChild(opt);
+    }
+  };
+
+  skyImgR.control.appendChild(makeButton({ icon: 'folder_open', title: 'Browse for Image', onClick: async () => {
+    let id: string;
+    try {
+      id = await ipcRenderer.invoke('pick-sky-image');
+    } catch {
+      showToast('Couldn\'t add that sky image. Pick a .png, .jpg, or .webp file.');
+      return;
+    }
+    if (!id) return;
+    ui.skyImage = id;
+    // The override is off by default, so without this the pick would do nothing
+    ui.skyOverride = true;
+    const cb = skyToggle.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+    if (cb) cb.checked = true;
+    saveUI();
+    await populateSkies();
+    onSettingChanged('refresh');
+  } }));
+  skyImgR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Skies Folder', onClick: () => ipcRenderer.invoke('open-skies-folder') }));
+  skyGroup.appendChild(skyImgR.row);
+
+  populateSkies();
+
+  skyImgSelect.addEventListener('change', () => {
+    ui.skyImage = skyImgSelect.value;
+    saveUI();
+    onSettingChanged('refresh');
+  });
 }
 
 export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void {
@@ -522,6 +669,83 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
     ui.socialCssTheme = socialThemeSelect.value;
     saveUI();
   });
+
+  // ── Menu Music ──
+  const musicGroup = createGroup(body, 'Menu Music');
+
+  const applyMusic = (): void => {
+    saveUI();
+    updateSocialMusicConfig({
+      source: ui.socialMusic || '',
+      volume: ui.socialMusicVolume ?? 40,
+      onSocial: ui.socialMusicOnSocial ?? DEFAULT_CONFIG.ui.socialMusicOnSocial,
+      onMarket: ui.socialMusicOnMarket ?? DEFAULT_CONFIG.ui.socialMusicOnMarket,
+    });
+  };
+
+  musicGroup.appendChild(createToggleRow({
+    label: 'Play in Social Hub',
+    desc: 'Loop the music while the social hub is open',
+    checked: ui.socialMusicOnSocial ?? DEFAULT_CONFIG.ui.socialMusicOnSocial,
+    instant: true,
+    onChange: (v) => { ui.socialMusicOnSocial = v; applyMusic(); },
+  }));
+
+  musicGroup.appendChild(createToggleRow({
+    label: 'Play in Market',
+    desc: 'Loop the music while the Market & Trading menu is open',
+    checked: ui.socialMusicOnMarket ?? DEFAULT_CONFIG.ui.socialMusicOnMarket,
+    instant: true,
+    onChange: (v) => { ui.socialMusicOnMarket = v; applyMusic(); },
+  }));
+
+  const musicR = createTextRow({
+    label: 'Music Source',
+    desc: 'Loops while an enabled menu (above) is open, and fades out when you close it. Use a direct audio file link ending in .mp3, .ogg, or .wav — page links (Pixabay, YouTube, etc.) will not work. The easiest way is to download the file and pick it with the browse button (local files must be under 30 MB). Leave blank to disable.',
+    value: ui.socialMusic || '',
+    placeholder: 'https://example.com/track.mp3  or  C:\\path\\to\\file.mp3',
+    onChange: (v) => { ui.socialMusic = v; applyMusic(); },
+  });
+  const musicInput = musicR.input;
+  const musicControl = musicR.row.querySelector('.kcc-row-control') as HTMLElement;
+  musicControl.appendChild(makeButton({ icon: 'folder_open', title: 'Browse for Audio File', onClick: async () => {
+    const path: string = await ipcRenderer.invoke('pick-audio-file');
+    if (path) { musicInput.value = path; ui.socialMusic = path; applyMusic(); }
+  } }));
+
+  stopMusicPreview(); // this panel is rebuilt on every open
+  const resetMusicBtn = (failed?: boolean): void => {
+    stopMusicPreview();
+    musicPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+    if (failed) showToast('Couldn\'t load that music. Use a direct audio file link (.mp3/.ogg/.wav) or download it and pick the file — page links won\'t work.');
+  };
+  const musicPlayBtn = makeButton({ icon: 'play_arrow', title: 'Preview Music', onClick: async () => {
+    if (musicPreview) { resetMusicBtn(); return; }
+    const src = (await ipcRenderer.invoke('resolve-social-music', musicInput.value.trim())) as SocialMusicSource;
+    let url = '';
+    if (src && 'url' in src) {
+      url = src.url;
+    } else if (src && 'bytes' in src) {
+      musicPreviewUrl = URL.createObjectURL(new Blob([src.bytes as unknown as BlobPart], { type: src.mime }));
+      url = musicPreviewUrl;
+    }
+    if (!url) { resetMusicBtn(true); return; }
+    musicPreview = new Audio(url);
+    musicPreview.volume = Math.min(1, Math.max(0, (ui.socialMusicVolume ?? 40) / 100));
+    musicPlayBtn.innerHTML = '<span class="material-icons">stop</span>';
+    musicPreview.onended = () => resetMusicBtn();
+    musicPreview.onerror = () => resetMusicBtn(true);
+    musicPreview.play().catch(() => resetMusicBtn(true));
+  } });
+  musicControl.appendChild(musicPlayBtn);
+  musicGroup.appendChild(musicR.row);
+
+  musicGroup.appendChild(createNumberRow({
+    label: 'Music Volume',
+    desc: 'Playback volume (0-100)',
+    min: 0, max: 100, value: ui.socialMusicVolume ?? 40, instant: true,
+    onChange: (v) => { ui.socialMusicVolume = v; applyMusic(); },
+  }));
 
   const loadingGroup = createGroup(body, 'Loading Screen');
 

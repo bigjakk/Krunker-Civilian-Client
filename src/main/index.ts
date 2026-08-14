@@ -1,13 +1,14 @@
 import { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, powerSaveBlocker, safeStorage, session, shell, webContents } from 'electron';
-import { join, extname } from 'path';
-import { existsSync, mkdirSync, promises as fsp, readFileSync, statSync } from 'fs';
+import { join, extname, basename, dirname, resolve as resolvePath } from 'path';
+import { existsSync, mkdirSync, promises as fsp } from 'fs';
 import { get as httpsGet } from 'https';
 import { execFile } from 'child_process';
 import * as os from 'os';
 import { Socket } from 'net';
-import { detectPlatform, applyPlatformFlags, getValidAngleBackends, devWindowIcon } from './platform';
-import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount, DEFAULT_CONFIG } from './config';
-import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper } from './swapper';
+import { detectPlatform, applyPlatformFlags, getValidAngleBackends, devWindowIcon, clampFrameCap } from './platform';
+import { config, Keybind, DEFAULT_KEYBINDS, SavedAccount, DEFAULT_CONFIG, SocialMusicSource } from './config';
+import { initSwapperProtocol, registerSwapperFileProtocol, ResourceSwapper, filePathToSwapURL } from './swapper';
+import { listSkyImages, resolveSkyImage, SKIES_DIR, SKY_TEXTURE_RE, SKY_IMAGE_EXTS } from './sky-textures';
 import { UserscriptManager } from './userscripts';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog, getLogPath, closeLogStreams } from './logger';
@@ -29,25 +30,40 @@ const AUDIO_MIME: Record<string, string> = {
   '.aac': 'audio/aac',
 };
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
+const MAX_MUSIC_BYTES = 30 * 1024 * 1024;
 
-function resolveRankedAudioUrl(setting: string): string {
+/** The extension allowlist is load-bearing — this inlines file bytes into a renderer. */
+async function readAudio(path: string, maxBytes: number): Promise<{ bytes: Buffer; mime: string } | null> {
+  try {
+    const mime = AUDIO_MIME[extname(path).toLowerCase()];
+    if (!mime) throw new Error('unsupported audio type');
+    const stat = await fsp.stat(path);
+    if (!stat.isFile()) throw new Error('not a file');
+    if (stat.size > maxBytes) {
+      electronLog.warn(`[KCC] Audio file too large (${stat.size} bytes, max ${maxBytes}): ${path}`);
+      return null;
+    }
+    return { bytes: await fsp.readFile(path), mime };
+  } catch (err) {
+    electronLog.warn(`[KCC] Audio file invalid (${path}):`, err);
+    return null;
+  }
+}
+
+async function resolveRankedAudioUrl(setting: string): Promise<string> {
   const s = (setting || '').trim();
   if (!s) return DEFAULT_RANKED_AUDIO_URL;
   if (/^https?:\/\//i.test(s)) return s;
-  try {
-    const stat = statSync(s);
-    if (!stat.isFile()) throw new Error('not a file');
-    if (stat.size > MAX_AUDIO_BYTES) {
-      electronLog.warn(`[KCC] Ranked match sound too large (${stat.size} bytes), using default`);
-      return DEFAULT_RANKED_AUDIO_URL;
-    }
-    const mime = AUDIO_MIME[extname(s).toLowerCase()] || 'audio/mpeg';
-    const b64 = readFileSync(s).toString('base64');
-    return `data:${mime};base64,${b64}`;
-  } catch (err) {
-    electronLog.warn(`[KCC] Ranked match sound invalid (${s}):`, err);
-    return DEFAULT_RANKED_AUDIO_URL;
-  }
+  const a = await readAudio(s, MAX_AUDIO_BYTES);
+  return a ? `data:${a.mime};base64,${a.bytes.toString('base64')}` : DEFAULT_RANKED_AUDIO_URL;
+}
+
+/** Local files come back as raw bytes for a Blob; base64 would add a third again. */
+async function resolveSocialMusic(setting: string): Promise<SocialMusicSource> {
+  const s = (setting || '').trim();
+  if (!s) return null;
+  if (/^https?:\/\//i.test(s)) return { url: s };
+  return await readAudio(s, MAX_MUSIC_BYTES);
 }
 
 // ── App version for API calls ──
@@ -119,7 +135,7 @@ function stopServerPing(): void {
 // ── Platform flags (must run before app.ready) ──
 const platformInfo = detectPlatform();
 const advancedConfig = { ...DEFAULT_CONFIG.advanced, ...config.get('advanced') };
-const perfConfig = { ...config.get('performance') };
+const perfConfig = { ...DEFAULT_CONFIG.performance, ...config.get('performance') };
 
 // Self-heal angleBackend if a previous version's value is no longer valid for this platform (e.g. user picked 'vulkan', 'd3d9', etc., and we removed it).
 const validBackends = getValidAngleBackends(platformInfo);
@@ -130,6 +146,17 @@ if (advancedConfig.angleBackend && !validBackends.includes(advancedConfig.angleB
 }
 
 applyPlatformFlags(platformInfo, advancedConfig, perfConfig);
+
+// Live frame-cap changes are safe only in sessions launched without
+// CustomMaxPendingFrames (cap and deeper frame queue are mutually exclusive —
+// depth ≥ 2 decouples the renderer from the paced draw loop) and with the FPS
+// uncap active. Otherwise the new value persists and applies next restart.
+const launchFrameCap = clampFrameCap(perfConfig.frameCap);
+const capLiveAvailable = perfConfig.fpsUnlocked &&
+  (launchFrameCap > 0 || !perfConfig.higherMaxFps);
+if (launchFrameCap > 0) {
+  electronLog.log(`[KCC] FPS cap ${launchFrameCap}, live changes ${capLiveAvailable ? 'enabled' : 'need a restart'}`);
+}
 
 // ── User agent ──
 // Deliberately not a browser UA. Electron's default reports the true Chromium build, a
@@ -326,13 +353,19 @@ app.whenReady().then(async () => {
       splashStatus('Checking for updates...', -1);
       const update = await checkForUpdate(appVersion);
       if (!splashAlive()) return; // user closed the splash — app is quitting
-      if (update) {
+      const skippedVer = config.get('ui')?.skippedUpdateVersion || '';
+      if (update && update.version === skippedVer) {
+        electronLog.log(`[KCC] Update v${update.version} available but skipped by user preference`);
+      } else if (update) {
         electronLog.log(`[KCC] Update available: v${update.version}`);
 
-        const choice = await splashPrompt('install', update.version, appVersion);
+        const choice = await splashPrompt('install', update.version, appVersion, update.notes);
         if (choice === 'closed') return; // app is quitting
-        if (choice === 'secondary') {
+        if (choice === 'secondary' || choice === 'secondary-skip') {
           electronLog.log('[KCC] User skipped update');
+          if (choice === 'secondary-skip') {
+            config.set('ui', { ...DEFAULT_CONFIG.ui, ...config.get('ui'), skippedUpdateVersion: update.version });
+          }
         } else {
           const tempDir = join(app.getPath('temp'), 'kcc-update');
           if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true });
@@ -387,10 +420,16 @@ app.whenReady().then(async () => {
       splashStatus('Checking for updates...', -1);
       const notice = await checkForUpdateNotice(appVersion);
       if (!splashAlive()) return; // user closed the splash — app is quitting
-      if (notice) {
+      const skippedVer = config.get('ui')?.skippedUpdateVersion || '';
+      if (notice && notice.version === skippedVer) {
+        electronLog.log(`[KCC] Update v${notice.version} available but skipped by user preference`);
+      } else if (notice) {
         electronLog.log(`[KCC] Update available (notify-only): v${notice.version}`);
-        const choice = await splashPrompt('notice', notice.version, appVersion);
+        const choice = await splashPrompt('notice', notice.version, appVersion, notice.notes);
         if (choice === 'closed') return; // app is quitting
+        if (choice === 'secondary-skip') {
+          config.set('ui', { ...DEFAULT_CONFIG.ui, ...config.get('ui'), skippedUpdateVersion: notice.version });
+        }
         if (choice === 'primary') {
           // Open the release page and quit instead of launching the old version.
           electronLog.log('[KCC] User chose to download update; opening release page and quitting');
@@ -421,17 +460,16 @@ async function launchApp(): Promise<void> {
   // ── Session: persistent partition ──
   const ses = session.fromPartition('persist:krunker');
 
-  // ── Register swapper file protocol on this session ──
-  registerSwapperFileProtocol(ses);
-
   // ── Resource swapper ──
   const swapperConfig = config.get('swapper');
   const swapDir = swapperConfig.path || join(app.getPath('userData'), 'Krunker Civilian Client', 'swapper');
-  // Ensure swap subdirectories exist (themes/, backgrounds/, socialthemes/)
-  for (const sub of [GAME_THEMES_DIR, 'backgrounds', SOCIAL_THEMES_DIR]) {
+  // Ensure swap subdirectories exist (themes/, backgrounds/, socialthemes/, skies/)
+  for (const sub of [GAME_THEMES_DIR, 'backgrounds', SOCIAL_THEMES_DIR, SKIES_DIR]) {
     const dir = join(swapDir, sub);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
+
+  registerSwapperFileProtocol(ses, swapDir);
 
   const swapper = swapperConfig.enabled ? new ResourceSwapper(swapDir) : null;
   electronLog.log(`[KCC] Resource swapper: ${swapper ? 'enabled' : 'disabled'} (${swapDir})`);
@@ -479,6 +517,12 @@ async function launchApp(): Promise<void> {
     // Turf Wars clan banner block — same empty-body redirect
     if (hideTurfBanners && TURF_BANNER_URL_RE.test(details.url)) {
       return callback({ redirectURL: EMPTY_RESPONSE_URL });
+    }
+    // Sky dome texture — redirect the sentinel asset to the user's local image.
+    // Config is read here rather than cached: this fires once per map load.
+    if (SKY_TEXTURE_RE.test(details.url)) {
+      const skyFile = resolveSkyImage(config.get('ui')?.skyImage || '', swapDir);
+      if (skyFile) return callback({ redirectURL: filePathToSwapURL(skyFile) });
     }
     // Check swapper next — redirect matching assets to local files
     if (swapper) {
@@ -819,6 +863,14 @@ async function launchApp(): Promise<void> {
     win.webContents.send('main_did-finish-load');
   });
 
+  // Window focus gates social-hub music — see social-music.ts. Guarded because
+  // blur can arrive while the window is being torn down.
+  const sendFocus = (focused: boolean): void => {
+    if (!win.isDestroyed()) win.webContents.send('kcc-window-focus', focused);
+  };
+  win.on('focus', () => sendFocus(true));
+  win.on('blur', () => sendFocus(false));
+
   // ── IPC handlers ──
   // 'accounts' is intentionally excluded — it holds encrypted credential blobs.
   // The renderer must go through the dedicated alt-* handlers (alt-list returns
@@ -874,6 +926,8 @@ async function launchApp(): Promise<void> {
     pendingConfigWrites.clear();
   }
 
+  app.on('before-quit', flushPendingConfigWrites);
+
   ipcMain.handle('set-config', (_e, key: string, value: unknown) => {
     if (!ALLOWED_CONFIG_KEYS.has(key)) return;
     // Flush immediately for keys that have side effects
@@ -881,6 +935,17 @@ async function launchApp(): Promise<void> {
       config.set(key as any, value);
       cachedKeybinds = null;
       return;
+    }
+    let frameCapNeedsRestart = false;
+    if (key === 'performance') {
+      // setFrameCap only exists on the frameCap-patched Electron builds
+      const capWin = win as BrowserWindow & { setFrameCap?: (fps: number) => void };
+      const capped = clampFrameCap((value as any)?.frameCap);
+      if (capLiveAvailable && typeof capWin.setFrameCap === 'function') {
+        capWin.setFrameCap(capped);
+      } else if (capped !== launchFrameCap && (value as any)?.fpsUnlocked) {
+        frameCapNeedsRestart = true;
+      }
     }
     // Invalidate caches immediately (not on flush) to prevent stale reads
     if (key === 'game') {
@@ -918,6 +983,7 @@ async function launchApp(): Promise<void> {
     if (!configWriteTimer) {
       configWriteTimer = setTimeout(flushPendingConfigWrites, 300);
     }
+    return frameCapNeedsRestart;
   });
   ipcMain.handle('window-minimize', () => win.minimize());
   ipcMain.handle('window-maximize', () => {
@@ -939,6 +1005,7 @@ async function launchApp(): Promise<void> {
   ipcMain.handle('open-themes-folder', () => shell.openPath(join(swapDir, GAME_THEMES_DIR)));
   ipcMain.handle('open-social-themes-folder', () => shell.openPath(join(swapDir, SOCIAL_THEMES_DIR)));
   ipcMain.handle('open-backgrounds-folder', () => shell.openPath(join(swapDir, 'backgrounds')));
+  ipcMain.handle('open-skies-folder', () => shell.openPath(join(swapDir, SKIES_DIR)));
   ipcMain.handle('open-screenshots-folder', () => openScreenshotsFolder());
 
   // ── Ping regions IPC handler (TCP connect timing, cached 60s) ──
@@ -986,9 +1053,9 @@ async function launchApp(): Promise<void> {
   });
 
   // ── Ranked queue IPC handler ──
-  ipcMain.on('open-ranked-queue', (_e, token: string, region: string, allRegions: boolean) => {
+  ipcMain.on('open-ranked-queue', async (_e, token: string, region: string, allRegions: boolean) => {
     const mm = config.get('matchmaker');
-    const audioUrl = resolveRankedAudioUrl(mm?.rankedMatchSound || '');
+    const audioUrl = await resolveRankedAudioUrl(mm?.rankedMatchSound || '');
     const showHeader = config.get('ui')?.watermark ?? true;
     openRankedQueue(token, region, allRegions, audioUrl, showHeader);
   });
@@ -1006,7 +1073,31 @@ async function launchApp(): Promise<void> {
     return result.filePaths[0];
   });
 
+  // Copies the pick in rather than storing its path: kcc-swap only serves files under the swap dir.
+  ipcMain.handle('pick-sky-image', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Sky Image',
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: SKY_IMAGE_EXTS }],
+    });
+    if (result.canceled || result.filePaths.length === 0) return '';
+    const src = result.filePaths[0];
+    const ext = extname(src);
+    // The dialog filter is advisory — the file name box opens anything typed into it
+    if (!SKY_IMAGE_EXTS.includes(ext.slice(1).toLowerCase())) throw new Error(`Not a sky image: ${src}`);
+    const destDir = join(swapDir, SKIES_DIR);
+    if (dirname(resolvePath(src)) === resolvePath(destDir)) return `swap:${basename(src)}`;
+    mkdirSync(destDir, { recursive: true });
+    const stem = basename(src, ext);
+    let name = `${stem}${ext}`;
+    for (let n = 1; existsSync(join(destDir, name)); n++) name = `${stem} (${n})${ext}`;
+    await fsp.copyFile(src, join(destDir, name));
+    return `swap:${name}`;
+  });
+
   ipcMain.handle('resolve-ranked-sound', (_e, setting: string) => resolveRankedAudioUrl(setting));
+
+  ipcMain.handle('resolve-social-music', (_e, setting: string) => resolveSocialMusic(setting));
 
   // ── Discord Rich Presence IPC handler ──
   ipcMain.on('discord-update', (_e, activity: any) => {
@@ -1025,6 +1116,18 @@ async function launchApp(): Promise<void> {
   ipcMain.handle('list-social-themes', () => listThemes(swapDir, SOCIAL_THEMES_DIR));
   ipcMain.handle('get-theme-css', (_e, themeId: string) => getThemeCSS(themeId, swapDir));
   ipcMain.handle('list-loading-themes', () => listLoadingThemes(swapDir));
+  ipcMain.handle('list-sky-images', () => listSkyImages(swapDir));
+  // Sync: the preload reads this once at top level, before wrapping fetch. The image
+  // resolves here so a selected-but-missing file falls back to the gradient.
+  ipcMain.on('get-sky-config', (e) => {
+    const uiConf = config.get('ui');
+    e.returnValue = {
+      enabled: uiConf?.skyOverride ?? DEFAULT_CONFIG.ui.skyOverride,
+      zenith: uiConf?.skyZenith || DEFAULT_CONFIG.ui.skyZenith,
+      horizon: uiConf?.skyHorizon || DEFAULT_CONFIG.ui.skyHorizon,
+      useImage: resolveSkyImage(uiConf?.skyImage || '', swapDir) !== null,
+    };
+  });
   ipcMain.handle('get-loading-screen-css', (_e, loadingTheme: string, backgroundUrl: string) => {
     return getLoadingScreenCSS(loadingTheme, backgroundUrl, swapDir);
   });
@@ -1090,6 +1193,7 @@ async function launchApp(): Promise<void> {
     }
   });
   ipcMain.handle('restart-client', () => {
+    flushPendingConfigWrites();
     app.relaunch();
     app.quit();
   });
@@ -1141,6 +1245,7 @@ async function launchApp(): Promise<void> {
     delete (clientSettings.game as Record<string, unknown>).lastServer;
     clientSettings.ui = { ...(clientSettings.ui as Record<string, unknown>) };
     delete (clientSettings.ui as Record<string, unknown>).lastSeenVersion;
+    delete (clientSettings.ui as Record<string, unknown>).skippedUpdateVersion;
 
     const payload = {
       app: 'Krunker-Civilian-Client',

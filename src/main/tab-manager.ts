@@ -399,7 +399,7 @@ export class TabManager {
     private unfreezeTab(tab: TabInfo): void {
         const wc = tab.view.webContents;
         if (wc.isDestroyed()) return;
-        // Keep debugger attached for the tab's lifetime (freeze re-attaches it on demand).
+        // Debugger stays attached for the tab's lifetime once freezeTab attaches it.
         // First activation: no debugger session yet, no-op and let title watcher restart.
         if (!wc.debugger.isAttached()) {
             this.startTitleWatcher(tab.id, wc);

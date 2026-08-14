@@ -23,6 +23,7 @@ Was AI used in the creation of this client? Yes, if you came across this client 
 - CSS theme system with `@import` support (drop `.css` files in `swap/themes/`)
 - separate CSS themes for social/hub tabs (`swap/socialthemes/`)
 - custom loading screen backgrounds (`swap/backgrounds/`)
+- sky override — recolour the in-game sky, or replace it with an image (`swap/skies/`)
 - customizable matchmaker with lobby scan animation
   - filter by region, gamemode, map, player count, remaining time
   - auto-join with server capacity verification
