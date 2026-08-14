@@ -1,6 +1,6 @@
 # Krunker Civilian Client
 
-<img src="assets/KCCPOSTER.webp" alt="Krunker Civilian Client" width="600">
+<img src="assets/KCCPOSTER.webp" alt="Krunker Civilian Client">
 
 [![GitHub Downloads](https://img.shields.io/github/downloads/bigjakk/Krunker-Civilian-Client/total?style=flat&logo=github&label=Downloads)](https://github.com/bigjakk/Krunker-Civilian-Client/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/bigjakk/Krunker-Civilian-Client?style=flat&logo=github&label=Stars)](https://github.com/bigjakk/Krunker-Civilian-Client/stargazers)
