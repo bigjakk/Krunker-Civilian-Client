@@ -539,8 +539,8 @@ export function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfR
   const skyGroup = createGroup(body, 'Sky');
 
   const skyToggle = createToggleRow({
-    label: 'Sky Override',
-    desc: 'Recolour the in-game sky gradient',
+    label: 'Sky Swapper',
+    desc: 'Replace the in-game sky with your own colours or image',
     checked: ui.skyOverride ?? DEFAULT_CONFIG.ui.skyOverride,
     refreshOnly: true,
     onChange: (v) => { ui.skyOverride = v; saveUI(); },
