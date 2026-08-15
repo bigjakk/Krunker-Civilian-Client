@@ -1,5 +1,7 @@
 # Krunker Civilian Client
 
+<img src="assets/KCCPOSTER.webp" alt="Krunker Civilian Client">
+
 [![GitHub Downloads](https://img.shields.io/github/downloads/bigjakk/Krunker-Civilian-Client/total?style=flat&logo=github&label=Downloads)](https://github.com/bigjakk/Krunker-Civilian-Client/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/bigjakk/Krunker-Civilian-Client?style=flat&logo=github&label=Stars)](https://github.com/bigjakk/Krunker-Civilian-Client/stargazers)
 [![Latest Release](https://img.shields.io/github/v/release/bigjakk/Krunker-Civilian-Client?style=flat&label=Latest)](https://github.com/bigjakk/Krunker-Civilian-Client/releases/latest)
@@ -23,7 +25,7 @@ Was AI used in the creation of this client? Yes, if you came across this client 
 - CSS theme system with `@import` support (drop `.css` files in `swap/themes/`)
 - separate CSS themes for social/hub tabs (`swap/socialthemes/`)
 - custom loading screen backgrounds (`swap/backgrounds/`)
-- sky override — recolour the in-game sky, or replace it with an image (`swap/skies/`)
+- sky swapper — recolour the in-game sky, or replace it with an image (`swap/skies/`)
 - customizable matchmaker with lobby scan animation
   - filter by region, gamemode, map, player count, remaining time
   - auto-join with server capacity verification
