@@ -1,11 +1,11 @@
 # Krunker Civilian Client
 
-<img src="assets/KCCPOSTER.webp" alt="Krunker Civilian Client">
-
 [![GitHub Downloads](https://img.shields.io/github/downloads/bigjakk/Krunker-Civilian-Client/total?style=flat&logo=github&label=Downloads)](https://github.com/bigjakk/Krunker-Civilian-Client/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/bigjakk/Krunker-Civilian-Client?style=flat&logo=github&label=Stars)](https://github.com/bigjakk/Krunker-Civilian-Client/stargazers)
 [![Latest Release](https://img.shields.io/github/v/release/bigjakk/Krunker-Civilian-Client?style=flat&label=Latest)](https://github.com/bigjakk/Krunker-Civilian-Client/releases/latest)
 [![License](https://img.shields.io/github/license/bigjakk/Krunker-Civilian-Client?style=flat&label=License)](https://github.com/bigjakk/Krunker-Civilian-Client/blob/main/LICENSE)
+
+<img src="assets/KCCPOSTER.webp" alt="Krunker Civilian Client">
 
 Was AI used in the creation of this client? Yes, if you came across this client and don't want to use it due to that, I highly recommend looking at [Glorp](https://github.com/slavcp/glorp) by slav or [Crankshaft](https://github.com/KraXen72/crankshaft) by KraXen72
 
