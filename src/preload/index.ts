@@ -20,6 +20,7 @@ import { installGameSocketTap } from './game-socket';
 import { installSkyHook } from './sky';
 import { installSoundHook, setHeadshotSoundMode } from './headshot-sound';
 import { initKccProtocol } from './protocol';
+import { initSuspectPing } from './kpd-call';
 
 
 _console.log('[KCC] Preload script loaded');
@@ -121,6 +122,8 @@ function initShowPing(): void {
                     const ping = icon.getAttribute('title');
                     icon.classList.remove('pListPing', 'material-icons');
                     icon.removeAttribute('title');
+                    // data-ping survives the class/title strip so the KPD call row can still read it.
+                    icon.setAttribute('data-ping', ping ?? '');
                     icon.textContent = ping ? ping + ' ' : 'N/A ';
                 }
                 return doc.body.innerHTML;
@@ -206,6 +209,11 @@ ipcRenderer.on('main_did-finish-load', () => {
     // ── Show ping in player list ──
     if (isGamePage && (gameConf?.showPing ?? true)) {
       initShowPing();
+    }
+
+    // ── Suspect ping on KPD calls ──
+    if (isGamePage && (gameConf?.suspectPing ?? true)) {
+      initSuspectPing();
     }
 
     // ── Raw input (Windows only — unadjustedMovement) ──

@@ -77,6 +77,7 @@ const SERVER_MAP: Record<string, string> = {
   'us-tx': 'DAL', 'me-bhn': 'BHN', 'brz': 'BRZ', 'us-nj': 'NY',
 };
 let pingCache: Record<string, number> = {};
+let gamePingCache = { key: '', ms: -1, at: 0 };
 let pingCacheTime = 0;
 
 function osPing(host: string): Promise<number> {
@@ -110,9 +111,15 @@ function tcpPing(host: string, port: number): Promise<number> {
 }
 
 function setPingTarget(host: string, port: number, win: BrowserWindow): void {
-  if (_pingTarget?.host === host && _pingTarget?.port === port) return;
+  const wantPolling = !!config.get('ui')?.directServerPing;
+  const sameTarget = _pingTarget?.host === host && _pingTarget?.port === port;
+  // Timer state is part of the dedupe: the target survives an F5, so comparing
+  // host/port alone would skip starting the timer after the setting is enabled.
+  if (sameTarget && !!_pingTimer === wantPolling) return;
   if (_pingTimer) clearInterval(_pingTimer);
+  _pingTimer = null;
   _pingTarget = { host, port };
+  if (!wantPolling) return;
   const measure = async () => {
     if (!_pingTarget || win.isDestroyed()) return;
     const ms = await tcpPing(_pingTarget.host, _pingTarget.port);
@@ -499,9 +506,7 @@ async function launchApp(): Promise<void> {
 
   ses.webRequest.onBeforeRequest({ urls: requestFilterUrls }, (details, callback) => {
     // Direct ping: detect game-server WebSocket (lobby-* host) and start TCP timing.
-    if (details.resourceType === 'webSocket'
-      && details.url.includes('lobby-')
-      && config.get('ui')?.directServerPing) {
+    if (details.resourceType === 'webSocket' && details.url.includes('lobby-')) {
       try {
         const u = new URL(details.url);
         const port = u.port ? parseInt(u.port) : (u.protocol === 'wss:' ? 443 : 80);
@@ -1007,6 +1012,15 @@ async function launchApp(): Promise<void> {
   ipcMain.handle('open-backgrounds-folder', () => shell.openPath(join(swapDir, 'backgrounds')));
   ipcMain.handle('open-skies-folder', () => shell.openPath(join(swapDir, SKIES_DIR)));
   ipcMain.handle('open-screenshots-folder', () => openScreenshotsFolder());
+
+  ipcMain.handle('game-server-ping', async () => {
+    if (!_pingTarget) return -1;
+    const key = `${_pingTarget.host}:${_pingTarget.port}`;
+    if (key === gamePingCache.key && Date.now() - gamePingCache.at < 1000) return gamePingCache.ms;
+    const ms = await tcpPing(_pingTarget.host, _pingTarget.port);
+    gamePingCache = { key, ms, at: Date.now() };
+    return ms;
+  });
 
   // ── Ping regions IPC handler (TCP connect timing, cached 60s) ──
   ipcMain.handle('ping-regions', async () => {

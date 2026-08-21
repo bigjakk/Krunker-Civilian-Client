@@ -57,6 +57,7 @@ export interface AppConfig {
     betterChat: boolean;
     chatHistorySize: number;
     showPing: boolean;
+    suspectPing: boolean;
     hpEnemyCounter: boolean;
     hideBunnies: boolean;
     hideTurfBanners: boolean;
@@ -195,6 +196,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     betterChat: true,
     chatHistorySize: 200,
     showPing: true,
+    suspectPing: true,
     hpEnemyCounter: true,
     hideBunnies: false,
     hideTurfBanners: false,

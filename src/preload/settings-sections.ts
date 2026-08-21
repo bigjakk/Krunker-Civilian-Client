@@ -17,6 +17,7 @@ import {
 import { setClassicSocial, startHidePopups, stopHidePopups } from './menu-tweaks';
 import { updateSocialMusicConfig } from './social-music';
 import { initHPCounter, destroyHPCounter } from './competitive';
+import { initSuspectPing, destroySuspectPing } from './kpd-call';
 import { setHeadshotSoundMode } from './headshot-sound';
 import type { HeadshotSoundMode } from './headshot-sound';
 import { updateKeystrokes } from './keystrokes';
@@ -173,6 +174,16 @@ export function buildGameSection(
     desc: 'Replace the ping icon with numeric millisecond values in the player list',
     checked: game.showPing ?? true, refreshOnly: true,
     onChange: (v) => { game.showPing = v; saveGame(); },
+  }));
+
+  inputGroup.appendChild(createToggleRow({
+    label: 'Suspect Ping on KPD Calls',
+    desc: 'Show the suspect ping alongside your own while spectating on a KPD call',
+    checked: game.suspectPing ?? true, instant: true,
+    onChange: (v) => {
+      game.suspectPing = v; saveGame();
+      if (v) initSuspectPing(); else destroySuspectPing();
+    },
   }));
 
   inputGroup.appendChild(createToggleRow({
