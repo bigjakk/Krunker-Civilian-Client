@@ -47,6 +47,7 @@ Was AI used in the creation of this client? Yes, if you came across this client 
 - changelog popup on update
 - configurable keybinds with visual rebinding dialog
 - configurable ANGLE backend (D3D11, OpenGL, D3D11on12)
+- optional minimum-period WASAPI shared-mode audio on Windows
 - advanced Chromium flag tweaks (GPU rasterization, high-performance GPU, debloat, and more)
 - auto-updater
 - maintained & open source (GPL-3.0)
@@ -80,7 +81,7 @@ Any `.js` file in the scripts folder will be loaded as a userscript if enabled i
 
 ## Custom Electron Build
 
-This client uses a custom-patched Electron build to overcome the aim freezing issue present in modern Electron versions. The patched binary is downloaded automatically during `npm install`.
+This client uses a custom-patched Electron build to overcome the aim freezing issue present in modern Electron versions and to provide optional minimum-period WASAPI shared-mode audio on Windows. The patched binary is downloaded automatically during `npm install`.
 
 For details on the patch and build instructions, see [Electron-Websocket-Fix](https://github.com/bigjakk/Electron-Websocket-Fix).
 

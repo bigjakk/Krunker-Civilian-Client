@@ -47,6 +47,7 @@ export interface AppConfig {
     higherMaxFps: boolean;
     frameCap: number;
     processPriority: string;
+    lowLatencyAudio: boolean;
   };
   game: {
     lastServer: string;
@@ -186,6 +187,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     higherMaxFps: false,
     frameCap: 0,
     processPriority: 'Normal',
+    lowLatencyAudio: false,
   },
   game: {
     lastServer: '',

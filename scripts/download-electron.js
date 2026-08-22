@@ -7,8 +7,9 @@
  * is active on modern Chromium. Without this, uncapped FPS causes 50-300ms input delays.
  * This build also bundles thegu5's frame-pacing patch so pending-frame limits are still
  * enforced under --disable-frame-rate-limit, plus the CustomFrameCap feature backing the
- * exact FPS cap. The macOS (arm64) build additionally carries a null-guard for the Chromium
- * mac present-path crash (external_begin_frame_source() null deref).
+ * exact FPS cap. The Windows build additionally supports the optional minimum-period WASAPI
+ * shared-mode feature. The macOS (arm64) build carries a null-guard for the Chromium mac
+ * present-path crash (external_begin_frame_source() null deref).
  *
  * Platform behavior:
  *   Windows:        patched Win   → dist/       (replaces stock)
@@ -33,7 +34,7 @@ const REPO = 'bigjakk/Electron-Websocket-Fix';
 const RELEASE_TAG = 'v43.0.0-framecap';
 
 const PLATFORMS = {
-    win32: { asset: 'electron-v43.0.0-ws-frameThrottle-frameCap2-patched-windows-x64.zip' },
+    win32: { asset: 'electron-v43.0.0-ws-frameThrottle-frameCap2-wasapiLowLatency-patched-windows-x64.zip' },
     linux: { asset: 'electron-v43.0.0-ws-frameThrottle-frameCap2-patched-linux-x64.zip' },
     darwin: { asset: 'electron-v43.0.0-ws-frameThrottle-frameCap2-patched-mac-arm64.zip' },
 };

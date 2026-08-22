@@ -102,6 +102,9 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
 
   if (info.isWindows) {
     disableFeatures('CalculateNativeWinOcclusion', 'HardwareMediaKeyHandling');
+    // The custom Electron build maps this feature to the minimum shared-mode
+    // engine period reported by IAudioClient3 for the selected output device.
+    if (performance.lowLatencyAudio) enableFeatures('WASAPILowLatencySharedMode');
   }
 
   if (info.isLinux) {

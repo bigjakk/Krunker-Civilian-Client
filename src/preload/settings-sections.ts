@@ -464,6 +464,13 @@ export function buildPerformanceSection(
       value: perf.processPriority, restart: true, safety: 2,
       onChange: (v) => { perf.processPriority = v; savePerf(); },
     }));
+
+    sysGroup.appendChild(createToggleRow({
+      label: 'Low-latency Audio',
+      desc: 'Use the lowest shared-mode WASAPI period supported by the active output device (Windows only)',
+      checked: perf.lowLatencyAudio, restart: true, safety: 2,
+      onChange: (v) => { perf.lowLatencyAudio = v; savePerf(); },
+    }));
   }
 
   const angleOptions: Array<{ value: string; label: string }> = isWindows
