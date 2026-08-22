@@ -29,16 +29,16 @@ function pingColor(ms: number): string {
     return 'rgb(158,235,86)';
 }
 
-// Krunker leaves the HUD ping empty during a call, so fall back to a measured round-trip.
+// Krunker blanks or zeroes the HUD ping during a call, so fall back to a measured round-trip.
 function updateOwnPing(): void {
     const target = ownVal;
     if (!target) return;
     // innerText, not textContent: the Direct Server Ping lock replaces that setter with no getter.
-    const hud = /\d+/.exec(document.getElementById('pingText')?.innerText ?? '');
-    if (hud) { target.textContent = `${hud[0]}ms`; return; }
+    const hud = parseInt(/\d+/.exec(document.getElementById('pingText')?.innerText ?? '')?.[0] ?? '', 10);
+    if (hud > 0) { target.textContent = `${hud}ms`; return; }
     ipcRenderer.invoke('game-server-ping').then((ms: number) => {
         if (target !== ownVal) return;
-        target.textContent = ms >= 0 ? `${ms}ms` : '?';
+        target.textContent = ms > 0 ? `${ms}ms` : '?';
     }).catch(() => {
         if (target === ownVal) target.textContent = '?';
     });
