@@ -83,6 +83,8 @@ Any `.js` file in the scripts folder will be loaded as a userscript if enabled i
 
 This client uses a custom-patched Electron build to overcome the aim freezing issue present in modern Electron versions and to provide optional minimum-period WASAPI shared-mode audio on Windows. The patched binary is downloaded automatically during `npm install`.
 
+On one same-device Windows A/B run, the included DevTools console probe reported 42 ms with low-latency audio disabled and 29 ms with it enabled (13 ms / approximately 31% lower). Results depend on the active audio endpoint.
+
 For details on the patch and build instructions, see [Electron-Websocket-Fix](https://github.com/bigjakk/Electron-Websocket-Fix).
 
 ## Building From Source
