@@ -307,6 +307,16 @@ function getKeybinds(): Record<string, Keybind> {
   return cachedKeybinds;
 }
 
+// Separate async fn: preventDefault() must run while the input listener is still on the stack.
+async function joinFromClipboard(win: BrowserWindow): Promise<void> {
+  const text = await clipboard.readText();
+  try {
+    const u = new URL(text);
+    if (u.protocol === 'https:' && u.hostname.endsWith('krunker.io')) win.loadURL(text);
+    else electronLog.warn('[KCC] Join-from-clipboard: clipboard is not a krunker.io https URL');
+  } catch { electronLog.warn('[KCC] Join-from-clipboard: clipboard is not a valid URL'); }
+}
+
 // ── Debounced window state persistence ──
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -710,12 +720,7 @@ async function launchApp(): Promise<void> {
       }
       event.preventDefault();
     } else if (matchesKeybind(input, binds.joinFromClipboard)) {
-      const text = clipboard.readText();
-      try {
-        const u = new URL(text);
-        if (u.protocol === 'https:' && u.hostname.endsWith('krunker.io')) win.loadURL(text);
-        else electronLog.warn('[KCC] Join-from-clipboard: clipboard is not a krunker.io https URL');
-      } catch { electronLog.warn('[KCC] Join-from-clipboard: clipboard is not a valid URL'); }
+      void joinFromClipboard(win);
       event.preventDefault();
     } else if (matchesKeybind(input, binds.copyGameLink)) {
       clipboard.writeText(win.webContents.getURL());
