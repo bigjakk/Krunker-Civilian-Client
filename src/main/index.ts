@@ -83,7 +83,11 @@ let pingCacheTime = 0;
 function osPing(host: string): Promise<number> {
   return new Promise((resolve) => {
     const isWin = process.platform === 'win32';
-    const args = isWin ? ['-n', '1', '-w', '1500', host] : ['-c', '1', '-W', '2', host];
+    // -W units differ by platform: seconds on Linux, milliseconds on macOS/BSD. Sending
+    // Linux's '2' to BSD ping waits 2ms, so the reply arrives outside the wait window and
+    // ping omits the per-packet 'time=' line the regex below needs — every region read -1.
+    const wait = process.platform === 'darwin' ? '2000' : '2';
+    const args = isWin ? ['-n', '1', '-w', '1500', host] : ['-c', '1', '-W', wait, host];
     execFile('ping', args, { timeout: 3000 }, (err, stdout) => {
       if (err) { resolve(-1); return; }
       const match = stdout.match(/time[=<]([\d.]+)\s*ms/i);
