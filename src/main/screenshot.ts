@@ -3,6 +3,7 @@
 // index.ts wires takeScreenshot() to the screenshot keybind and openScreenshotsFolder()
 // to the open-folder IPC handler.
 
+import * as electron from 'electron';
 import { app, BrowserWindow, clipboard, shell } from 'electron';
 import { join } from 'path';
 import { promises as fsp } from 'fs';
@@ -26,13 +27,16 @@ export async function takeScreenshot(win: BrowserWindow): Promise<void> {
       electronLog.warn('[KCC] Screenshot: capturePage returned an empty image (nothing captured)');
       return;
     }
-    clipboard.writeImage(image);
+    const png = image.toPNG();
+    // electron devDep is still 43, whose types predate the W3C clipboard API — drop the casts on bump.
+    const item = new (electron as any).ClipboardItem({ 'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }) });
+    await (clipboard as any).write([item]);
     let savedPath = '';
     if (config.get('game').screenshotSave) {
       const dir = screenshotDir();
       await fsp.mkdir(dir, { recursive: true });
       savedPath = join(dir, `Krunker_${timestamp()}.png`);
-      await fsp.writeFile(savedPath, image.toPNG());
+      await fsp.writeFile(savedPath, png);
     }
     electronLog.log(`[KCC] Screenshot copied to clipboard${savedPath ? ` + saved to ${savedPath}` : ''}`);
     if (!win.isDestroyed()) {
