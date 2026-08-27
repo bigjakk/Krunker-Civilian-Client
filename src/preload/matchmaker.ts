@@ -129,33 +129,6 @@ const POPUP_ID = 'matchmakerPopupContainer';
 const popupElement = document.createElement('div');
 popupElement.id = POPUP_ID;
 
-// Result-phase elements
-const popupTitle = document.createElement('div');
-popupTitle.id = 'matchmakerPopupTitle';
-popupElement.appendChild(popupTitle);
-
-const popupDescription = document.createElement('div');
-popupDescription.id = 'matchmakerPopupDescription';
-popupElement.appendChild(popupDescription);
-
-const popupOptions = document.createElement('div');
-popupOptions.id = 'matchmakerPopupOptions';
-
-const popupCancelBtn = document.createElement('div');
-popupCancelBtn.id = 'matchmakerCancelButton';
-popupCancelBtn.className = 'matchmakerPopupButton bigShadowT';
-popupCancelBtn.textContent = 'Cancel';
-popupCancelBtn.setAttribute('onmouseenter', 'playTick()');
-popupCancelBtn.addEventListener('click', () => {
-    const w = window as any;
-    if (typeof w.playSelect === 'function') w.playSelect();
-    dismissPopup();
-});
-
-popupOptions.appendChild(popupCancelBtn);
-popupElement.appendChild(popupOptions);
-
-// Search-phase elements
 const searchContainer = document.createElement('div');
 searchContainer.id = 'matchmakerSearchContainer';
 
@@ -235,9 +208,7 @@ async function verifyAndJoin(run: number, gameID: string): Promise<void> {
 
 function dismissPopup(): void {
     document.removeEventListener('keydown', handleSearchBind, true);
-
     if (popupElement.parentNode) popupElement.remove();
-    popupElement.classList.remove('searching');
 }
 
 function handleSearchBind(event: KeyboardEvent): void {
@@ -250,14 +221,11 @@ function handleSearchBind(event: KeyboardEvent): void {
 }
 
 function showSearchPopup(): void {
-    popupElement.classList.add('searching');
-    popupElement.style.backgroundImage = 'none';
     searchStatus.textContent = 'Connecting...';
     searchStatus.classList.remove('mm-status-fail');
     searchFeed.innerHTML = '';
     searchFeed.classList.remove('mm-feed-found');
     searchCounter.textContent = '';
-
 
     document.addEventListener('keydown', handleSearchBind, true);
 

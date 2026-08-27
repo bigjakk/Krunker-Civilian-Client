@@ -674,90 +674,25 @@ export const MATCHMAKER_SETTINGS_CSS = `
   0% { transform: translate(-50%, -500%); }
   100% { transform: translate(-50%, 0%); }
 }
-.onGame #matchmakerPopupContainer:not(.searching) {
-  opacity: 0 !important;
-}
 #matchmakerPopupContainer {
   position: absolute;
   top: 8em;
   left: 50%;
   z-index: var(--kcc-z-popup);
   box-sizing: border-box;
-  width: 32em;
+  width: 24em;
+  padding: 18px 22px;
   border-radius: var(--kcc-modal-radius);
   overflow: hidden;
   pointer-events: all;
-  background-color: var(--kcc-modal-bg);
+  background: rgba(18,18,22,0.5);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
   border: var(--kcc-modal-border);
   box-shadow: var(--kcc-modal-shadow);
   display: flex;
   flex-direction: column;
   animation: matchmakerPopupSlideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-#matchmakerPopupTitle {
-  font-size: 1.15rem;
-  font-weight: 600;
-  color: #fff;
-  letter-spacing: -0.01em;
-  padding: 16px 20px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-#matchmakerPopupDescription {
-  color: var(--kcc-yellow);
-  box-sizing: border-box;
-  padding: 14px 20px;
-  font-size: 0.95rem;
-  line-height: 1.5;
-}
-#matchmakerPopupOptions {
-  display: flex;
-  padding: 8px 12px 12px;
-  gap: 8px;
-}
-.matchmakerPopupButton {
-  text-align: center;
-  border: 2px solid;
-  box-sizing: border-box;
-  color: white;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 500;
-  background-color: rgba(0,0,0,0.3);
-  padding: 8px 20px;
-  transition: all 0.1s ease;
-}
-#matchmakerConfirmButton {
-  border-color: var(--kcc-green);
-  flex-grow: 1;
-}
-#matchmakerCancelButton {
-  border-color: var(--kcc-red);
-}
-.matchmakerPopupButton:hover {
-  cursor: pointer;
-  border-color: white !important;
-  transform: scale(0.95);
-}
-.matchmakerPopupButton:active {
-  transform: scale(0.85);
-}
-
-/* ── Search phase ── */
-#matchmakerPopupContainer.searching {
-  background-image: none !important;
-  background: rgba(18,18,22,0.5);
-  backdrop-filter: blur(14px) saturate(120%);
-  -webkit-backdrop-filter: blur(14px) saturate(120%);
-  width: 24em;
-  padding: 18px 22px;
-}
-#matchmakerPopupContainer.searching #matchmakerPopupTitle,
-#matchmakerPopupContainer.searching #matchmakerPopupDescription,
-#matchmakerPopupContainer.searching #matchmakerPopupOptions {
-  display: none;
-}
-#matchmakerPopupContainer:not(.searching) #matchmakerSearchContainer {
-  display: none;
 }
 #matchmakerSearchStatus {
   font-size: 1.4em;
