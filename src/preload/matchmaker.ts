@@ -84,6 +84,9 @@ const MIN_TICK_MS = 20;
 const POST_SCAN_PAUSE_MS = 180;
 const FOUND_HOLD_MS = 1200;
 const NOT_FOUND_HOLD_MS = 1100;
+const FETCH_TIMEOUT_MS = 10000;
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 interface MatchmakerGame {
     gameID: string;
@@ -181,21 +184,29 @@ popupElement.appendChild(searchContainer);
 let popupCandidates: MatchmakerGame[] = [];
 let openServerBrowser = true;
 let cancelKey: Keybind = { key: 'Escape', ctrl: false, shift: false, alt: false };
-let searchAborted = false;
-// Bumped on each fetchGame() call; a delayed continuation checks it survived re-entry.
-let searchGeneration = 0;
+// id of the in-flight search (0 = idle); unique so a stale continuation can tell it was cancelled.
+let activeRun = 0;
+let runCounter = 0;
+
+function cancelled(run: number): boolean {
+    return run !== activeRun;
+}
 
 function abortSearch(): void {
-    searchAborted = true;
+    activeRun = 0;
     const w = window as any;
     if (typeof w.playSelect === 'function') w.playSelect();
     dismissPopup();
 }
 
-async function verifyAndJoin(gameID: string): Promise<void> {
+async function verifyAndJoin(run: number, gameID: string): Promise<void> {
     try {
-        const resp = await fetch(`https://matchmaker.krunker.io/game-list?hostname=${window.location.hostname}`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        const resp = await fetch(`https://matchmaker.krunker.io/game-list?hostname=${window.location.hostname}`, { signal: controller.signal });
+        clearTimeout(timeout);
         const result = await resp.json();
+        if (cancelled(run)) return;
         const liveMap = new Map<string, { players: number; limit: number }>();
         for (const g of result.games) {
             liveMap.set(g[0], { players: g[2], limit: g[3] });
@@ -216,6 +227,7 @@ async function verifyAndJoin(gameID: string): Promise<void> {
             (window as any).openServerWindow(0);
         }
     } catch {
+        if (cancelled(run)) return;
         dismissPopup();
         window.location.href = `https://krunker.io/?game=${gameID}`;
     }
@@ -238,7 +250,6 @@ function handleSearchBind(event: KeyboardEvent): void {
 }
 
 function showSearchPopup(): void {
-    searchAborted = false;
     popupElement.classList.add('searching');
     popupElement.style.backgroundImage = 'none';
     searchStatus.textContent = 'Connecting...';
@@ -279,7 +290,7 @@ function createFeedEntry(lobby: RawLobby): HTMLDivElement {
     return entry;
 }
 
-async function animateLobbyScan(lobbies: RawLobby[], finalLobby?: MatchmakerGame): Promise<void> {
+async function animateLobbyScan(run: number, lobbies: RawLobby[], finalLobby?: MatchmakerGame): Promise<void> {
     if (lobbies.length === 0) return;
 
     searchStatus.textContent = 'Scanning lobbies...';
@@ -290,7 +301,7 @@ async function animateLobbyScan(lobbies: RawLobby[], finalLobby?: MatchmakerGame
     const tickMs = total > maxEntries ? BASE_TICK_MS : Math.max(MIN_TICK_MS, Math.min(BASE_TICK_MS, MAX_ANIMATION_MS / total));
 
     for (let f = 0; f < total; f += step) {
-        if (searchAborted) return;
+        if (cancelled(run)) return;
         const i = Math.min(Math.floor(f), total - 1);
 
         const entry = createFeedEntry(lobbies[i]);
@@ -302,11 +313,11 @@ async function animateLobbyScan(lobbies: RawLobby[], finalLobby?: MatchmakerGame
 
         searchCounter.textContent = `Checked: ${i + 1} / ${total} lobbies`;
 
-        await new Promise(r => setTimeout(r, tickMs));
+        await sleep(tickMs);
     }
 
+    if (cancelled(run)) return;
     searchCounter.textContent = `Checked: ${total} / ${total} lobbies`;
-    if (searchAborted) return;
 
     // Settle the scroll on the matched lobby so it visibly "lands" on the result
     if (finalLobby) {
@@ -318,7 +329,7 @@ async function animateLobbyScan(lobbies: RawLobby[], finalLobby?: MatchmakerGame
         }
     }
 
-    await new Promise(r => setTimeout(r, POST_SCAN_PAUSE_MS));
+    await sleep(POST_SCAN_PAUSE_MS);
 }
 
 async function fetchAllGames(mmConfig: MatchmakerConfig): Promise<{ all: RawLobby[]; filtered: MatchmakerGame[] }> {
@@ -380,23 +391,26 @@ function sortGames(games: MatchmakerGame[], pings: Record<string, number>, sortB
     });
 }
 
+// Repeat presses while a search is running are ignored; the cancel keybind stops it.
 export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole): Promise<void> {
+    if (activeRun !== 0) return;
+    const myRun = ++runCounter;
+    activeRun = myRun;
+    try {
+        await runSearch(myRun, mmConfig, _con);
+    } finally {
+        if (activeRun === myRun) activeRun = 0;
+    }
+}
+
+async function runSearch(myRun: number, mmConfig: MatchmakerConfig, _con?: SavedConsole): Promise<void> {
     openServerBrowser = mmConfig.openServerBrowser;
     cancelKey = mmConfig.cancelKey;
     const hideOverlay = mmConfig.hideSearchOverlay;
-    const myRun = ++searchGeneration;
 
-    // Dismiss existing popup if active (also aborts in-flight search)
-    searchAborted = true;
-    dismissPopup();
-
-    // Phase 1: Show search popup immediately — unless the overlay is hidden, in
-    // which case search/join happens silently (still reset searchAborted so the
-    // run isn't aborted by the dismiss above). Hidden runs skip showSearchPopup,
-    // so the cancel keybind is intentionally inert — there's nothing to cancel
-    // during a near-instant silent search.
-    if (hideOverlay) searchAborted = false;
-    else showSearchPopup();
+    // Phase 1: show the popup. Hidden runs skip it, so the cancel keybind is
+    // intentionally inert — there's nothing to cancel during a silent search.
+    if (!hideOverlay) showSearchPopup();
     _con?.log('[KCC-MM] Fetching game list + pings...');
 
     // Phase 2: Fetch data
@@ -404,24 +418,28 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
     let filtered: MatchmakerGame[];
     let pings: Record<string, number>;
     try {
-        const [fetchResult, pingResult] = await Promise.all([
-            fetchAllGames(mmConfig),
-            ipcRenderer.invoke('ping-regions').catch(() => ({} as Record<string, number>)),
+        const [fetchResult, pingResult] = await Promise.race([
+            Promise.all([
+                fetchAllGames(mmConfig),
+                ipcRenderer.invoke('ping-regions').catch(() => ({} as Record<string, number>)),
+            ]),
+            sleep(FETCH_TIMEOUT_MS).then(() => { throw new Error('timed out'); }),
         ]);
         allLobbies = fetchResult.all;
         filtered = fetchResult.filtered;
         pings = pingResult;
     } catch (err) {
         _con?.error('[KCC-MM] Failed to fetch lobby list/pings:', err);
-        if (!searchAborted && !hideOverlay) {
+        if (!cancelled(myRun) && !hideOverlay) {
             searchStatus.textContent = 'Failed to fetch lobbies';
-            await new Promise(r => setTimeout(r, 2000));
+            await sleep(2000);
+            if (cancelled(myRun)) return;
             dismissPopup();
         }
         return;
     }
 
-    if (searchAborted) return;
+    if (cancelled(myRun)) return;
 
     _con?.log('[KCC-MM]', filtered.length, '/', allLobbies.length, 'games passed filters');
 
@@ -445,8 +463,8 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
     }
 
     // Scan scrolls the lobbies and, when there's a match, settles on it before stopping
-    if (!hideOverlay) await animateLobbyScan(allLobbies, best);
-    if (searchAborted) return;
+    if (!hideOverlay) await animateLobbyScan(myRun, allLobbies, best);
+    if (cancelled(myRun)) return;
 
     if (best) {
         if (!hideOverlay) {
@@ -465,9 +483,10 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
             if (foundIcon) found.prepend(foundIcon);
             searchFeed.appendChild(found);
             searchCounter.textContent = `${best.gamemode} \u00B7 ${regionName} \u00B7 ${pings[best.region] ?? '?'}ms`;
-            await new Promise(r => setTimeout(r, FOUND_HOLD_MS));
+            await sleep(FOUND_HOLD_MS);
+            if (cancelled(myRun)) return;
         }
-        await verifyAndJoin(best.gameID);
+        await verifyAndJoin(myRun, best.gameID);
     } else {
         _con?.log('[KCC-MM] No matching games found');
         if (!hideOverlay) {
@@ -482,10 +501,8 @@ export async function fetchGame(mmConfig: MatchmakerConfig, _con?: SavedConsole)
             notFound.textContent = 'No matching lobbies';
             searchFeed.appendChild(notFound);
             searchCounter.textContent = openServerBrowser ? 'Opening server browser…' : '';
-            await new Promise(r => setTimeout(r, NOT_FOUND_HOLD_MS));
-            // A new search may have started during the hold (fetchGame is re-entrant and
-            // resets searchAborted); bail if this run is no longer the active one.
-            if (searchAborted || myRun !== searchGeneration) return;
+            await sleep(NOT_FOUND_HOLD_MS);
+            if (cancelled(myRun)) return;
         }
         dismissPopup();
         if (openServerBrowser && typeof (window as any).openServerWindow === 'function') {
