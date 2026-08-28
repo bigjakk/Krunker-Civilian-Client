@@ -13,7 +13,7 @@
  * Platform behavior:
  *   Windows:        patched Win   → dist/       (replaces stock)
  *   Linux (local):  patched Linux → dist/       (replaces stock), Win → dist-win/
- *   CI (Linux):     Win → dist-win/, Linux → dist-linux/  (stock stays in dist/)
+ *   CI (Linux):     Linux → dist-linux/  (stock stays in dist/)
  *   macOS:          patched Mac   → dist/       (replaces stock, arm64)
  *
  * Usage:
@@ -169,9 +169,8 @@ async function main() {
         // Windows local dev: patched Win → dist/ (replaces stock)
         await installTo(path.join(ELECTRON_BASE, 'dist'), PLATFORMS.win32);
     } else if (IS_CI) {
-        // CI (Linux): keep stock in dist/ untouched,
-        // patched Win → dist-win/, patched Linux → dist-linux/
-        await installTo(path.join(ELECTRON_BASE, 'dist-win'), PLATFORMS.win32);
+        // CI (Linux): keep stock in dist/ untouched, patched Linux → dist-linux/.
+        // Windows CI builds run on a Windows runner and take the IS_WIN branch above.
         await installTo(path.join(ELECTRON_BASE, 'dist-linux'), PLATFORMS.linux);
     } else {
         // Linux local dev: patched Linux → dist/ (for npm run dev),

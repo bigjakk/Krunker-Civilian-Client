@@ -45,8 +45,43 @@ jobs:
             echo "SKIP=false" >> "$GITHUB_OUTPUT"
           fi
 
-  build-desktop:
-    name: Build Windows + Linux
+  build-windows:
+    name: Build Windows
+    needs: version-check
+    if: needs.version-check.outputs.SKIP == 'false' || inputs.force_build
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build source
+        run: npm run build
+
+      # On a Windows host download-electron.js patches dist/ directly — no override needed.
+      - name: Build Windows distributables
+        run: npx electron-builder --win --publish never
+
+      - name: Report build sizes
+        shell: bash
+        run: ls -lh out/*.exe 2>/dev/null || true
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist-windows
+          path: out/*.exe
+          if-no-files-found: error
+
+  build-linux:
+    name: Build Linux
     needs: version-check
     if: needs.version-check.outputs.SKIP == 'false' || inputs.force_build
     runs-on: ubuntu-latest
@@ -59,43 +94,23 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install system dependencies
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            wine wine32 wine64 \
-            libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2t64 \
-            libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
-            libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 \
-            libcairo2 libasound2t64 libgtk-3-0
-          WINEDEBUG=-all wine wineboot --init || true
-
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
       - name: Build source
         run: npm run build
 
-      - name: Build Windows distributables
-        env:
-          WINEDEBUG: "-all"
-        run: npx electron-builder --win -c.electronDist=node_modules/electron/dist-win --publish never
-
       - name: Build Linux distributables
         run: npx electron-builder --linux -c.electronDist=node_modules/electron/dist-linux --publish never
 
       - name: Report build sizes
-        run: |
-          echo "=== Build output sizes ==="
-          ls -lh out/*.exe out/*.AppImage out/*.deb 2>/dev/null || true
+        run: ls -lh out/*.AppImage out/*.deb 2>/dev/null || true
 
-      - name: Upload desktop artifacts
+      - name: Upload Linux artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: dist-desktop
+          name: dist-linux
           path: |
-            out/*.exe
             out/*.AppImage
             out/*.deb
           if-no-files-found: error
@@ -191,7 +206,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [version-check, build-desktop, build-mac]
+    needs: [version-check, build-windows, build-linux, build-mac]
     # Publish only from main: a dispatch on another branch runs the build jobs (for
     # test artifacts) but must never cut a --latest release of unmerged code. SIGNED
     # must hold too — an unsigned DMG would trip Gatekeeper on download (belt-and-braces;
