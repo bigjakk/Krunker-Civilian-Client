@@ -86,7 +86,6 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
   app.commandLine.appendSwitch('disable-background-timer-throttling');
   app.commandLine.appendSwitch('disable-renderer-backgrounding');
   app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
-  app.commandLine.appendSwitch('overscroll-history-navigation', '0');
   app.commandLine.appendSwitch('pull-to-refresh', '0');
   // WebGL is mandatory for Krunker — force it past any GPU blocklist.
   // On Chromium 134+ the blocklist is stricter and silently disables WebGL on many Linux GPUs.
