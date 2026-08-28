@@ -53,7 +53,7 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
 
   // ── FPS uncap ──
   // disable-frame-rate-limit causes compositor CPU spin on Chromium 84+, starving
-  // input events. On Electron 43 (Chromium 150), this is fixed by a patch to
+  // input events. On Electron 44 (Chromium 152), this is fixed by a patch to
   // cc/scheduler/scheduler.cc in our custom Electron build.
   if (performance.fpsUnlocked) {
     app.commandLine.appendSwitch('disable-frame-rate-limit');
@@ -123,7 +123,7 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
   }
 
   // ── Remove useless features ──
-  // Pruned to switches that exist in Electron 43 — chrome-layer switches (print
+  // Pruned to switches that exist in Electron 44 — chrome-layer switches (print
   // preview, component update, metrics, hyperlink pings) are not compiled into
   // Electron and never had any effect.
   if (advanced.removeUselessFeatures) {

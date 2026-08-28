@@ -6,7 +6,7 @@ directories:
 afterPack: "./scripts/afterPack-linux.js"
 # Ship the custom-patched Electron from node_modules/electron/dist/ that
 # scripts/download-electron.js installs during postinstall — NOT a stock build. The
-# electron devDependency (43.0.0) matches the patched binary's version, but it's still a
+# electron devDependency (44.0.0) matches the patched binary's version, but it's still a
 # patched build, so we point electron-builder at the local dist/ to package that exact
 # binary (input-priority + frame-pacing patches) instead of re-resolving stock from CDN.
 # CI / cross-compile must override on CLI: --electronDist=./node_modules/electron/dist-{linux,win}
