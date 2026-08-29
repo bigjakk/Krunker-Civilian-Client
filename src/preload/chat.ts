@@ -32,6 +32,27 @@ const USER_SCROLL_WINDOW = 200; // ms after a wheel that 'scroll' counts as user
 // re-insert them at the top of the list.
 const kccRemovedNodes = new WeakSet<Node>();
 
+// A userscript that deletes chat messages fights the re-insert below — we
+// restore, it deletes, forever — and both observers are microtasks, so the
+// page locks up. Krunker's prune drops a node once per new message, so a node
+// crossing this count in one turn is being fought over: let it go.
+const REINSERT_LIMIT = 8;
+let reInsertCounts = new WeakMap<Node, number>();
+let reInsertResetQueued = false;
+
+function shouldReInsert(node: Node): boolean {
+    const n = (reInsertCounts.get(node) ?? 0) + 1;
+    if (n > REINSERT_LIMIT) return false;
+    reInsertCounts.set(node, n);
+    if (!reInsertResetQueued) {
+        reInsertResetQueued = true;
+        // Macrotask, not a microtask: the fight is many microtasks inside one
+        // event-loop turn, so a microtask reset would re-arm it mid-loop.
+        setTimeout(() => { reInsertCounts = new WeakMap(); reInsertResetQueued = false; }, 0);
+    }
+    return true;
+}
+
 function isChatMessage(node: Node): node is HTMLElement {
     return node.nodeType === 1 && (node as HTMLElement).id?.startsWith('chatMsg_');
 }
@@ -72,7 +93,7 @@ function handleMutations(mutations: MutationRecord[]): void {
         for (const mut of mutations) {
             if (reInsertGuard) break;
             for (const node of mut.removedNodes) {
-                if (isChatMessage(node) && !kccRemovedNodes.has(node)) removed.push(node);
+                if (isChatMessage(node) && !kccRemovedNodes.has(node) && shouldReInsert(node)) removed.push(node);
             }
         }
         if (removed.length > 0) {
