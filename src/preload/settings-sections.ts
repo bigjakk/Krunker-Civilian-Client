@@ -20,6 +20,7 @@ import { initHPCounter, destroyHPCounter } from './competitive';
 import { initSuspectPing, destroySuspectPing } from './kpd-call';
 import { setHeadshotSoundMode } from './headshot-sound';
 import type { HeadshotSoundMode } from './headshot-sound';
+import { setTradeDing } from './trade-ding';
 import { updateKeystrokes } from './keystrokes';
 import type { KeystrokesConfig } from './keystrokes';
 import { setBetterChat, setChatHistorySize } from './chat';
@@ -214,6 +215,81 @@ export function buildGameSection(
     value: game.headshotSound ?? 'off', instant: true,
     onChange: (v) => { game.headshotSound = v as HeadshotSoundMode; saveGame(); setHeadshotSoundMode(v as HeadshotSoundMode); },
   }));
+
+  const tdSettings = () => ({
+    sound: game.tradeDingSound ?? 'off',
+    volume: game.tradeDingVolume ?? 40,
+    soundFile: game.tradeDingSoundFile ?? '',
+    intervalSec: game.tradeDingInterval ?? 15,
+  });
+
+  // Custom sound file row — built first so the sound select can show/hide it.
+  const tdFile = createTextRow({
+    label: 'Custom Trade Sound',
+    desc: 'A direct audio link ending in .mp3/.ogg/.wav, or browse for a local file.',
+    value: game.tradeDingSoundFile || '',
+    placeholder: 'https://example.com/ding.mp3  or  C:\\path\\to\\ding.mp3',
+    onChange: (v) => { game.tradeDingSoundFile = v; saveGame(); setTradeDing(tdSettings()); },
+  });
+  const tdFileControl = tdFile.row.querySelector('.kcc-row-control') as HTMLElement;
+  tdFileControl.appendChild(makeButton({ icon: 'folder_open', title: 'Browse for Audio File', onClick: async () => {
+    const path: string = await ipcRenderer.invoke('pick-audio-file');
+    if (path) { tdFile.input.value = path; game.tradeDingSoundFile = path; saveGame(); setTradeDing(tdSettings()); }
+  } }));
+  let tdPreview: HTMLAudioElement | null = null;
+  const tdResetPlay = (failed?: boolean): void => {
+    tdPreview = null;
+    tdPlayBtn.innerHTML = '<span class="material-icons">play_arrow</span>';
+    if (failed) showToast('Couldn\'t load that sound. Use a direct audio file link (.mp3/.ogg/.wav) or pick a local file.');
+  };
+  const tdPlayBtn = makeButton({ icon: 'play_arrow', title: 'Preview Sound', onClick: async () => {
+    if (tdPreview) { tdPreview.pause(); tdResetPlay(); return; }
+    const url: string = await ipcRenderer.invoke('resolve-audio-file', tdFile.input.value.trim());
+    if (!url) { tdResetPlay(true); return; }
+    tdPreview = new Audio(url);
+    tdPreview.volume = Math.min(1, Math.max(0, (game.tradeDingVolume ?? 40) / 100));
+    tdPlayBtn.innerHTML = '<span class="material-icons">stop</span>';
+    tdPreview.onended = () => tdResetPlay();
+    tdPreview.onerror = () => tdResetPlay(true);
+    tdPreview.play().catch(() => tdResetPlay(true));
+  } });
+  tdFileControl.appendChild(tdPlayBtn);
+
+  // Only reveal the custom file row when the sound is set to Custom File.
+  const syncTdRows = (): void => {
+    tdFile.row.classList.toggle('kcc-row-hidden', (game.tradeDingSound ?? 'off') !== 'custom');
+  };
+
+  inputGroup.appendChild(createSelectRow({
+    label: 'Trade Request Sound',
+    desc: 'Play a sound when another player sends you a trade request. Checks your pending trades on the interval below.',
+    options: [
+      { value: 'off', label: 'Off' },
+      { value: 'chime', label: 'Chime' },
+      { value: 'tick_0', label: 'Krunker Tick' },
+      { value: 'headshot_0', label: 'Headshot Ding' },
+      { value: 'custom', label: 'Custom File…' },
+    ],
+    value: game.tradeDingSound ?? 'off', instant: true,
+    onChange: (v) => { game.tradeDingSound = v; saveGame(); syncTdRows(); setTradeDing(tdSettings()); },
+  }));
+  inputGroup.appendChild(tdFile.row);
+
+  inputGroup.appendChild(createNumberRow({
+    label: 'Trade Request Volume',
+    desc: 'Loudness of the trade request sound',
+    min: 0, max: 100, value: game.tradeDingVolume ?? 40, instant: true,
+    onChange: (v) => { game.tradeDingVolume = v; saveGame(); setTradeDing(tdSettings()); },
+  }));
+
+  inputGroup.appendChild(createNumberRow({
+    label: 'Trade Check Interval',
+    desc: 'How often to check for new trade requests, in seconds',
+    min: 5, max: 60, value: game.tradeDingInterval ?? 15, instant: true,
+    onChange: (v) => { game.tradeDingInterval = v; saveGame(); setTradeDing(tdSettings()); },
+  }));
+
+  syncTdRows();
 
   const worldGroup = createGroup(body, 'World');
 

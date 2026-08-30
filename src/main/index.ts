@@ -58,6 +58,15 @@ async function resolveRankedAudioUrl(setting: string): Promise<string> {
   return a ? `data:${a.mime};base64,${a.bytes.toString('base64')}` : DEFAULT_RANKED_AUDIO_URL;
 }
 
+/** Like resolveRankedAudioUrl but with no built-in default — empty/unreadable → ''. */
+async function resolveAudioUrl(setting: string): Promise<string> {
+  const s = (setting || '').trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s;
+  const a = await readAudio(s, MAX_AUDIO_BYTES);
+  return a ? `data:${a.mime};base64,${a.bytes.toString('base64')}` : '';
+}
+
 /** Local files come back as raw bytes for a Blob; base64 would add a third again. */
 async function resolveSocialMusic(setting: string): Promise<SocialMusicSource> {
   const s = (setting || '').trim();
@@ -1114,6 +1123,8 @@ async function launchApp(): Promise<void> {
   });
 
   ipcMain.handle('resolve-ranked-sound', (_e, setting: string) => resolveRankedAudioUrl(setting));
+
+  ipcMain.handle('resolve-audio-file', (_e, setting: string) => resolveAudioUrl(setting));
 
   ipcMain.handle('resolve-social-music', (_e, setting: string) => resolveSocialMusic(setting));
 

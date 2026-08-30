@@ -63,6 +63,10 @@ export interface AppConfig {
     hideTurfBanners: boolean;
     screenshotSave: boolean;
     headshotSound: 'off' | 'kill' | 'hit';
+    tradeDingSound: string;
+    tradeDingVolume: number;
+    tradeDingSoundFile: string;
+    tradeDingInterval: number;
   };
   keystrokes: {
     enabled: boolean;
@@ -202,6 +206,10 @@ export const DEFAULT_CONFIG: AppConfig = {
     hideTurfBanners: false,
     screenshotSave: false,
     headshotSound: 'off',
+    tradeDingSound: 'off',
+    tradeDingVolume: 40,
+    tradeDingSoundFile: '',
+    tradeDingInterval: 15,
   },
   keystrokes: {
     enabled: false,

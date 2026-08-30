@@ -19,6 +19,7 @@ import { initBanlog } from './banlog';
 import { installGameSocketTap } from './game-socket';
 import { installSkyHook } from './sky';
 import { installSoundHook, setHeadshotSoundMode } from './headshot-sound';
+import { initTradeDing } from './trade-ding';
 import { initKccProtocol } from './protocol';
 import { initSuspectPing } from './kpd-call';
 
@@ -248,6 +249,16 @@ ipcRenderer.on('main_did-finish-load', () => {
     if (isGamePage) {
       setHeadshotSoundMode(gameConf?.headshotSound ?? 'off');
       installSoundHook();
+    }
+
+    // ── Trade request ding ──
+    if (isGamePage) {
+      initTradeDing({
+        sound: gameConf?.tradeDingSound ?? 'off',
+        volume: gameConf?.tradeDingVolume ?? 40,
+        soundFile: gameConf?.tradeDingSoundFile ?? '',
+        intervalSec: gameConf?.tradeDingInterval ?? 15,
+      });
     }
 
     // ── Keystrokes + Mouse overlay ──
