@@ -262,7 +262,9 @@ export function buildGameSection(
     tdFile.row.classList.toggle('kcc-row-hidden', (game.tradeDingSound ?? 'off') !== 'custom');
   };
 
-  inputGroup.appendChild(createSelectRow({
+  const tradeGroup = createGroup(body, 'Trade Requests');
+
+  tradeGroup.appendChild(createSelectRow({
     label: 'Trade Request Sound',
     desc: 'Play a sound when another player sends you a trade request. Checks your pending trades on the interval below.',
     options: [
@@ -275,16 +277,16 @@ export function buildGameSection(
     value: game.tradeDingSound ?? 'off', instant: true,
     onChange: (v) => { game.tradeDingSound = v; saveGame(); syncTdRows(); setTradeDing(tdSettings()); },
   }));
-  inputGroup.appendChild(tdFile.row);
+  tradeGroup.appendChild(tdFile.row);
 
-  inputGroup.appendChild(createNumberRow({
+  tradeGroup.appendChild(createNumberRow({
     label: 'Trade Request Volume',
     desc: 'Loudness of the trade request sound',
     min: 0, max: 100, value: game.tradeDingVolume ?? 40, instant: true,
     onChange: (v) => { game.tradeDingVolume = v; saveGame(); setTradeDing(tdSettings()); },
   }));
 
-  inputGroup.appendChild(createNumberRow({
+  tradeGroup.appendChild(createNumberRow({
     label: 'Trade Check Interval',
     desc: 'How often to check for new trade requests, in seconds',
     min: 5, max: 60, value: game.tradeDingInterval ?? 15, instant: true,
