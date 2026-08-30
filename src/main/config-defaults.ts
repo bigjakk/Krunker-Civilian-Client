@@ -76,6 +76,14 @@ export interface AppConfig {
     showAuxKeys: boolean;
     mouseEnabled: boolean;
   };
+  nukeCounter: {
+    enabled: boolean;
+    goal: number;
+    background: boolean;
+    scale: number;
+    x: number;
+    y: number;
+  };
   swapper: {
     enabled: boolean;
     path: string;
@@ -218,6 +226,14 @@ export const DEFAULT_CONFIG: AppConfig = {
     auxKey2: 'n',
     showAuxKeys: true,
     mouseEnabled: false,
+  },
+  nukeCounter: {
+    enabled: false,
+    goal: 0,
+    background: true,
+    scale: 1,
+    x: 94,
+    y: 50,
   },
   swapper: {
     enabled: false,

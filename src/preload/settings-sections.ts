@@ -23,6 +23,8 @@ import type { HeadshotSoundMode } from './headshot-sound';
 import { setTradeDing } from './trade-ding';
 import { updateKeystrokes } from './keystrokes';
 import type { KeystrokesConfig } from './keystrokes';
+import { setNukeCounter } from './nuke-counter';
+import type { NukeCounterConfig } from './nuke-counter';
 import { setBetterChat, setChatHistorySize } from './chat';
 import { updateTranslatorConfig } from './translator';
 import { showChangelogNow } from './changelog';
@@ -700,7 +702,7 @@ export function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfR
   });
 }
 
-export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void {
+export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any, ncConf: any): void {
   const ui = uiConfRaw;
 
   function saveUI(): void {
@@ -756,6 +758,64 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any): void 
     ui.socialCssTheme = socialThemeSelect.value;
     saveUI();
   });
+
+  const nc: NukeCounterConfig = { ...DEFAULT_CONFIG.nukeCounter, ...ncConf };
+
+  function saveNuke(): void {
+    ipcRenderer.invoke('set-config', 'nukeCounter', nc);
+    setNukeCounter(nc);
+  }
+
+  const nukeGroup = createGroup(body, 'Nuke Counter');
+  const nukeSubRows: HTMLElement[] = [];
+  const syncNukeRows = (): void => {
+    for (const r of nukeSubRows) r.classList.toggle('kcc-row-hidden', !nc.enabled);
+  };
+
+  nukeGroup.appendChild(createToggleRow({
+    label: 'Nuke Counter Overlay',
+    desc: 'Show your career nuke total in-game. Updates when a match ends.',
+    checked: nc.enabled, instant: true,
+    onChange: (v) => { nc.enabled = v; saveNuke(); syncNukeRows(); },
+  }));
+
+  nukeSubRows.push(createNumberRow({
+    label: 'Nuke Goal',
+    desc: 'Target total shown next to the counter (1,833 / 2,500). 0 hides it.',
+    min: 0, max: 50000, value: nc.goal, instant: true,
+    onChange: (v) => { nc.goal = v; saveNuke(); },
+  }));
+
+  nukeSubRows.push(createToggleRow({
+    label: 'Background',
+    desc: 'Dark backdrop behind the counter',
+    checked: nc.background, instant: true,
+    onChange: (v) => { nc.background = v; saveNuke(); },
+  }));
+
+  nukeSubRows.push(createNumberRow({
+    label: 'Scale',
+    desc: 'Visual size of the counter',
+    min: 0.5, max: 2, step: 0.05, value: nc.scale, instant: true,
+    onChange: (v) => { nc.scale = v; saveNuke(); },
+  }));
+
+  nukeSubRows.push(createNumberRow({
+    label: 'X Position',
+    desc: 'Percent of screen width (50 = centered)',
+    min: 0, max: 100, step: 0.5, value: nc.x, instant: true,
+    onChange: (v) => { nc.x = v; saveNuke(); },
+  }));
+
+  nukeSubRows.push(createNumberRow({
+    label: 'Y Position',
+    desc: 'Percent of screen height (50 = centered)',
+    min: 0, max: 100, step: 0.5, value: nc.y, instant: true,
+    onChange: (v) => { nc.y = v; saveNuke(); },
+  }));
+
+  for (const r of nukeSubRows) nukeGroup.appendChild(r);
+  syncNukeRows();
 
   // ── Menu Music ──
   const musicGroup = createGroup(body, 'Menu Music');

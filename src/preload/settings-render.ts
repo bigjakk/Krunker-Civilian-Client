@@ -343,7 +343,7 @@ function renderSettings(searchQuery?: string): void {
   // gap here lets the browser paint the (Krunker-cleared) empty holder = a flash.
   let data: { config: any; platform: any; version: string };
   try {
-    data = ipcRenderer.sendSync('get-settings-data-sync', ['swapper', 'matchmaker', 'keybinds', 'advanced', 'game', 'ui', 'discord', 'translator', 'performance']);
+    data = ipcRenderer.sendSync('get-settings-data-sync', ['swapper', 'matchmaker', 'keybinds', 'advanced', 'game', 'ui', 'discord', 'translator', 'performance', 'nukeCounter']);
   } catch (err: any) {
     _console.error('[KCC] Settings render error:', err);
     return;
@@ -393,7 +393,7 @@ function renderSettings(searchQuery?: string): void {
     { key: 'Game', label: 'Game', icon: 'sports_esports', build: (b) => buildGameSection(b, gameConf, uiConfRaw, bag) },
     { key: 'Performance', label: 'Performance', icon: 'speed', build: (b) => buildPerformanceSection(b, allConf.performance, allConf.advanced, isWindows) },
     { key: 'Swapper', label: 'Swapper', icon: 'swap_horiz', build: (b) => buildSwapperSection(b, allConf.swapper, uiConfRaw) },
-    { key: 'Appearance', label: 'Appearance', icon: 'palette', build: (b) => buildAppearanceSection(b, uiConfRaw) },
+    { key: 'Appearance', label: 'Appearance', icon: 'palette', build: (b) => buildAppearanceSection(b, uiConfRaw, allConf.nukeCounter) },
     { key: 'Matchmaker', label: 'Matchmaker', icon: 'travel_explore', build: (b) => buildMatchmakerSection(b, allConf.matchmaker, bag) },
     { key: 'Chat', label: 'Chat', icon: 'chat', build: (b) => buildChatSection(b, gameConf, allConf.translator) },
     { key: 'Discord', label: 'Discord', icon: 'forum', build: (b) => buildDiscordSection(b, allConf.discord) },
