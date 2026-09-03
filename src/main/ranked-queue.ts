@@ -16,6 +16,7 @@ const RANKED_MAPS: Record<string, { number: number; image: string }> = {
     bureau:       { number: 17, image: 'https://assets.krunker.io/img/maps/map_17.png' },
     burg_new:     { number: 0,  image: 'https://assets.krunker.io/img/maps/map_0.png' },
     eterno_sim:   { number: 39, image: 'https://assets.krunker.io/img/maps/map_39.png' },
+    Frontier:     { number: 42, image: 'https://assets.krunker.io/img/maps/map_42.png' },
 };
 
 const RANKED_REGIONS: Record<string, string> = {
