@@ -297,6 +297,54 @@ function safeOpenExternal(url: string): void {
   } catch { /* malformed URL — ignore */ }
 }
 
+// ── Open issue count ──
+const ISSUE_COUNT_URL = 'https://api.github.com/search/issues?q=repo:bigjakk/Krunker-Civilian-Client+is:issue+is:open&per_page=1';
+const ISSUE_COUNT_TTL = 10 * 60 * 1000;
+const ISSUE_COUNT_TIMEOUT_MS = 5000;
+let issueCount: { value: Promise<number | null>; at: number } | null = null;
+
+function fetchIssueCount(): Promise<number | null> {
+  return new Promise((resolve) => {
+    const req = httpsGet(ISSUE_COUNT_URL, { headers: { 'User-Agent': 'KCC' } }, (res) => {
+      if (res.statusCode !== 200) {
+        electronLog.warn('[KCC] Issue count returned status', res.statusCode);
+        res.resume();
+        resolve(null);
+        return;
+      }
+      res.setEncoding('utf8');
+      let body = '';
+      res.on('data', (chunk: string) => { body += chunk; });
+      res.on('end', () => {
+        try {
+          const total = JSON.parse(body).total_count;
+          resolve(typeof total === 'number' ? total : null);
+        } catch (err) {
+          electronLog.warn('[KCC] Issue count parse failed:', err);
+          resolve(null);
+        }
+      });
+      res.on('error', () => resolve(null));
+    });
+    req.setTimeout(ISSUE_COUNT_TIMEOUT_MS, () => {
+      req.destroy();
+      resolve(null);
+    });
+    req.on('error', (err) => {
+      electronLog.warn('[KCC] Issue count fetch failed:', err);
+      resolve(null);
+    });
+  });
+}
+
+// The unauthenticated search limit is tight, so cache the promise itself: dedupes concurrent renders and holds a failure for the TTL.
+function getIssueCount(): Promise<number | null> {
+  if (!issueCount || Date.now() - issueCount.at >= ISSUE_COUNT_TTL) {
+    issueCount = { value: fetchIssueCount(), at: Date.now() };
+  }
+  return issueCount.value;
+}
+
 // ── Keybind matching ──
 function matchesKeybind(input: { key: string; control: boolean; shift: boolean; alt: boolean }, bind: Keybind | undefined): boolean {
   if (!bind) return false;
@@ -1180,6 +1228,8 @@ async function launchApp(): Promise<void> {
       return '';
     }
   });
+
+  ipcMain.handle('github-issue-count', () => getIssueCount());
 
   // ── Userscript IPC handlers ──
   ipcMain.handle('userscripts-get-dir', () => userscriptManager ? userscriptManager.dir : '');

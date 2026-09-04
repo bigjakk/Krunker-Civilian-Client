@@ -101,6 +101,36 @@ ${THEME_CSS}
   color: var(--kcc-text-primary);
 }
 .kcc-header-ver { font-size: 11px; color: var(--kcc-text-muted); }
+.kcc-header-issues {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--kcc-border-default);
+  border-radius: 999px;
+  background: var(--kcc-surface-card);
+  color: var(--kcc-text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.kcc-header-issues:hover {
+  background: var(--kcc-surface-hover);
+  border-color: var(--kcc-border-medium);
+  color: var(--kcc-text-primary);
+}
+.kcc-issues-mark { width: 15px; height: 15px; flex: none; color: var(--kcc-text-muted); }
+.kcc-header-issues:hover .kcc-issues-mark { color: var(--kcc-accent); }
+.kcc-issues-count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--kcc-accent-soft);
+  color: var(--kcc-accent);
+  font-size: 11px;
+}
+.kcc-issues-count:empty { display: none; }
 
 /* -- Shell: category rail + content pane -- */
 .kcc-shell { display: flex; align-items: flex-start; }
