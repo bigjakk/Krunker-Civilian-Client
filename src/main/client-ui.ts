@@ -274,6 +274,8 @@ ${THEME_CSS}
 .kcc-toggle input:disabled + .kcc-toggle-track { opacity: 0.5; pointer-events: none; }
 
 /* -- Krunker's own import popup -- */
+/* Krunker's textarea resizes freely with no max-width, so it overruns the panel. */
+#importTxt { max-width: 100%; resize: vertical; }
 .kcc-import-groups {
   display: flex;
   flex-direction: column;
