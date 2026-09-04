@@ -12,6 +12,8 @@ import { KCC_ICON_DATA_URL } from './header-icon';
 import { savedConsole as _console } from './saved-console';
 import { openKeybindDialog, keybindDisplayString } from './keybind-dialog';
 import { showConfirm } from './confirm-dialog';
+import { isSkippedKey, newImportChoices, skippedGroups } from './import-groups';
+import type { ImportGroup } from './import-groups';
 import {
   createToggleRow, createButtonRow, createInfoRow, createGroup,
   createRowShell, createSelect, onSettingChanged,
@@ -54,11 +56,11 @@ function collectKrunkerSettings(): Record<string, string> {
   return out;
 }
 
-function applyKrunkerSettings(settings: Record<string, string> | undefined): void {
+function applyKrunkerSettings(settings: Record<string, string> | undefined, skip: Set<ImportGroup>): void {
   if (!settings || typeof settings !== 'object') return;
   try {
     for (const [key, val] of Object.entries(settings)) {
-      if (isKrunkerSettingKey(key) && typeof val === 'string') {
+      if (isKrunkerSettingKey(key) && typeof val === 'string' && !isSkippedKey(key, skip)) {
         localStorage.setItem(key, val);
       }
     }
@@ -256,15 +258,18 @@ function buildManageSection(body: HTMLElement): void {
     });
   }));
   backupGrid.appendChild(makeActionBtn('file_upload', 'Import Settings', () => {
+    const choices = newImportChoices();
     showConfirm({
       title: 'Import Settings',
-      message: 'Import settings from a file? This overwrites your current client and Krunker settings (alt accounts are not affected) and restarts the client.',
+      message: 'Import settings from a file? This overwrites your current client and Krunker settings (alt accounts are not affected) and restarts the client. Unchecked groups keep your current settings.',
       confirmLabel: 'Import',
+      checkboxes: choices,
     }).then((ok) => {
       if (!ok) return;
-      ipcRenderer.invoke('import-settings').then((res: any) => {
+      const skip = skippedGroups(choices);
+      ipcRenderer.invoke('import-settings', [...skip]).then((res: any) => {
         if (res && res.success) {
-          applyKrunkerSettings(res.krunker);
+          applyKrunkerSettings(res.krunker, skip);
           ipcRenderer.invoke('restart-client');
         } else if (res && !res.canceled) {
           showToast('Import failed: ' + (res.error || 'unknown error'));

@@ -2,6 +2,7 @@ import { ipcRenderer } from 'electron';
 import { fetchGame } from './matchmaker';
 import type { MatchmakerConfig } from './matchmaker';
 import { hookSettings } from './settings-render';
+import { hookNativeImport } from './native-import';
 import { initUserscripts } from './userscripts';
 import { initTranslator } from './translator';
 import { installCompositorAnimFix, setDeathAnimBlock, setMenuTimer, setWatermark, showToast } from './utils';
@@ -474,6 +475,7 @@ ipcRenderer.on('main_did-finish-load', () => {
       clearInterval(pollInterval);
       _console.log('[KCC] Settings window found, hooking...');
       hookSettings();
+      hookNativeImport();
     }
   }, 500);
 });

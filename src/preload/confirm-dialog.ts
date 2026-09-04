@@ -5,12 +5,20 @@
 
 import { ipcRenderer } from 'electron';
 
+// `checked` is updated in place, so the caller reads its choices off the same array.
+export interface ConfirmCheckbox {
+  id: string;
+  label: string;
+  checked: boolean;
+}
+
 export interface ConfirmOptions {
   title: string;
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
+  checkboxes?: ConfirmCheckbox[];
 }
 
 export function showConfirm(opts: ConfirmOptions): Promise<boolean> {
@@ -61,6 +69,10 @@ export function showConfirm(opts: ConfirmOptions): Promise<boolean> {
         padding: 12px 24px 22px; line-height: 1.55; font-size: 0.9rem;
         color: rgba(255,255,255,0.8);
       }
+      .checks { display: flex; flex-direction: column; gap: 11px; padding: 0 24px 20px; margin-top: -8px; }
+      .check { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: rgba(255,255,255,0.8); cursor: pointer; }
+      .check:hover { color: #fff; }
+      .check input { accent-color: ${accent}; width: 15px; height: 15px; margin: 0; cursor: pointer; }
       .footer { display: flex; justify-content: flex-end; gap: 10px; padding: 0 24px 22px; }
       .btn {
         font-family: inherit; font-size: 0.85rem; font-weight: 600;
@@ -104,6 +116,24 @@ export function showConfirm(opts: ConfirmOptions): Promise<boolean> {
     footer.appendChild(confirmBtn);
     modal.appendChild(titleEl);
     modal.appendChild(bodyEl);
+    if (opts.checkboxes && opts.checkboxes.length > 0) {
+      const checks = document.createElement('div');
+      checks.className = 'checks';
+      for (const box of opts.checkboxes) {
+        const row = document.createElement('label');
+        row.className = 'check';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = box.checked;
+        input.addEventListener('change', () => { box.checked = input.checked; });
+        const text = document.createElement('span');
+        text.textContent = box.label;
+        row.appendChild(input);
+        row.appendChild(text);
+        checks.appendChild(row);
+      }
+      modal.appendChild(checks);
+    }
     modal.appendChild(footer);
     overlay.appendChild(modal);
     shadow.appendChild(style);

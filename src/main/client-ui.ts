@@ -273,6 +273,28 @@ ${THEME_CSS}
 .kcc-toggle input:checked + .kcc-toggle-track::before { left: 22px; }
 .kcc-toggle input:disabled + .kcc-toggle-track { opacity: 0.5; pointer-events: none; }
 
+/* -- Krunker's own import popup -- */
+.kcc-import-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 2px 4px;
+}
+.kcc-import-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+}
+.kcc-import-group span {
+  /* !important so Krunker's popup text rules can't override the size. */
+  font-size: 19px !important;
+  letter-spacing: 0.5px;
+  color: var(--kcc-text-secondary) !important;
+}
+.kcc-import-group:hover span { color: var(--kcc-text-primary) !important; }
+
 /* -- Select + text input -- */
 .kcc-select, .kcc-input {
   background: var(--kcc-surface-input);

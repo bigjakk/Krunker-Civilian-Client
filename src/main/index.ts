@@ -1303,7 +1303,7 @@ async function launchApp(): Promise<void> {
     }
   });
 
-  ipcMain.handle('import-settings', async () => {
+  ipcMain.handle('import-settings', async (_e, skipGroups: string[] = []) => {
     const result = await dialog.showOpenDialog(win, {
       title: 'Import Settings',
       properties: ['openFile'],
@@ -1333,8 +1333,10 @@ async function launchApp(): Promise<void> {
     // not in EXPORT_CONFIG_KEYS — so alt credentials are unaffected by import.
     // The renderer restarts the client after this, which is what makes every
     // imported setting (and derived state like tab mode / hideBunnies) take hold.
+    const skipKeybinds = Array.isArray(skipGroups) && skipGroups.includes('keybinds');
     let applied = 0;
     for (const key of EXPORT_CONFIG_KEYS) {
+      if (skipKeybinds && key === 'keybinds') continue;
       const incoming = parsed.client[key];
       if (incoming && typeof incoming === 'object' && !Array.isArray(incoming)) {
         config.set(key as any, { ...(DEFAULT_CONFIG as Record<string, any>)[key], ...incoming });
