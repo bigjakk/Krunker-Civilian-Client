@@ -236,6 +236,7 @@ ipcRenderer.on('main_did-finish-load', () => {
     if (isGamePage) {
       initChat({
         betterChat: gameConf?.betterChat ?? true,
+        autoHideChat: gameConf?.autoHideChat ?? false,
         chatHistorySize: gameConf?.chatHistorySize ?? 200,
       }, _console);
     }

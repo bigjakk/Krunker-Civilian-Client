@@ -1,4 +1,4 @@
-// ── Better Chat + Chat History ──
+// ── Better Chat + Chat History + Auto-Hide ──
 // Merges team/all chat with [T]/[M] prefixes and prevents Krunker from pruning old messages.
 
 import type { SavedConsole } from './utils';
@@ -16,6 +16,7 @@ let observer: MutationObserver | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let historyMax = 0;
 let betterChatEnabled = false;
+let autoHideChatEnabled = false;
 let reInsertGuard = false;
 let scrollPaused = false;
 let savedScrollTop = 0; // position to hold while paused (user scrolled up)
@@ -60,18 +61,32 @@ function isChatMessage(node: Node): node is HTMLElement {
 // Krunker only displays the active channel's messages (the globe toggle);
 // Better Chat shows both channels at once and labels them instead.
 const MERGE_CSS = '#chatList > * { display: block !important; }';
-let mergeStyle: HTMLStyleElement | null = null;
 
-function syncMergeCss(): void {
-    if (betterChatEnabled && !mergeStyle && document.head) {
-        mergeStyle = document.createElement('style');
-        mergeStyle.id = 'kcc-chatMerge';
-        mergeStyle.textContent = MERGE_CSS;
-        document.head.appendChild(mergeStyle);
-    } else if (!betterChatEnabled && mergeStyle) {
-        mergeStyle.remove();
-        mergeStyle = null;
+// :not(.onSpect) keeps the input for spectators; the transitions sit on the
+// in-game rules so leaving the game snaps — updateChatClamp measures on onMenu.
+const AUTOHIDE_CSS = `
+#uiBase.onGame:not(.onSpect) #chatInputHolder { opacity: 0; transform: translateY(50px); transition: opacity .2s ease-in-out, transform .2s ease-in-out; }
+#uiBase.onGame:not(.onSpect) #chatList { margin-bottom: -50px; transition: margin-bottom .2s ease-in-out; }
+#uiBase.onGame:not(.onSpect) #chatHolder:focus-within #chatInputHolder { opacity: 1; transform: translateY(0); }
+#uiBase.onGame:not(.onSpect) #chatHolder:focus-within #chatList { margin-bottom: 0; }
+`;
+
+let chatStyle: HTMLStyleElement | null = null;
+
+function syncChatCss(): void {
+    const css = (betterChatEnabled ? MERGE_CSS : '') + (autoHideChatEnabled ? AUTOHIDE_CSS : '');
+    if (!css) {
+        chatStyle?.remove();
+        chatStyle = null;
+        return;
     }
+    if (!chatStyle) {
+        if (!document.head) return;
+        chatStyle = document.createElement('style');
+        chatStyle.id = 'kcc-chatStyle';
+        document.head.appendChild(chatStyle);
+    }
+    chatStyle.textContent = css;
 }
 
 function isTeamMode(): boolean {
@@ -247,7 +262,7 @@ function tryAttach(): boolean {
         if (document.pointerLockElement) resumeChatScroll();
     });
 
-    syncMergeCss();
+    syncChatCss();
     _con?.log('[KCC-Chat] Observer attached to #chatList');
     return true;
 }
@@ -325,9 +340,10 @@ function startChatClamp(): void {
     }, 250);
 }
 
-export function initChat(options: { betterChat: boolean; chatHistorySize: number }, con?: SavedConsole): void {
+export function initChat(options: { betterChat: boolean; autoHideChat: boolean; chatHistorySize: number }, con?: SavedConsole): void {
     _con = con ?? null;
     betterChatEnabled = options.betterChat;
+    autoHideChatEnabled = options.autoHideChat;
     historyMax = options.chatHistorySize;
 
     if (tryAttach()) { startChatClamp(); return; }
@@ -344,7 +360,12 @@ export function initChat(options: { betterChat: boolean; chatHistorySize: number
 
 export function setBetterChat(enabled: boolean): void {
     betterChatEnabled = enabled;
-    syncMergeCss();
+    syncChatCss();
+}
+
+export function setAutoHideChat(enabled: boolean): void {
+    autoHideChatEnabled = enabled;
+    syncChatCss();
 }
 
 export function setChatHistorySize(size: number): void {

@@ -25,7 +25,7 @@ import { updateKeystrokes } from './keystrokes';
 import type { KeystrokesConfig } from './keystrokes';
 import { setNukeCounter } from './nuke-counter';
 import type { NukeCounterConfig } from './nuke-counter';
-import { setBetterChat, setChatHistorySize } from './chat';
+import { setBetterChat, setAutoHideChat, setChatHistorySize } from './chat';
 import { updateTranslatorConfig } from './translator';
 import { showChangelogNow } from './changelog';
 import { setVerbose } from './saved-console';
@@ -1137,6 +1137,13 @@ export function buildChatSection(body: HTMLElement, gameConf: any, translatorCon
     desc: 'Merge team and all-chat with colored [T]/[M] prefixes',
     checked: game.betterChat, instant: true,
     onChange: (v) => { game.betterChat = v; saveGame(); setBetterChat(v); },
+  }));
+
+  chatGroup.appendChild(createToggleRow({
+    label: 'Auto-Hide Chat Input',
+    desc: 'Fade the chat input box out in-game until you open chat',
+    checked: game.autoHideChat, instant: true,
+    onChange: (v) => { game.autoHideChat = v; saveGame(); setAutoHideChat(v); },
   }));
 
   chatGroup.appendChild(createNumberRow({

@@ -55,6 +55,7 @@ export interface AppConfig {
     joinAsSpectator: boolean;
     rawInput: boolean;
     betterChat: boolean;
+    autoHideChat: boolean;
     chatHistorySize: number;
     showPing: boolean;
     suspectPing: boolean;
@@ -206,6 +207,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     joinAsSpectator: false,
     rawInput: true,
     betterChat: true,
+    autoHideChat: false,
     chatHistorySize: 200,
     showPing: true,
     suspectPing: true,
