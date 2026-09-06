@@ -178,13 +178,8 @@ if (launchFrameCap > 0) {
   electronLog.log(`[KCC] FPS cap ${launchFrameCap}, live changes ${capLiveAvailable ? 'enabled' : 'need a restart'}`);
 }
 
-// ── User agent ──
-// Deliberately not a browser UA. Electron's default reports the true Chromium build, a
-// version real Chrome can't emit, and the captcha rejects it. Claiming to be Chrome instead
-// invites a consistency check our Sec-CH-UA fails, which only survives on well-reputed IPs.
-// Claiming nothing has nothing to contradict. Krunker reads 'Electron' to keep the captcha
-// clearance across refreshes.
-app.userAgentFallback = 'Electron';
+// Never override the UA: Krunker falls back to a ~4x slower item-resolution path for any
+// UA it can't identify as a browser, costing seconds per spawn with randomised cosmetics.
 
 // ── App identity (must match electron-builder appId for taskbar pin persistence) ──
 app.setAppUserModelId('com.krunkercivilian.client');
