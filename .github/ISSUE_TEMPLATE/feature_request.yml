@@ -1,0 +1,29 @@
+name: Feature request
+description: Suggest a new feature or an improvement to an existing one
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like the client to do?
+      description: Describe the feature, and what you are currently doing instead.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: native
+    attributes:
+      label: Does Krunker already do this on its own?
+      description: Krunker has grown a lot of built-in settings and editors. Features that duplicate one are usually declined.
+      options:
+        - No — Krunker has nothing like it
+        - Krunker has something similar but it is not enough
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Screenshots, links to how another client does it, or edge cases worth knowing.
