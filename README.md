@@ -22,7 +22,7 @@ Was AI used in the creation of this client? Yes, if you came across this client 
 - unobtrusive — nearly all features can be disabled
 - hides ads by default
 - resource swapper (textures, sounds, models)
-- CSS theme system with `@import` support (drop `.css` files in `swap/themes/`)
+- CSS swapper (drop `.css` files in `swap/themes/`)
 - separate CSS themes for social/hub tabs (`swap/socialthemes/`)
 - custom loading screen backgrounds (`swap/backgrounds/`)
 - sky swapper — recolour the in-game sky, or replace it with an image (`swap/skies/`)
