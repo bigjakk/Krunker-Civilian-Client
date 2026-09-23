@@ -1080,8 +1080,15 @@ export const BANLOG_SEARCH_CSS = `
 #kpdCalls tr.kcc-banlog-hide { display: none !important; }
 `;
 
+// ── More Krunker popup CSS ──
+// Hides the official-client download promo and shrinks the fixed-width popup to the remaining options grid.
+export const MORE_KRUNKER_POPUP_CSS = `
+.moreKrunkerClient { display: none !important; }
+.moreKrunkerPopup { width: auto !important; }
+`;
+
 /** Pre-concatenated CSS for single-call injection */
-export const ALL_CLIENT_CSS = `${CLIENT_SETTINGS_CSS}\n${MATCHMAKER_SETTINGS_CSS}\n${TRANSLATOR_CSS}\n${ALT_MANAGER_CSS}\n${HP_COUNTER_CSS}\n${BP_CLAIM_ALL_CSS}\n${RANK_TRACKER_CSS}\n${WATERMARK_CSS}\n${BANLOG_SEARCH_CSS}`;
+export const ALL_CLIENT_CSS = `${CLIENT_SETTINGS_CSS}\n${MATCHMAKER_SETTINGS_CSS}\n${TRANSLATOR_CSS}\n${ALT_MANAGER_CSS}\n${HP_COUNTER_CSS}\n${BP_CLAIM_ALL_CSS}\n${RANK_TRACKER_CSS}\n${WATERMARK_CSS}\n${BANLOG_SEARCH_CSS}\n${MORE_KRUNKER_POPUP_CSS}`;
 
 /** Hides leftover ad container divs after the network-level URL block cancels their payloads. */
 export const HIDE_ADS_CSS = `
