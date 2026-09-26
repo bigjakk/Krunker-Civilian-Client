@@ -19,6 +19,7 @@ import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS, GAME_T
 import { TabManager } from './tab-manager';
 import { openRankedQueue, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
 import { takeScreenshot, openScreenshotsFolder } from './screenshot';
+import { blockOffsiteRedirects, isGameURL, isKrunkerHost, isKrunkerPage, safeOpenExternal } from './links';
 
 const AUDIO_MIME: Record<string, string> = {
   '.mp3': 'audio/mpeg',
@@ -281,16 +282,6 @@ document.addEventListener('keydown', function(e) {
     document.exitPointerLock();
   }
 }, true);`;
-
-// ── Safe external URL opener (only http/https) ──
-function safeOpenExternal(url: string): void {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
-      shell.openExternal(url);
-    }
-  } catch { /* malformed URL — ignore */ }
-}
 
 // ── Open issue count ──
 const ISSUE_COUNT_URL = 'https://api.github.com/search/issues?q=repo:bigjakk/Krunker-Civilian-Client+is:issue+is:open&per_page=1';
@@ -593,7 +584,7 @@ async function launchApp(): Promise<void> {
     // Determine if this URL is a krunker.io request (matched by the broad swapper pattern)
     // vs an ad-block pattern. krunker.io requests that weren't swapped pass through normally.
     try {
-      if (new URL(details.url).hostname.endsWith('krunker.io')) return callback({});
+      if (isKrunkerHost(new URL(details.url).hostname)) return callback({});
     } catch { /* invalid URL — fall through to cancel */ }
     // Matched an ad-block pattern — cancel it
     callback({ cancel: true });
@@ -763,11 +754,8 @@ async function launchApp(): Promise<void> {
       event.preventDefault();
     } else if (matchesKeybind(input, binds.joinFromClipboard)) {
       const text = clipboard.readText();
-      try {
-        const u = new URL(text);
-        if (u.protocol === 'https:' && u.hostname.endsWith('krunker.io')) win.loadURL(text);
-        else electronLog.warn('[KCC] Join-from-clipboard: clipboard is not a krunker.io https URL');
-      } catch { electronLog.warn('[KCC] Join-from-clipboard: clipboard is not a valid URL'); }
+      if (isKrunkerPage(text)) win.loadURL(text);
+      else electronLog.warn('[KCC] Join-from-clipboard: clipboard is not a krunker.io https URL');
       event.preventDefault();
     } else if (matchesKeybind(input, binds.copyGameLink)) {
       clipboard.writeText(win.webContents.getURL());
@@ -809,16 +797,6 @@ async function launchApp(): Promise<void> {
   win.on('enter-full-screen', () => saveWindowState(win));
   win.on('leave-full-screen', () => saveWindowState(win));
 
-  // ── URL classification ──
-  const GAME_PAGE_PATHS = ['/', ''];
-  function isGameURL(url: string): boolean {
-    try {
-      const parsed = new URL(url);
-      if (!parsed.hostname.includes('krunker.io')) return false;
-      return GAME_PAGE_PATHS.includes(parsed.pathname);
-    } catch { return false; }
-  }
-
   // ── Cached game config (invalidated on set-config writes to 'game') ──
   let cachedGameConf: typeof DEFAULT_CONFIG.game | null = null;
   function getGameConf(): typeof DEFAULT_CONFIG.game {
@@ -834,7 +812,7 @@ async function launchApp(): Promise<void> {
   let socialTheme = config.get('ui')?.socialCssTheme || 'disabled';
   const socialThemeCSS = () => getThemeCSS(socialTheme, swapDir, SOCIAL_THEMES_DIR);
   let tabManager = new TabManager(
-    win, ses, preloadPath, tabMode, isGameURL,
+    win, ses, preloadPath, tabMode,
     () => config.get('tabWindow'),
     (state) => config.set('tabWindow', state),
     () => sessionTabs,
@@ -845,30 +823,18 @@ async function launchApp(): Promise<void> {
 
   // Intercept in-page navigation (e.g. window.location = '/social.html')
   win.webContents.on('will-navigate', (event, url) => {
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-        event.preventDefault();
-        return;
-      }
-    } catch { event.preventDefault(); return; }
-    if (url.includes('krunker.io') && !isGameURL(url)) {
-      event.preventDefault();
-      tabManager.openTab(url);
-    }
+    if (isGameURL(url)) return;
+    event.preventDefault();
+    if (isKrunkerPage(url)) tabManager.openTab(url);
+    else safeOpenExternal(url);
   });
+  blockOffsiteRedirects(win.webContents);
 
   // Intercept target="_blank" / window.open links
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.includes('krunker.io')) {
-      if (isGameURL(url)) {
-        win.loadURL(url);
-      } else {
-        setImmediate(() => tabManager.openTab(url));
-      }
-    } else {
-      setImmediate(() => safeOpenExternal(url));
-    }
+    if (isGameURL(url)) win.loadURL(url);
+    else if (isKrunkerPage(url)) setImmediate(() => tabManager.openTab(url));
+    else setImmediate(() => safeOpenExternal(url));
     return { action: 'deny' };
   });
 
@@ -876,11 +842,11 @@ async function launchApp(): Promise<void> {
   win.webContents.on('context-menu', (_e, params) => {
     if (!params.linkURL) return;
     const items: Electron.MenuItemConstructorOptions[] = [];
-    if (params.linkURL.includes('krunker.io') && !isGameURL(params.linkURL)) {
+    if (isKrunkerPage(params.linkURL) && !isGameURL(params.linkURL)) {
       items.push({ label: 'Open in New Tab', click: () => tabManager.openTab(params.linkURL) });
     }
     items.push({ label: 'Copy Link', click: () => clipboard.writeText(params.linkURL) });
-    if (!params.linkURL.includes('krunker.io')) {
+    if (!isKrunkerPage(params.linkURL)) {
       items.push({ label: 'Open in Browser', click: () => safeOpenExternal(params.linkURL) });
     }
     if (items.length) Menu.buildFromTemplate(items).popup();
@@ -1021,7 +987,7 @@ async function launchApp(): Promise<void> {
           tabManager.destroyAll();
           tabMode = newMode;
           tabManager = new TabManager(
-            win, ses, preloadPath, tabMode, isGameURL,
+            win, ses, preloadPath, tabMode,
             () => config.get('tabWindow'),
             (state) => config.set('tabWindow', state),
             () => sessionTabs,
@@ -1427,7 +1393,7 @@ async function launchApp(): Promise<void> {
     // Only accept https Krunker asset URLs — never arbitrary or data: URLs.
     try {
       const u = new URL(avatarUrl);
-      if (u.protocol !== 'https:' || !u.hostname.endsWith('krunker.io')) return false;
+      if (u.protocol !== 'https:' || !isKrunkerHost(u.hostname)) return false;
     } catch { return false; }
     const accounts = config.get('accounts') || [];
     const target = username.toLowerCase();

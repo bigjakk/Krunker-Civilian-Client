@@ -1,5 +1,6 @@
-import { BrowserWindow, WebContentsView, View, Menu, clipboard, ipcMain, shell } from 'electron';
+import { BrowserWindow, WebContentsView, View, Menu, clipboard, ipcMain } from 'electron';
 import { TAB_BAR_DATA_URL } from './tab-bar-html';
+import { blockOffsiteRedirects, isGameURL, isKrunkerPage, safeOpenExternal } from './links';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog } from './logger';
 import { devWindowIcon } from './platform';
@@ -38,7 +39,6 @@ export class TabManager {
     private mainWin: BrowserWindow;
     private ses: Electron.Session;
     private preloadPath: string;
-    private isGameURL: (url: string) => boolean;
     private titlePolls = new Map<number, ReturnType<typeof setInterval>>();
     private recentlyClosed: { url: string; title: string }[] = [];
     private getTabWindowState: () => TabWindowState;
@@ -55,7 +55,6 @@ export class TabManager {
         ses: Electron.Session,
         preloadPath: string,
         mode: TabMode,
-        isGameURL: (url: string) => boolean,
         getTabWindowState: () => TabWindowState,
         saveTabWindowState: (state: TabWindowState) => void,
         getSavedTabs: () => string[],
@@ -67,7 +66,6 @@ export class TabManager {
         this.ses = ses;
         this.preloadPath = preloadPath;
         this.mode = mode;
-        this.isGameURL = isGameURL;
         this.getTabWindowState = getTabWindowState;
         this.saveTabWindowState = saveTabWindowState;
         this.getSavedTabs = getSavedTabs;
@@ -84,6 +82,9 @@ export class TabManager {
             },
         });
         this.tabBarView.webContents.loadURL(TAB_BAR_DATA_URL);
+        // Has node integration, so it must never navigate (a link dropped onto the bar would)
+        this.tabBarView.webContents.on('will-navigate', (e) => e.preventDefault());
+        this.tabBarView.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
         // ── Container view (holds tab bar + active tab content) ──
         this.containerView = new View();
@@ -224,6 +225,10 @@ export class TabManager {
 
     // ── Open a single new tab ──
     private openSingleTab(url: string): number {
+        if (!isKrunkerPage(url)) {
+            electronLog.warn(`[KCC-Tabs] Not opening non-Krunker URL in a tab: ${url}`);
+            return -1;
+        }
         if (this.tabs.length >= MAX_TABS) {
             const existing = this.tabs.find(t => t.url === url);
             if (existing) {
@@ -293,38 +298,40 @@ export class TabManager {
         });
 
         wc.setWindowOpenHandler(({ url: linkUrl }) => {
-            if (linkUrl.includes('krunker.io')) {
-                if (this.isGameURL(linkUrl)) {
-                    this.mainWin.loadURL(linkUrl);
-                    if (this.mode === 'same') this.hideTabs();
-                    else this.mainWin.focus();
-                } else {
-                    setImmediate(() => this.openTab(linkUrl));
-                }
+            if (isGameURL(linkUrl)) {
+                this.mainWin.loadURL(linkUrl);
+                if (this.mode === 'same') this.hideTabs();
+                else this.mainWin.focus();
+            } else if (isKrunkerPage(linkUrl)) {
+                setImmediate(() => this.openTab(linkUrl));
             } else {
-                setImmediate(() => shell.openExternal(linkUrl));
+                setImmediate(() => safeOpenExternal(linkUrl));
             }
             return { action: 'deny' as const };
         });
 
         wc.on('will-navigate', (event, navUrl) => {
-            if (navUrl.includes('krunker.io') && this.isGameURL(navUrl)) {
+            if (isGameURL(navUrl)) {
                 event.preventDefault();
                 this.mainWin.loadURL(navUrl);
                 if (this.mode === 'same') this.hideTabs();
                 else this.mainWin.focus();
+            } else if (!isKrunkerPage(navUrl)) {
+                event.preventDefault();
+                safeOpenExternal(navUrl);
             }
         });
+        blockOffsiteRedirects(wc);
 
         wc.on('context-menu', (_e, params) => {
             if (!params.linkURL) return;
             const items: Electron.MenuItemConstructorOptions[] = [];
-            if (params.linkURL.includes('krunker.io') && !this.isGameURL(params.linkURL)) {
+            if (isKrunkerPage(params.linkURL) && !isGameURL(params.linkURL)) {
                 items.push({ label: 'Open in New Tab', click: () => this.openTab(params.linkURL) });
             }
             items.push({ label: 'Copy Link', click: () => clipboard.writeText(params.linkURL) });
-            if (!params.linkURL.includes('krunker.io')) {
-                items.push({ label: 'Open in Browser', click: () => shell.openExternal(params.linkURL) });
+            if (!isKrunkerPage(params.linkURL)) {
+                items.push({ label: 'Open in Browser', click: () => safeOpenExternal(params.linkURL) });
             }
             if (items.length) Menu.buildFromTemplate(items).popup();
         });
