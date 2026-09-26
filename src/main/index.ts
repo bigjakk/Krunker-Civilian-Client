@@ -917,6 +917,12 @@ async function launchApp(): Promise<void> {
     'keybinds', 'userscripts', 'ui', 'discord', 'translator', 'advanced',
   ] as const;
 
+  // Folder paths are hand-edited only: page scripts and imported files must not repoint where code loads from
+  function keepFolderPath(key: string, value: unknown): unknown {
+    if (key !== 'userscripts' && key !== 'swapper') return value;
+    return { ...(value as object), path: config.get(key).path };
+  }
+
   ipcMain.handle('get-version', () => appVersion);
   ipcMain.handle('get-platform', () => platformInfo);
   ipcMain.handle('get-config', (_e, key: string) => {
@@ -957,6 +963,7 @@ async function launchApp(): Promise<void> {
 
   ipcMain.handle('set-config', (_e, key: string, value: unknown) => {
     if (!ALLOWED_CONFIG_KEYS.has(key)) return;
+    value = keepFolderPath(key, value);
     // Flush immediately for keys that have side effects
     if (key === 'keybinds') {
       config.set(key as any, value);
@@ -1350,7 +1357,7 @@ async function launchApp(): Promise<void> {
       if (skipKeybinds && key === 'keybinds') continue;
       const incoming = parsed.client[key];
       if (incoming && typeof incoming === 'object' && !Array.isArray(incoming)) {
-        config.set(key as any, { ...(DEFAULT_CONFIG as Record<string, any>)[key], ...incoming });
+        config.set(key as any, keepFolderPath(key, { ...(DEFAULT_CONFIG as Record<string, any>)[key], ...incoming }));
         applied++;
       }
     }
