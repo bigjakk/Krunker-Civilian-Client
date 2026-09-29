@@ -698,11 +698,12 @@ async function launchApp(): Promise<void> {
 
   // ── Process Priority (Windows only) ──
   if (process.platform === 'win32') {
+    const { PRIORITY_HIGH, PRIORITY_ABOVE_NORMAL, PRIORITY_BELOW_NORMAL, PRIORITY_LOW } = os.constants.priority;
     const PRIORITY_MAP: Record<string, number> = {
-      'High': -14,
-      'Above Normal': -7,
-      'Below Normal': 7,
-      'Low': 19,
+      'High': PRIORITY_HIGH,
+      'Above Normal': PRIORITY_ABOVE_NORMAL,
+      'Below Normal': PRIORITY_BELOW_NORMAL,
+      'Low': PRIORITY_LOW,
     };
     const prioritySetting = config.get('performance')?.processPriority || 'Normal';
     const priorityVal = PRIORITY_MAP[prioritySetting];
