@@ -162,6 +162,10 @@ interface OpenTrade { trid: number; player?: string; buyer?: string; }
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let knownTrids: Record<string, 1> | null = null;
 let seenKey: string | null = null;
+// Leaving the page (e.g. the matchmaker joining a lobby) cancels an in-flight poll with "Failed to fetch"
+let unloading = false;
+
+function onPageHide(): void { unloading = true; }
 
 function checkOpen(open: OpenTrade[]): void {
   const me = myName();
@@ -203,7 +207,9 @@ function doPoll(): void {
       const open = d.data && d.data.open;
       checkOpen(Array.isArray(open) ? open : []);
     })
-    .catch((err) => _console.log('[KCC-Trade] poll failed:', err));   // transient (offline/closing); self-heals next tick
+    .catch((err) => {
+      if (!unloading) _console.log('[KCC-Trade] poll failed:', err);   // transient (offline); self-heals next tick
+    });
 }
 
 function startPolling(): void {
@@ -229,6 +235,7 @@ export function initTradeDing(settings: TradeDingSettings): void {
   void resolveCustom();
   window.addEventListener('pointerdown', unlock, { passive: true });
   window.addEventListener('keydown', unlock, { passive: true });
+  window.addEventListener('pagehide', onPageHide);
   startPolling();
   _console.log('[KCC-Trade] trade ding active');
 }
@@ -254,6 +261,7 @@ export function destroyTradeDing(): void {
   stopPolling();
   window.removeEventListener('pointerdown', unlock);
   window.removeEventListener('keydown', unlock);
+  window.removeEventListener('pagehide', onPageHide);
   if (customAudio) { try { customAudio.pause(); } catch { /* ignore */ } }
   knownTrids = null;
   seenKey = null;
