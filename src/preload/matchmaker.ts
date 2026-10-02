@@ -51,8 +51,10 @@ const MAP_ICON_INDEX_BY_NORM = new Map<string, number>(
 // Official maps Krunker added after MAP_ICON_INDICES was last synced: their preview
 // images (map_<idx>.png) exist beyond index 39. Registered explicitly with the icon
 // index verified by inspecting the live image.
+MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Stalk Factory'), 40);
 MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Eterno Jump'), 41);
 MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Frontier'), 42);
+MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Bastion'), 43);
 MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Piazza'), 44);
 MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Barnyard'), 45);
 // Normalized IDs of the maps offered in the picker. Used as the default map
