@@ -31,6 +31,7 @@ export const MATCHMAKER_MAP_FILTER = [
     'Site', 'SkyTemple', 'Lagoon', 'Tropicano', 'Habitat', 'Atomic', 'Old_Burg',
     'Throwback', 'Clockwork', 'Bazaar', 'Erupt', 'HQ', 'Lush', 'Vivo',
     'Slide Moonlight', 'Eterno Simulator', 'Eterno Jump', 'Frontier',
+    'Piazza', 'Barnyard',
 ];
 
 // Normalize a map identifier for comparison: lowercase, strip non-alphanumerics.
@@ -52,6 +53,8 @@ const MAP_ICON_INDEX_BY_NORM = new Map<string, number>(
 // index verified by inspecting the live image.
 MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Eterno Jump'), 41);
 MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Frontier'), 42);
+MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Piazza'), 44);
+MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Barnyard'), 45);
 // Normalized IDs of the maps offered in the picker. Used as the default map
 // filter when the user selects no maps, so anything outside the curated list —
 // community maps (e.g. "AIM_Room") and unlisted official maps (e.g. "Shipyard")
