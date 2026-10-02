@@ -5,6 +5,7 @@
 
 import { ipcRenderer } from 'electron';
 import type { Keybind } from '../main/config';
+import { OFFICIAL_MAPS, mapImageUrl } from '../main/maps';
 import { escapeHtml, type SavedConsole } from './utils';
 
 // Full array — indices must match the server's gamemode IDs (game[4].g)
@@ -19,7 +20,6 @@ export const MATCHMAKER_GAMEMODE_FILTER = [
 ];
 export const MATCHMAKER_REGIONS = ['SV', 'TOK', 'FRA', 'MBI', 'SYD', 'SIN', 'DAL', 'BHN', 'BRZ', 'NY'];
 export const MATCHMAKER_REGION_NAMES: Record<string, string> = { SV: 'Silicon Valley', TOK: 'Tokyo', FRA: 'Frankfurt', MBI: 'Mumbai', SYD: 'Sydney', SIN: 'Singapore', DAL: 'Dallas', BHN: 'Bahrain', BRZ: 'Brazil', NY: 'New York' };
-export const MAP_ICON_INDICES = ['Burg', 'Littletown', 'Sandstorm', 'Subzero', 'Undergrowth', 'Shipment', 'Freight', 'Lostworld', 'Citadel', 'Oasis', 'Kanji', 'Industry', 'Lumber', 'Evacuation', 'Site', 'SkyTemple', 'Lagoon', 'Bureau', 'Tortuga', 'Tropicano', 'Krunk_Plaza', 'Arena', 'Habitat', 'Atomic', 'Old_Burg', 'Throwback', 'Stockade', 'Facility', 'Clockwork', 'Laboratory', 'Shipyard', 'Soul Sanctum', 'Bazaar', 'Erupt', 'HQ', 'Khepri', 'Lush', 'Vivo', 'Slide Moonlight', 'Eterno Simulator'];
 export const MATCHMAKER_MAP_NAMES: Record<string, string> = {
     SkyTemple: 'Sky Temple', Krunk_Plaza: 'Krunk Plaza', Old_Burg: 'Old Burg',
 };
@@ -42,21 +42,12 @@ function normalizeMapId(name: string): string {
     return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-// Krunker hosts a top-down preview image per official map at a fixed index — the
-// map's position in MAP_ICON_INDICES. Community maps aren't indexed (no icon).
-// Lookup is normalized so live IDs like "slide_moonlight" still resolve.
+// Krunker hosts a top-down preview image per official map at the map's id.
+// Community maps aren't indexed (no icon). Lookup is normalized so live IDs like
+// "slide_moonlight" still resolve.
 const MAP_ICON_INDEX_BY_NORM = new Map<string, number>(
-    MAP_ICON_INDICES.map((name, i) => [normalizeMapId(name), i]),
+    OFFICIAL_MAPS.map((name, i) => [normalizeMapId(name), i]),
 );
-// Official maps Krunker added after MAP_ICON_INDICES was last synced: their preview
-// images (map_<idx>.png) exist beyond index 39. Registered explicitly with the icon
-// index verified by inspecting the live image.
-MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Stalk Factory'), 40);
-MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Eterno Jump'), 41);
-MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Frontier'), 42);
-MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Bastion'), 43);
-MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Piazza'), 44);
-MAP_ICON_INDEX_BY_NORM.set(normalizeMapId('Barnyard'), 45);
 // Normalized IDs of the maps offered in the picker. Used as the default map
 // filter when the user selects no maps, so anything outside the curated list —
 // community maps (e.g. "AIM_Room") and unlisted official maps (e.g. "Shipyard")
@@ -67,7 +58,7 @@ const DEFAULT_MAP_NORMS = new Set(MATCHMAKER_MAP_FILTER.map(normalizeMapId));
 const PARKOUR_MAP_NORMS = new Set(['Eterno Jump', 'Slide Moonlight'].map(normalizeMapId));
 export function mapIconUrl(mapName: string): string | null {
     const idx = MAP_ICON_INDEX_BY_NORM.get(normalizeMapId(mapName));
-    return idx === undefined ? null : `https://assets.krunker.io/img/maps/map_${idx}.png`;
+    return idx === undefined ? null : mapImageUrl(idx);
 }
 
 function createMapIcon(mapName: string, className: string): HTMLImageElement | null {
