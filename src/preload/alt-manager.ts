@@ -11,38 +11,29 @@ import { createRowShell } from './settings-controls';
 // Tracks the open in-game Alt Manager modal so the header button can toggle it.
 let altModalClose: (() => void) | null = null;
 
-function switchToAccount(account: { username: string; password: string }): void {
-  const w = window as any;
-  if (typeof w.loginOrRegister !== 'function') {
-    _console.warn('[KCC-Alt] loginOrRegister unavailable; cannot switch account');
-    return;
-  }
-
-  function doLogin(): void {
-    w.loginOrRegister();
+function submitLogin(account: { username: string; password: string }): void {
+  (window as any).loginOrRegister();
+  queueMicrotask(() => {
+    const toggleBtn = document.querySelector('.auth-toggle-btn') as HTMLElement;
+    if (toggleBtn && toggleBtn.textContent?.includes('username')) toggleBtn.click();
     queueMicrotask(() => {
-      const toggleBtn = document.querySelector('.auth-toggle-btn') as HTMLElement;
-      if (toggleBtn && toggleBtn.textContent?.includes('username')) toggleBtn.click();
-      queueMicrotask(() => {
-        const nameInput = document.querySelector('#accName') as HTMLInputElement;
-        const passInput = document.querySelector('#accPass') as HTMLInputElement;
-        if (!nameInput || !passInput) return;
-        nameInput.value = account.username;
-        passInput.value = account.password;
-        nameInput.dispatchEvent(new Event('input', { bubbles: true }));
-        passInput.dispatchEvent(new Event('input', { bubbles: true }));
-        const submitBtn = document.querySelector('.io-button') as HTMLElement;
-        if (submitBtn) submitBtn.click();
-      });
+      const nameInput = document.querySelector('#accName') as HTMLInputElement;
+      const passInput = document.querySelector('#accPass') as HTMLInputElement;
+      if (!nameInput || !passInput) return;
+      nameInput.value = account.username;
+      passInput.value = account.password;
+      nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+      passInput.dispatchEvent(new Event('input', { bubbles: true }));
+      const submitBtn = document.querySelector('.io-button') as HTMLElement;
+      if (submitBtn) submitBtn.click();
     });
-  }
+  });
+}
 
-  if (typeof w.logoutAcc === 'function') {
-    w.logoutAcc();
-    setTimeout(doLogin, 500);
-  } else {
-    doLogin();
-  }
+// Krunker's API calls wait on an FRVR token; logoutAcc() deletes it and nothing on the page makes a new one.
+async function ensureFrvrSession(): Promise<void> {
+  const auth = (window as any).FRVR?.auth;
+  if (typeof auth?.isLoggedIn === 'function' && !auth.isLoggedIn()) await auth.loginAsAnonymous();
 }
 
 // ── Shared alt-manager data operations ──
@@ -100,11 +91,24 @@ function altRemove(index: number): Promise<unknown> {
   return ipcRenderer.invoke('alt-remove', index);
 }
 
-function altSwitch(index: number): Promise<void> {
-  return ipcRenderer.invoke('alt-get-credentials', index).then((creds: { username: string; password: string } | null) => {
-    if (creds) switchToAccount(creds);
-    else _console.warn('[KCC-Alt] No stored credentials for account index ' + index);
-  });
+async function altSwitch(index: number): Promise<void> {
+  try {
+    const creds: { username: string; password: string } | null = await ipcRenderer.invoke('alt-get-credentials', index);
+    if (!creds) {
+      _console.warn('[KCC-Alt] No stored credentials for account index ' + index);
+      return;
+    }
+    const w = window as any;
+    if (typeof w.loginOrRegister !== 'function') {
+      _console.warn('[KCC-Alt] loginOrRegister unavailable; cannot switch account');
+      return;
+    }
+    if (document.querySelector('#signedInHeaderBar') && typeof w.logoutAcc === 'function') w.logoutAcc();
+    await ensureFrvrSession();
+    submitLogin(creds);
+  } catch (err) {
+    _console.error('[KCC-Alt] Account switch failed:', err);
+  }
 }
 
 // ── Settings-panel section ──
