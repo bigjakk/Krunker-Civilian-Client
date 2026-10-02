@@ -17,7 +17,7 @@ import { createSplash, splashStatus, splashPrompt, splashAlive, splashElapsed, g
 import { DiscordRPC } from './discord-rpc';
 import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS, GAME_THEMES_DIR, SOCIAL_THEMES_DIR } from './css-themes';
 import { TabManager } from './tab-manager';
-import { openRankedQueue, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
+import { openRankedQueue, loadQueueMaps, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
 import { takeScreenshot, openScreenshotsFolder } from './screenshot';
 import { blockOffsiteRedirects, isGameURL, isKrunkerHost, isKrunkerPage, safeOpenExternal } from './links';
 
@@ -1099,9 +1099,9 @@ async function launchApp(): Promise<void> {
   // ── Ranked queue IPC handler ──
   ipcMain.on('open-ranked-queue', async (_e, token: string, region: string, allRegions: boolean) => {
     const mm = config.get('matchmaker');
-    const audioUrl = await resolveRankedAudioUrl(mm?.rankedMatchSound || '');
+    const [audioUrl, maps] = await Promise.all([resolveRankedAudioUrl(mm?.rankedMatchSound || ''), loadQueueMaps()]);
     const showHeader = config.get('ui')?.watermark ?? true;
-    openRankedQueue(token, region, allRegions, audioUrl, showHeader);
+    openRankedQueue(token, region, allRegions, audioUrl, showHeader, maps);
   });
 
   ipcMain.handle('pick-audio-file', async () => {

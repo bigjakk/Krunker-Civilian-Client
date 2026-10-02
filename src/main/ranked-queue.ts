@@ -1,6 +1,8 @@
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, net } from 'electron';
 import { QUEUE_NOTIFICATION_AUDIO } from './ranked-queue-audio';
 import { devWindowIcon } from './platform';
+import { electronLog } from './logger';
+import { OFFICIAL_MAPS, mapImageUrl } from './maps';
 
 export const DEFAULT_RANKED_AUDIO_URL = `data:audio/mpeg;base64,${QUEUE_NOTIFICATION_AUDIO}`;
 
@@ -8,16 +10,35 @@ let queueWindow: BrowserWindow | null = null;
 
 const RANKED_QUEUE_WS = 'wss://gamefrontend.svc.krunker.io/v1/matchmaking/queue';
 
-const RANKED_MAPS: Record<string, { number: number; image: string }> = {
-    sandstorm_v3: { number: 2,  image: 'https://assets.krunker.io/img/maps/map_2.png' },
-    undergrowth:  { number: 4,  image: 'https://assets.krunker.io/img/maps/map_4.png' },
-    industry:     { number: 11, image: 'https://assets.krunker.io/img/maps/map_11.png' },
-    site:         { number: 14, image: 'https://assets.krunker.io/img/maps/map_14.png' },
-    bureau:       { number: 17, image: 'https://assets.krunker.io/img/maps/map_17.png' },
-    burg_new:     { number: 0,  image: 'https://assets.krunker.io/img/maps/map_0.png' },
-    eterno_sim:   { number: 39, image: 'https://assets.krunker.io/img/maps/map_39.png' },
-    Frontier:     { number: 42, image: 'https://assets.krunker.io/img/maps/map_42.png' },
-};
+const MAPS_URL = 'https://gapi.svc.krunker.io/maps';
+
+type QueueMaps = Record<string, { number: number; image: string }>;
+
+function toQueueMaps(entries: [number, string][]): QueueMaps {
+    const maps: QueueMaps = {};
+    for (const [id, name] of entries) maps[name.replace(/_/g, ' ')] = { number: id, image: mapImageUrl(id) };
+    return maps;
+}
+
+let liveMaps: Promise<QueueMaps> | null = null;
+
+// The ranked pool changes every season, so queue for (and name) every official map, read live from Krunker
+export function loadQueueMaps(): Promise<QueueMaps> {
+    liveMaps ??= net.fetch(MAPS_URL, { signal: AbortSignal.timeout(4000) })
+        .then((res) => res.json())
+        .then((body: { data?: { id?: unknown; name?: unknown }[] }) => {
+            const entries = (body.data ?? []).filter((m): m is { id: number; name: string } =>
+                Number.isInteger(m.id) && (m.id as number) >= 0 && typeof m.name === 'string');
+            if (!entries.length) throw new Error('empty map table');
+            return toQueueMaps(entries.map((m) => [m.id, m.name]));
+        })
+        .catch((err) => {
+            electronLog.warn('[KCC-Ranked] Live map list unavailable, using the bundled one:', err);
+            liveMaps = null;
+            return toQueueMaps(OFFICIAL_MAPS.map((name, i) => [i, name]));
+        });
+    return liveMaps;
+}
 
 const RANKED_REGIONS: Record<string, string> = {
     na: 'North America',
@@ -246,14 +267,6 @@ body {
 #closeButton:hover { background: var(--hover); color: var(--t1); }
 `;
 
-function buildMapsJson(): string {
-    const entries: string[] = [];
-    for (const [name, data] of Object.entries(RANKED_MAPS)) {
-        entries.push(`${JSON.stringify(name)}: { number: ${data.number}, image: ${JSON.stringify(data.image)} }`);
-    }
-    return `{ ${entries.join(', ')} }`;
-}
-
 function buildRegionsJson(): string {
     return JSON.stringify(RANKED_REGIONS);
 }
@@ -275,7 +288,7 @@ function jsLiteral(value: unknown): string {
         .replace(/>/g, '\\u003e');
 }
 
-function buildQueueScript(token: string, region: string, allRegions: boolean, audioUrl: string): string {
+function buildQueueScript(token: string, region: string, allRegions: boolean, audioUrl: string, maps: QueueMaps): string {
     return `
 let isQueued = false;
 let queueStartTime = null;
@@ -293,7 +306,7 @@ const INIT_REGION = ${jsLiteral(region)};
 const INIT_ALL_REGIONS = ${jsLiteral(allRegions)};
 const AUDIO_URL = ${jsLiteral(audioUrl)};
 const FALLBACK_AUDIO_URL = ${JSON.stringify(DEFAULT_RANKED_AUDIO_URL)};
-const maps = ${buildMapsJson()};
+const maps = ${jsLiteral(maps)};
 const regions = ${buildRegionsJson()};
 
 const queueStatus = document.getElementById('queueStatus');
@@ -563,7 +576,7 @@ loadSettings();
 `;
 }
 
-function buildQueueHtml(token: string, region: string, allRegions: boolean, audioUrl: string, showHeader: boolean): string {
+function buildQueueHtml(token: string, region: string, allRegions: boolean, audioUrl: string, showHeader: boolean, maps: QueueMaps): string {
     const header = showHeader ? `  <div class="queue-header">
     <div class="queue-mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V5l-8-3z"/></svg></div>
     <div class="queue-head-text">
@@ -609,7 +622,7 @@ ${header}  <div class="queue-body">
     </div>
   </div>
 </div>
-<script>${buildQueueScript(token, region, allRegions, audioUrl)}</script>
+<script>${buildQueueScript(token, region, allRegions, audioUrl, maps)}</script>
 </body>
 </html>`;
 }
@@ -620,6 +633,7 @@ export function openRankedQueue(
     allRegions: boolean,
     audioUrl: string,
     showHeader: boolean,
+    maps: QueueMaps,
 ): void {
     if (queueWindow && !queueWindow.isDestroyed()) {
         queueWindow.focus();
@@ -645,6 +659,6 @@ export function openRankedQueue(
     queueWindow = win;
     win.on('closed', () => { queueWindow = null; });
 
-    const html = buildQueueHtml(token, region, allRegions, audioUrl, showHeader);
+    const html = buildQueueHtml(token, region, allRegions, audioUrl, showHeader, maps);
     win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 }
