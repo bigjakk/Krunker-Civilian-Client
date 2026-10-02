@@ -332,7 +332,7 @@ export function buildGameSection(
 
   menuGroup.appendChild(createToggleRow({
     label: 'Menu Timer',
-    desc: 'Show the game/spectate timer on the menu screen',
+    desc: 'Show the game/spectate timer on the menu screen. Drag it to move it; double-click to reset',
     checked: ui.menuTimer ?? true, instant: true,
     onChange: (v) => { ui.menuTimer = v; saveUI(); setMenuTimer(v); },
   }));

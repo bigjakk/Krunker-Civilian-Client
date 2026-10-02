@@ -74,8 +74,10 @@ export function installCompositorAnimFix(): void {
 // Krunker hides every #spectateUI child on the menu via
 // `.onMenu #spectateUI > div:not(#replayControls) { display: none !important }`,
 // so the rule that reveals #spectateHUD (the timer) must out-specify it.
+// z-index 11 clears #menuHolder (10), whose character preview covers the screen centre, but stays under windows.
 
 const MENU_TIMER_ID = 'kcc-menuTimer';
+const MENU_TIMER_POS_KEY = 'kcc_menu_timer_pos';
 const MENU_TIMER_CSS = `
 #uiBase.onMenu #spectateUI { display: block !important; }
 #uiBase.onCompMenu.onMenu #specTimer,
@@ -92,15 +94,77 @@ const MENU_TIMER_CSS = `
   position: fixed; top: calc(50% + 140px);
 }
 #uiBase.onMenu #spectateHUD #specGMessage { top: 0; }
-#uiBase.onMenu #spectateUI > #spectateHUD { z-index: 1; transform: unset; }
+#uiBase.onMenu #spectateUI > #spectateHUD { z-index: 11; transform: unset; }
 #uiBase.onMenu .spectateInfo {
-  position: fixed; top: calc(50% + 80px); left: 50%; transform: translate(-50%, -50%);
+  position: fixed; left: var(--kcc-menu-timer-x, 50%); top: var(--kcc-menu-timer-y, 25%);
+  transform: translate(-50%, -50%); pointer-events: auto; cursor: move;
 }
 #uiBase.onMenu #spectateUI div .spectateInfo #specTimer {
   background-color: transparent; padding: 25px; font-size: 42px; border-radius: 0.5em;
 }
 #uiBase.onMenu #specKPDContr { display: none; }
 `;
+
+type MenuTimerPos = { x: number; y: number };
+
+function applyMenuTimerPos(pos: MenuTimerPos | null): void {
+    const root = document.documentElement.style;
+    if (pos) {
+        root.setProperty('--kcc-menu-timer-x', pos.x + '%');
+        root.setProperty('--kcc-menu-timer-y', pos.y + '%');
+    } else {
+        root.removeProperty('--kcc-menu-timer-x');
+        root.removeProperty('--kcc-menu-timer-y');
+    }
+}
+
+function loadMenuTimerPos(): MenuTimerPos | null {
+    try {
+        const pos = JSON.parse(localStorage.getItem(MENU_TIMER_POS_KEY) || 'null');
+        return Number.isFinite(pos?.x) && Number.isFinite(pos?.y) ? pos : null;
+    } catch {
+        return null;
+    }
+}
+
+// Drag to move, double-click to reset. Swallows the press so it never reaches Krunker's click-to-play.
+function onMenuTimerPress(e: MouseEvent): void {
+    const info = (e.target as Element | null)?.closest?.('#uiBase.onMenu .spectateInfo');
+    if (!info) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dblclick') {
+        try { localStorage.removeItem(MENU_TIMER_POS_KEY); } catch { /* storage unavailable */ }
+        applyMenuTimerPos(null);
+        return;
+    }
+    if (e.type !== 'mousedown' || e.button !== 0) return;
+    const base = document.getElementById('uiBase')!.getBoundingClientRect();
+    const box = info.getBoundingClientRect();
+    const offX = e.clientX - (box.left + box.width / 2);
+    const offY = e.clientY - (box.top + box.height / 2);
+    const clamp = (v: number) => Math.min(100, Math.max(0, v));
+    let pos: MenuTimerPos | null = null;
+    const move = (ev: MouseEvent): void => {
+        // The mouseup is lost if focus leaves mid-drag (Alt-Tab with the button held)
+        if (!(ev.buttons & 1)) return up();
+        pos = {
+            x: clamp((ev.clientX - offX - base.left) / base.width * 100),
+            y: clamp((ev.clientY - offY - base.top) / base.height * 100),
+        };
+        applyMenuTimerPos(pos);
+    };
+    const up = (): void => {
+        document.removeEventListener('mousemove', move, true);
+        document.removeEventListener('mouseup', up, true);
+        if (!pos) return;
+        try { localStorage.setItem(MENU_TIMER_POS_KEY, JSON.stringify(pos)); } catch { /* storage unavailable */ }
+    };
+    document.addEventListener('mousemove', move, true);
+    document.addEventListener('mouseup', up, true);
+}
+
+const MENU_TIMER_EVENTS = ['mousedown', 'mouseup', 'click', 'dblclick'] as const;
 
 export function setMenuTimer(enabled: boolean): void {
     let el = document.getElementById(MENU_TIMER_ID);
@@ -110,9 +174,12 @@ export function setMenuTimer(enabled: boolean): void {
             el.id = MENU_TIMER_ID;
             el.textContent = MENU_TIMER_CSS;
             document.head.appendChild(el);
+            applyMenuTimerPos(loadMenuTimerPos());
+            for (const type of MENU_TIMER_EVENTS) document.addEventListener(type, onMenuTimerPress, true);
         }
     } else if (el) {
         el.remove();
+        for (const type of MENU_TIMER_EVENTS) document.removeEventListener(type, onMenuTimerPress, true);
     }
 }
 
