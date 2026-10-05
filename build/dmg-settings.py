@@ -4,7 +4,7 @@
 #
 # Pass the packaged app with:  -D app=/path/to/Krunker Civilian Client.app
 # Paths are repo-relative: dist-mac.sh runs dmgbuild from the repo root.
-# Icon slots must match the arrow drawn by build/generate-dmg-background.py.
+# Icon slots must line up with the cards and arrow in build/dmg-background.png.
 import os.path
 
 app = defines["app"]  # noqa: F821
