@@ -36,6 +36,10 @@ if [ -n "$KCC_REQUIRE_SIGNED" ]; then
     fi
 fi
 
+# A mounted volume with the same name would push dmgbuild's scratch mount to
+# "/Volumes/<name> 1", and the background alias records that mount point.
+[ ! -e "/Volumes/$APPNAME" ] || { echo "[dist-mac] ERROR: eject or remove /Volumes/$APPNAME before building"; exit 1; }
+
 echo "[dist-mac] building renderer/main bundles..."
 npm run build
 
@@ -53,49 +57,46 @@ fi
 echo "[dist-mac] building DMG via dmgbuild..."
 # dmgbuild lays out the window (background, icon positions, no toolbar) and sets
 # the volume icon by writing .DS_Store directly — no Finder/AppleScript, so it
-# works on headless CI runners. Layout lives in build/dmg-settings.py.
-# dmgbuild runs from a private venv under out/ (git-ignored); the bookmark fix
-# below needs that same Python for the ds_store module.
+# works on headless CI runners. Layout lives in build/dmg-settings.py; it runs
+# through build/dmgbuild-alias-only.py, which leaves out the background bookmark
+# macOS 26 Finder can't resolve. The venv under out/ (git-ignored) is rebuilt
+# whenever the pins change.
 VENV="out/.dmgbuild-venv"
-if [ ! -x "$VENV/bin/dmgbuild" ]; then
+DMGBUILD_PINS="dmgbuild==1.6.5 ds-store==1.3.1 mac-alias==2.2.2"
+if [ "$(cat "$VENV/.pins" 2>/dev/null)" != "$DMGBUILD_PINS" ] || ! "$VENV/bin/python" -c "import dmgbuild" 2>/dev/null; then
     echo "[dist-mac] installing dmgbuild into $VENV..."
     rm -rf "$VENV"
     python3 -m venv "$VENV"
-    "$VENV/bin/pip" install -q --disable-pip-version-check "dmgbuild==1.6.5" "ds-store==1.3.1" "mac-alias==2.2.2"
+    # shellcheck disable=SC2086 # word-split the pin list into pip arguments
+    "$VENV/bin/pip" install -q --disable-pip-version-check $DMGBUILD_PINS
+    echo "$DMGBUILD_PINS" > "$VENV/.pins"
 fi
-RWDIR="$(mktemp -d)"; RW="$RWDIR/rw.dmg"
 rm -f "$DMG"
 # hdiutil create intermittently fails with "Resource busy" on GitHub macOS
 # runners (why electron-builder's dmg-builder retries it) — retry up to 3x.
 ok=""
 for attempt in 1 2 3; do
-    if "$VENV/bin/dmgbuild" -s build/dmg-settings.py -D app="$OUTAPP" -D format=UDRW "$APPNAME" "$RW"; then
+    if "$VENV/bin/python" build/dmgbuild-alias-only.py -s build/dmg-settings.py -D app="$OUTAPP" "$APPNAME" "$DMG"; then
         ok=1
         break
     fi
     echo "[dist-mac] dmgbuild failed (attempt $attempt/3), retrying in 5s..."
-    rm -f "$RW"
+    rm -f "$DMG"
     sleep 5
 done
-[ -n "$ok" ] || { echo "[dist-mac] dmgbuild failed after 3 attempts"; rm -rf "$RWDIR"; exit 1; }
-# Tahoe's Finder can't resolve dmgbuild's background bookmark (window renders
-# white), so swap in a macOS-generated one on the read-write image, then
-# compress. See build/dmg-fix-bookmark.py.
-MP="$(hdiutil attach "$RW" -nobrowse -readwrite -noautoopen | grep -o '/Volumes/.*$' | head -1)"
-"$VENV/bin/python" build/dmg-fix-bookmark.py "$MP"
-hdiutil detach "$MP" >/dev/null 2>&1 || hdiutil detach "$MP" -force >/dev/null
-hdiutil convert "$RW" -format UDZO -imagekey zlib-level=9 -o "$DMG" >/dev/null
-rm -rf "$RWDIR"
-# The app inside the DMG is what users copy — make sure the layout steps left its
-# signature intact (e.g. a Finder-info xattr on the bundle breaks --strict).
+[ -n "$ok" ] || { echo "[dist-mac] dmgbuild failed after 3 attempts"; exit 1; }
+# Check the finished image: the Finder layout is complete (build/dmg-verify.py)
+# and the app users copy still has a valid signature (e.g. a Finder-info xattr
+# on the bundle breaks --strict).
 MP="$(hdiutil attach "$DMG" -nobrowse -readonly -noautoopen | grep -o '/Volumes/.*$' | head -1)"
-if ! codesign --verify --deep --strict "$MP/$APPNAME.app"; then
-    hdiutil detach "$MP" -force >/dev/null 2>&1
-    echo "[dist-mac] ERROR: app signature inside the DMG is invalid"
+[ -n "$MP" ] || { echo "[dist-mac] ERROR: could not mount $DMG to check it"; exit 1; }
+if ! "$VENV/bin/python" build/dmg-verify.py "$MP" "$APPNAME.app" || ! codesign --verify --deep --strict "$MP/$APPNAME.app"; then
+    hdiutil detach "$MP" -force >/dev/null 2>&1 || true
+    echo "[dist-mac] ERROR: DMG check failed"
     exit 1
 fi
 hdiutil detach "$MP" >/dev/null 2>&1 || hdiutil detach "$MP" -force >/dev/null
-echo "[dist-mac] app signature inside DMG valid"
+echo "[dist-mac] DMG layout and app signature valid"
 
 # notarytool with whichever creds are set (CI API key vs local keychain profile),
 # in one place so submit and the log fetch can't drift apart.
