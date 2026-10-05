@@ -10,7 +10,8 @@ import os.path
 app = defines["app"]  # noqa: F821
 appname = os.path.basename(app)
 
-format = defines.get("format", "UDZO")  # noqa: F821
+format = "UDZO"
+compression_level = 9
 filesystem = "HFS+"
 
 files = [app]
