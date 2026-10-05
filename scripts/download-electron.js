@@ -10,11 +10,10 @@
  * exact FPS cap. The macOS (arm64) build additionally carries a null-guard for the Chromium
  * mac present-path crash (external_begin_frame_source() null deref).
  *
- * Platform behavior:
- *   Windows:        patched Win   → dist/       (replaces stock)
- *   Linux (local):  patched Linux → dist/       (replaces stock), Win → dist-win/
- *   CI (Linux):     Win → dist-win/, Linux → dist-linux/  (stock stays in dist/)
- *   macOS:          patched Mac   → dist/       (replaces stock, arm64)
+ * Platform behavior (electron-builder.yml packages from dist/):
+ *   Windows:  patched Win   → dist/
+ *   Linux:    patched Linux → dist/, plus Win → dist-win/ for cross-compiling (skipped on CI)
+ *   macOS:    patched Mac   → dist/  (arm64)
  *
  * Usage:
  *   node scripts/download-electron.js            # download if needed
@@ -163,21 +162,13 @@ async function installTo(distDir, platform) {
 
 async function main() {
     if (IS_MAC) {
-        // macOS local dev: patched Mac → dist/ (replaces stock)
         await installTo(path.join(ELECTRON_BASE, 'dist'), PLATFORMS.darwin);
     } else if (IS_WIN) {
-        // Windows local dev: patched Win → dist/ (replaces stock)
         await installTo(path.join(ELECTRON_BASE, 'dist'), PLATFORMS.win32);
-    } else if (IS_CI) {
-        // CI (Linux): keep stock in dist/ untouched,
-        // patched Win → dist-win/, patched Linux → dist-linux/
-        await installTo(path.join(ELECTRON_BASE, 'dist-win'), PLATFORMS.win32);
-        await installTo(path.join(ELECTRON_BASE, 'dist-linux'), PLATFORMS.linux);
     } else {
-        // Linux local dev: patched Linux → dist/ (for npm run dev),
-        // patched Win → dist-win/ (for cross-compilation)
         await installTo(path.join(ELECTRON_BASE, 'dist'), PLATFORMS.linux);
-        await installTo(path.join(ELECTRON_BASE, 'dist-win'), PLATFORMS.win32);
+        // CI builds Windows on a Windows runner, so only local Linux needs this
+        if (!IS_CI) await installTo(path.join(ELECTRON_BASE, 'dist-win'), PLATFORMS.win32);
     }
 
     // Write path.txt so the electron package's lazy downloader (index.js)
