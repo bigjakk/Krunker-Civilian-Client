@@ -50,41 +50,52 @@ else
     codesign --verify --deep "$OUTAPP" && echo "[dist-mac] ad-hoc signature valid"
 fi
 
-echo "[dist-mac] building DMG via hdiutil..."
-STAGE="$(mktemp -d)"
-ditto "$OUTAPP" "$STAGE/$APPNAME.app"
-ln -s /Applications "$STAGE/Applications"
-# Give the mounted volume the app icon instead of the generic disk-image icon.
-# Finder uses a .VolumeIcon.icns at the volume root, but only when the root also
-# carries the "custom icon" attribute — and hdiutil create -srcfolder drops that
-# attribute. So build a read-write image, set the bit on the live volume, then
-# convert to a compressed read-only image (the conversion preserves the bit).
-cp build/icon.icns "$STAGE/.VolumeIcon.icns"
-SETFILE="$(xcrun -f SetFile 2>/dev/null || true)"
+echo "[dist-mac] building DMG via dmgbuild..."
+# dmgbuild lays out the window (background, icon positions, no toolbar) and sets
+# the volume icon by writing .DS_Store directly — no Finder/AppleScript, so it
+# works on headless CI runners. Layout lives in build/dmg-settings.py.
+# dmgbuild runs from a private venv under out/ (git-ignored); the bookmark fix
+# below needs that same Python for the ds_store module.
+VENV="out/.dmgbuild-venv"
+if [ ! -x "$VENV/bin/dmgbuild" ]; then
+    echo "[dist-mac] installing dmgbuild into $VENV..."
+    rm -rf "$VENV"
+    python3 -m venv "$VENV"
+    "$VENV/bin/pip" install -q --disable-pip-version-check "dmgbuild==1.6.5" "ds-store==1.3.1" "mac-alias==2.2.2"
+fi
 RWDIR="$(mktemp -d)"; RW="$RWDIR/rw.dmg"
 rm -f "$DMG"
 # hdiutil create intermittently fails with "Resource busy" on GitHub macOS
 # runners (why electron-builder's dmg-builder retries it) — retry up to 3x.
 ok=""
 for attempt in 1 2 3; do
-    if hdiutil create -volname "$APPNAME" -srcfolder "$STAGE" -ov -format UDRW -fs HFS+ "$RW" >/dev/null; then
+    if "$VENV/bin/dmgbuild" -s build/dmg-settings.py -D app="$OUTAPP" -D format=UDRW "$APPNAME" "$RW"; then
         ok=1
         break
     fi
-    echo "[dist-mac] hdiutil create failed (attempt $attempt/3), retrying in 5s..."
+    echo "[dist-mac] dmgbuild failed (attempt $attempt/3), retrying in 5s..."
+    rm -f "$RW"
     sleep 5
 done
-[ -n "$ok" ] || { echo "[dist-mac] hdiutil create failed after 3 attempts"; rm -rf "$STAGE" "$RWDIR"; exit 1; }
-rm -rf "$STAGE"
-if [ -n "$SETFILE" ]; then
-    MP="$(hdiutil attach "$RW" -nobrowse -readwrite | grep -o '/Volumes/.*$' | head -1)"
-    "$SETFILE" -a C "$MP"
-    hdiutil detach "$MP" >/dev/null 2>&1 || hdiutil detach "$MP" -force >/dev/null 2>&1
-else
-    echo "[dist-mac] WARNING: SetFile unavailable — mounted DMG keeps the generic volume icon"
-fi
-hdiutil convert "$RW" -format UDZO -o "$DMG" >/dev/null
+[ -n "$ok" ] || { echo "[dist-mac] dmgbuild failed after 3 attempts"; rm -rf "$RWDIR"; exit 1; }
+# Tahoe's Finder can't resolve dmgbuild's background bookmark (window renders
+# white), so swap in a macOS-generated one on the read-write image, then
+# compress. See build/dmg-fix-bookmark.py.
+MP="$(hdiutil attach "$RW" -nobrowse -readwrite -noautoopen | grep -o '/Volumes/.*$' | head -1)"
+"$VENV/bin/python" build/dmg-fix-bookmark.py "$MP"
+hdiutil detach "$MP" >/dev/null 2>&1 || hdiutil detach "$MP" -force >/dev/null
+hdiutil convert "$RW" -format UDZO -imagekey zlib-level=9 -o "$DMG" >/dev/null
 rm -rf "$RWDIR"
+# The app inside the DMG is what users copy — make sure the layout steps left its
+# signature intact (e.g. a Finder-info xattr on the bundle breaks --strict).
+MP="$(hdiutil attach "$DMG" -nobrowse -readonly -noautoopen | grep -o '/Volumes/.*$' | head -1)"
+if ! codesign --verify --deep --strict "$MP/$APPNAME.app"; then
+    hdiutil detach "$MP" -force >/dev/null 2>&1
+    echo "[dist-mac] ERROR: app signature inside the DMG is invalid"
+    exit 1
+fi
+hdiutil detach "$MP" >/dev/null 2>&1 || hdiutil detach "$MP" -force >/dev/null
+echo "[dist-mac] app signature inside DMG valid"
 
 # notarytool with whichever creds are set (CI API key vs local keychain profile),
 # in one place so submit and the log fetch can't drift apart.
