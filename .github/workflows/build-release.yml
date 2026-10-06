@@ -103,15 +103,13 @@ jobs:
         run: npx electron-builder --linux --publish never
 
       - name: Report build sizes
-        run: ls -lh out/*.AppImage out/*.deb 2>/dev/null || true
+        run: ls -lh out/*.AppImage 2>/dev/null || true
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v7
         with:
           name: dist-linux
-          path: |
-            out/*.AppImage
-            out/*.deb
+          path: out/*.AppImage
           if-no-files-found: error
 
   build-mac:
@@ -231,7 +229,6 @@ jobs:
           subject-path: |
             out/*.exe
             out/*.AppImage
-            out/*.deb
             out/*.dmg
 
       - name: Generate release notes
@@ -247,7 +244,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ASSETS=()
-          for file in out/*.exe out/*.AppImage out/*.deb out/*.dmg; do
+          for file in out/*.exe out/*.AppImage out/*.dmg; do
             [ -f "$file" ] || continue
             ASSETS+=("$file")
           done
