@@ -3,9 +3,9 @@
 // electron-builder afterPack hook (Linux): wrap the Electron binary so
 // --ozone-platform=x11 and the right sandbox flag land on argv before
 // Chromium's early C++ init parses them. app.commandLine.appendSwitch in
-// main.js runs too late; electron-builder's linux.executableArgs only covers
-// AppRun and the .desktop Exec line, so wrapping the binary itself is the
-// only place that catches every entry point reliably.
+// the main process runs too late; electron-builder's linux.executableArgs
+// only covers AppRun and the .desktop Exec line, so wrapping the binary
+// itself is the only place that catches every entry point reliably.
 //
 // Sandbox: AppImage's chrome-sandbox can't be SUID root (FUSE mount is
 // user-owned + nosuid), so we prefer the namespace sandbox via
