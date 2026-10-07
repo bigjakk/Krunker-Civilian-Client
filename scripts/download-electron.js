@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Downloads patched Electron 43.0.0 builds for Windows, Linux, and macOS.
+ * Downloads patched Electron 45.0.0-alpha.14 builds for Windows, Linux, and macOS.
  *
  * The patched Electron fixes input starvation ("aim freeze") when --disable-frame-rate-limit
  * is active on modern Chromium. Without this, uncapped FPS causes 50-300ms input delays.
@@ -30,12 +30,12 @@ const { execSync } = require('child_process');
 // ── Configuration ──────────────────────────────────────────────────────────
 const GITHUB_BASE = 'https://github.com';
 const REPO = 'bigjakk/Electron-Websocket-Fix';
-const RELEASE_TAG = 'v43.0.0-framecap';
+const RELEASE_TAG = 'v45.0.0-alpha.14';
 
 const PLATFORMS = {
-    win32: { asset: 'electron-v43.0.0-ws-frameThrottle-frameCap2-patched-windows-x64.zip' },
-    linux: { asset: 'electron-v43.0.0-ws-frameThrottle-frameCap2-patched-linux-x64.zip' },
-    darwin: { asset: 'electron-v43.0.0-ws-frameThrottle-frameCap2-patched-mac-arm64.zip' },
+    win32: { asset: 'electron-v45.0.0-alpha.14-ws-frameThrottle-frameCap2-patched-windows-x64.zip' },
+    linux: { asset: 'electron-v45.0.0-alpha.14-ws-frameThrottle-frameCap2-patched-linux-x64.zip' },
+    darwin: { asset: 'electron-v45.0.0-alpha.14-ws-frameThrottle-frameCap2-patched-mac-arm64.zip' },
 };
 
 const IS_WIN = process.platform === 'win32';
