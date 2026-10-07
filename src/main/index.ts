@@ -1457,17 +1457,20 @@ async function launchApp(): Promise<void> {
   });
 
   // ── Alt manager IPC handlers (credentials encrypted via safeStorage) ──
-  const canEncrypt = safeStorage.isEncryptionAvailable();
-  if (!canEncrypt) electronLog.warn('[KCC] safeStorage encryption not available — account passwords will use base64 fallback');
-
-  function encryptString(plaintext: string): string {
-    if (canEncrypt) return safeStorage.encryptString(plaintext).toString('base64');
-    return Buffer.from(plaintext).toString('base64');
+  async function encryptString(plaintext: string): Promise<string> {
+    try {
+      return (await safeStorage.encryptStringAsync(plaintext)).toString('base64');
+    } catch (err) {
+      electronLog.warn('[KCC] safeStorage encryption failed — saving account credentials with base64 fallback:', err);
+      return Buffer.from(plaintext).toString('base64');
+    }
   }
 
-  function decryptString(encrypted: string): string {
-    if (canEncrypt) return safeStorage.decryptString(Buffer.from(encrypted, 'base64'));
-    return Buffer.from(encrypted, 'base64').toString();
+  async function decryptString(encrypted: string): Promise<string> {
+    const buf = Buffer.from(encrypted, 'base64');
+    // Base64-fallback values have no v1x key tag, and decryptStringAsync rejects them.
+    if (!/^v1\d/.test(buf.toString('latin1', 0, 3))) return buf.toString();
+    return (await safeStorage.decryptStringAsync(buf)).result;
   }
 
   ipcMain.handle('alt-list', () => {
@@ -1480,36 +1483,41 @@ async function launchApp(): Promise<void> {
   // rendered, both read by the renderer) to a saved account by matching the decrypted
   // username here in main. Lets us show each account's avatar without exposing
   // usernames to the renderer or hitting Krunker's (captcha-walled) profile API.
-  ipcMain.handle('alt-link-current', (_e, username: string, avatarUrl: string) => {
+  ipcMain.handle('alt-link-current', async (_e, username: string, avatarUrl: string) => {
     if (!username || !avatarUrl) return false;
     // Only accept https Krunker asset URLs — never arbitrary or data: URLs.
     try {
       const u = new URL(avatarUrl);
       if (u.protocol !== 'https:' || !isKrunkerHost(u.hostname)) return false;
     } catch { return false; }
-    const accounts = config.get('accounts') || [];
     const target = username.toLowerCase();
+    const matches = new Set<string>();
+    for (const acc of config.get('accounts') || []) {
+      try {
+        if ((await decryptString(acc.username)).toLowerCase() === target) matches.add(acc.username);
+      } catch { /* skip accounts that fail to decrypt */ }
+    }
+    // Re-read after the awaits so an account saved meanwhile isn't overwritten.
+    const accounts = config.get('accounts') || [];
     let changed = false;
     for (const acc of accounts) {
-      try {
-        if (decryptString(acc.username).toLowerCase() === target && acc.avatarUrl !== avatarUrl) {
-          acc.avatarUrl = avatarUrl;
-          changed = true;
-        }
-      } catch { /* skip accounts that fail to decrypt */ }
+      if (matches.has(acc.username) && acc.avatarUrl !== avatarUrl) {
+        acc.avatarUrl = avatarUrl;
+        changed = true;
+      }
     }
     if (changed) config.set('accounts', accounts);
     return changed;
   });
 
-  ipcMain.handle('alt-save', (_e, data: { label: string; username: string; password: string }) => {
+  ipcMain.handle('alt-save', async (_e, data: { label: string; username: string; password: string }) => {
     try {
-      const accounts = config.get('accounts') || [];
       const account: SavedAccount = {
         label: data.label,
-        username: encryptString(data.username),
-        password: encryptString(data.password),
+        username: await encryptString(data.username),
+        password: await encryptString(data.password),
       };
+      const accounts = config.get('accounts') || [];
       accounts.push(account);
       config.set('accounts', accounts);
       electronLog.log('[KCC] Saved alt account "' + data.label + '"');
@@ -1520,14 +1528,14 @@ async function launchApp(): Promise<void> {
     }
   });
 
-  ipcMain.handle('alt-get-credentials', (_e, index: number) => {
+  ipcMain.handle('alt-get-credentials', async (_e, index: number) => {
     const accounts = config.get('accounts') || [];
     if (index < 0 || index >= accounts.length) return null;
     const acc = accounts[index];
     try {
       return {
-        username: decryptString(acc.username),
-        password: decryptString(acc.password),
+        username: await decryptString(acc.username),
+        password: await decryptString(acc.password),
       };
     } catch (err) {
       electronLog.error('[KCC] Failed to decrypt account credentials:', err);
