@@ -18,6 +18,7 @@
  * Usage:
  *   node scripts/download-electron.js            # download if needed
  *   node scripts/download-electron.js --force     # re-download even if present
+ *   KCC_ELECTRON_DIR=<folder> npm install         # install from the zips in <folder>, not the release
  */
 
 const https = require('https');
@@ -40,6 +41,7 @@ const PLATFORMS = {
 const IS_WIN = process.platform === 'win32';
 const IS_MAC = process.platform === 'darwin';
 const IS_CI = !!process.env.CI;
+const LOCAL_DIR = process.env.KCC_ELECTRON_DIR;
 const ELECTRON_BASE = path.resolve(__dirname, '..', 'node_modules', 'electron');
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -127,14 +129,18 @@ async function installTo(distDir, platform) {
         console.log(`  [${label}] Installed: ${installed}, need: ${platform.asset}`);
     }
 
-    // Direct download from GitHub release
-    const url = `${GITHUB_BASE}/${REPO}/releases/download/${RELEASE_TAG}/${platform.asset}`;
-    console.log(`  [${label}] Asset URL: ${url}`);
-
-    // Download
-    await downloadToFile(url, tempZip);
-    const zipSize = (fs.statSync(tempZip).size / 1048576).toFixed(1);
-    console.log(`  [${label}] Downloaded: ${zipSize} MB`);
+    if (LOCAL_DIR) {
+        const localZip = path.join(LOCAL_DIR, platform.asset);
+        console.log(`  [${label}] Local asset: ${localZip}`);
+        fs.copyFileSync(localZip, tempZip);
+    } else {
+        // Direct download from GitHub release
+        const url = `${GITHUB_BASE}/${REPO}/releases/download/${RELEASE_TAG}/${platform.asset}`;
+        console.log(`  [${label}] Asset URL: ${url}`);
+        await downloadToFile(url, tempZip);
+        const zipSize = (fs.statSync(tempZip).size / 1048576).toFixed(1);
+        console.log(`  [${label}] Downloaded: ${zipSize} MB`);
+    }
 
     // Clear existing target dir and extract
     console.log(`  [${label}] Extracting...`);
@@ -188,12 +194,16 @@ main().then(() => {
     }
 }).catch((err) => {
     console.error('[KCC] Electron download failed:', err.message);
-    console.error('');
-    console.error('  Download the patched Electron manually from:');
-    console.error(`  ${GITHUB_BASE}/${REPO}/releases/tag/${RELEASE_TAG}`);
-    console.error('');
-    console.error(`  Win asset:   ${PLATFORMS.win32.asset}`);
-    console.error(`  Linux asset: ${PLATFORMS.linux.asset}`);
-    console.error(`  macOS asset: ${PLATFORMS.darwin.asset}`);
+    if (!LOCAL_DIR) {
+        console.error('');
+        console.error('  Download the patched Electron manually from:');
+        console.error(`  ${GITHUB_BASE}/${REPO}/releases/tag/${RELEASE_TAG}`);
+        console.error('');
+        console.error(`  Win asset:   ${PLATFORMS.win32.asset}`);
+        console.error(`  Linux asset: ${PLATFORMS.linux.asset}`);
+        console.error(`  macOS asset: ${PLATFORMS.darwin.asset}`);
+        console.error('');
+        console.error('  Or set KCC_ELECTRON_DIR to a folder holding the asset zip and re-run.');
+    }
     process.exit(1);
 });
