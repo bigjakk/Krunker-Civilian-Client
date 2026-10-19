@@ -239,6 +239,8 @@ const BLOCKED_URL_PATTERNS = [
   '*://coeus.frvr.com/*',
   '*://apis.google.com/js/platform.js',
   '*://imasdk.googleapis.com/*',
+  '*://unpkg.com/web3*',
+  '*://*.twitter.com/*',
 ];
 
 // ── Bunny NPC blocklist (mirrors Glorp) ──
