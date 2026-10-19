@@ -131,6 +131,7 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     app.commandLine.appendSwitch('disable-logging');
     app.commandLine.appendSwitch('disable-hang-monitor');
     app.commandLine.appendSwitch('disable-2d-canvas-clip-aa');
+    app.commandLine.appendSwitch('disable-gpu-process-for-dx12-info-collection');
     disableFeatures('MediaRouter');
   }
 
