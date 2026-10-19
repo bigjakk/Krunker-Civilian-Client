@@ -7,7 +7,7 @@ import { ipcRenderer } from 'electron';
 import type { Keybind } from '../main/config';
 import { DEFAULT_CONFIG } from '../main/config-defaults';
 import type { SocialMusicSource } from '../main/config-defaults';
-import { setDeathAnimBlock, setMenuTimer, setWatermark, showToast } from './utils';
+import { BRIGHTNESS_MIN, BRIGHTNESS_MAX, clampBrightness, setDeathAnimBlock, setGameBrightness, setMenuTimer, setWatermark, showToast } from './utils';
 import {
   createKeybindRow, createSimpleKeyRow, createToggleRow, createSelectRow,
   createNumberRow, createCheckboxGrid, createButtonRow, createTextRow,
@@ -316,6 +316,13 @@ export function buildGameSection(
     desc: 'Disable the slide-in animation on the death screen',
     checked: ui.deathscreenAnimation, instant: true,
     onChange: (v) => { ui.deathscreenAnimation = v; saveUI(); setDeathAnimBlock(v); },
+  }));
+
+  worldGroup.appendChild(createNumberRow({
+    label: 'Game Brightness',
+    desc: 'Dim or brighten the 3D game view. The HUD, nametags and menus are unaffected',
+    min: BRIGHTNESS_MIN, max: BRIGHTNESS_MAX, step: 5, value: clampBrightness(ui.gameBrightness), instant: true,
+    onChange: (v) => { ui.gameBrightness = v; saveUI(); setGameBrightness(v); },
   }));
 
   const menuGroup = createGroup(body, 'Menu');

@@ -5,7 +5,7 @@ import { hookSettings } from './settings-render';
 import { hookNativeImport } from './native-import';
 import { initUserscripts } from './userscripts';
 import { initTranslator } from './translator';
-import { installCompositorAnimFix, setDeathAnimBlock, setMenuTimer, setWatermark, showToast } from './utils';
+import { clampBrightness, installCompositorAnimFix, setDeathAnimBlock, setGameBrightness, setMenuTimer, setWatermark, showToast } from './utils';
 import { initChat } from './chat';
 import { initHPCounter, initRankProgress } from './competitive';
 import { initKeystrokes } from './keystrokes';
@@ -191,6 +191,7 @@ ipcRenderer.on('main_did-finish-load', () => {
 
     if (isGamePage) installCompositorAnimFix();
     if (uiConf?.deathscreenAnimation) setDeathAnimBlock(true);
+    if (isGamePage) setGameBrightness(clampBrightness(uiConf?.gameBrightness));
     if (uiConf?.hideMenuPopups) startHidePopups();
     if (uiConf?.menuTimer ?? true) setMenuTimer(true);
     if (isGamePage && uiConf?.classicSocial) setClassicSocial(true);

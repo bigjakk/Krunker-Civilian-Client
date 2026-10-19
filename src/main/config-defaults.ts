@@ -120,6 +120,7 @@ export interface AppConfig {
   ui: {
     showExitButton: boolean;
     deathscreenAnimation: boolean;
+    gameBrightness: number;
     hideMenuPopups: boolean;
     menuTimer: boolean;
     watermark: boolean;
@@ -262,6 +263,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   ui: {
     showExitButton: true,
     deathscreenAnimation: true,
+    gameBrightness: 100,
     hideMenuPopups: false,
     menuTimer: true,
     watermark: true,

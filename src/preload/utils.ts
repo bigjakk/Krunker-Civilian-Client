@@ -68,6 +68,48 @@ export function installCompositorAnimFix(): void {
     document.head.appendChild(el);
 }
 
+// ── Game Brightness ──
+
+export const BRIGHTNESS_MIN = 20;
+export const BRIGHTNESS_MAX = 150;
+
+const BRIGHTNESS_LAYER_ID = 'kcc-brightnessLayer';
+const BRIGHTNESS_STYLE_ID = 'kcc-brightnessStyle';
+// z-index 1 + prepend: over the canvas even when Krunker's Saturation/Hue filter stacks it, under #game-overlay/#uiBase and the lifted #loadingBg
+const BRIGHTNESS_CSS =
+    `#${BRIGHTNESS_LAYER_ID} { position: fixed; inset: 0; pointer-events: none; z-index: 1; }` +
+    ' #loadingBg { z-index: 1; }';
+
+export function clampBrightness(value: unknown): number {
+    return typeof value === 'number' && Number.isFinite(value)
+        ? Math.min(BRIGHTNESS_MAX, Math.max(BRIGHTNESS_MIN, Math.round(value)))
+        : 100;
+}
+
+export function setGameBrightness(percent: number): void {
+    let layer = document.getElementById(BRIGHTNESS_LAYER_ID);
+    if (percent === 100) {
+        layer?.remove();
+        document.getElementById(BRIGHTNESS_STYLE_ID)?.remove();
+        return;
+    }
+    if (!document.getElementById(BRIGHTNESS_STYLE_ID)) {
+        const style = document.createElement('style');
+        style.id = BRIGHTNESS_STYLE_ID;
+        style.textContent = BRIGHTNESS_CSS;
+        document.head.appendChild(style);
+    }
+    if (!layer) {
+        layer = document.createElement('div');
+        layer.id = BRIGHTNESS_LAYER_ID;
+        document.body.prepend(layer);
+    }
+    // Dimming is a plain blend; backdrop-filter re-reads the frame on every draw, so only brightening uses it
+    layer.style.cssText = percent < 100
+        ? `background:#000;opacity:${1 - percent / 100}`
+        : `backdrop-filter:brightness(${percent / 100})`;
+}
+
 // ── Menu Timer ──
 // Shows the native spectate/game timer prominently on the menu screen.
 // CSS approach from crankshaft/glorp.
