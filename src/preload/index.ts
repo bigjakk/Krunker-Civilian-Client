@@ -10,8 +10,7 @@ import { initChat } from './chat';
 import { initHPCounter, initRankProgress } from './competitive';
 import { initKeystrokes } from './keystrokes';
 import type { KeystrokesConfig } from './keystrokes';
-import { setNukeCounter } from './nuke-counter';
-import type { NukeCounterConfig } from './nuke-counter';
+import { initStatCounter } from './stat-counter';
 import { checkChangelog } from './changelog';
 import { DEFAULT_CONFIG } from '../main/config-defaults';
 import { savedConsole as _console, setVerbose } from './saved-console';
@@ -273,11 +272,10 @@ ipcRenderer.on('main_did-finish-load', () => {
       }).catch((err) => _console.warn('[KCC] keystrokes config load failed:', err));
     }
 
-    // ── Nuke counter overlay ──
+    // ── Stat counter overlay ──
     if (isGamePage) {
-      ipcRenderer.invoke('get-config', 'nukeCounter').then((ncConf: NukeCounterConfig | undefined) => {
-        if (ncConf && ncConf.enabled) setNukeCounter({ ...DEFAULT_CONFIG.nukeCounter, ...ncConf });
-      }).catch((err) => _console.warn('[KCC] nuke counter config load failed:', err));
+      ipcRenderer.invoke('get-config', 'nukeCounter').then(initStatCounter)
+        .catch((err) => _console.warn('[KCC] stat counter config load failed:', err));
     }
 
     // ── KCC watermark (in-game + menu) ──

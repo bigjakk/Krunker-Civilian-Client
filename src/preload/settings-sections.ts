@@ -23,8 +23,7 @@ import type { HeadshotSoundMode } from './headshot-sound';
 import { setTradeDing } from './trade-ding';
 import { updateKeystrokes } from './keystrokes';
 import type { KeystrokesConfig } from './keystrokes';
-import { setNukeCounter } from './nuke-counter';
-import type { NukeCounterConfig } from './nuke-counter';
+import { STATS, statCounterConfig, updateStatCounter, openStatCounterEditor } from './stat-counter';
 import { setBetterChat, setAutoHideChat, setChatHistorySize } from './chat';
 import { updateTranslatorConfig } from './translator';
 import { showChangelogNow } from './changelog';
@@ -768,63 +767,90 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any, ncConf
     saveUI();
   });
 
-  const nc: NukeCounterConfig = { ...DEFAULT_CONFIG.nukeCounter, ...ncConf };
+  const sc = statCounterConfig(ncConf);
+  const statGroup = createGroup(body, 'Stat Counters');
+  const statRows: HTMLElement[] = [];
+  const goalRows = new Map<string, HTMLElement>();
+  const syncStatRows = (): void => {
+    for (const r of statRows) r.classList.toggle('kcc-row-hidden', !sc.enabled);
+    for (const [id, r] of goalRows) r.classList.toggle('kcc-row-hidden', !sc.enabled || !sc.stats.includes(id));
+  };
+  const addStatRow = (row: HTMLElement): void => { statRows.push(row); statGroup.appendChild(row); };
 
-  function saveNuke(): void {
-    ipcRenderer.invoke('set-config', 'nukeCounter', nc);
-    setNukeCounter(nc);
+  statGroup.appendChild(createToggleRow({
+    label: 'Stat Counter Overlay',
+    desc: 'Show career stats like nukes, kills and wins in-game. Kills, headshots, wallbangs, melee and thrown kills and K/D update live; the rest when the match ends.',
+    checked: sc.enabled, instant: true,
+    onChange: (v) => { updateStatCounter({ enabled: v }); syncStatRows(); },
+  }));
+
+  addStatRow(createCheckboxGrid({
+    header: 'Stats',
+    items: STATS.map((s) => ({ value: s.id, label: s.label })),
+    selected: [...sc.stats],
+    onChange: (selected) => {
+      updateStatCounter({ stats: STATS.map((s) => s.id).filter((id) => selected.includes(id)) });
+      syncStatRows();
+    },
+  }));
+
+  for (const def of STATS) {
+    if (def.ratio) continue;
+    const { row, input } = createTextRow({
+      label: def.label + ' Goal',
+      desc: def.tiers ? 'Blank aims for your next title. 0 hides the goal.' : 'Target shown next to the counter. Blank or 0 hides it.',
+      value: sc.goals[def.id] !== undefined ? String(sc.goals[def.id]) : '',
+      placeholder: def.tiers ? 'Next title' : 'None',
+      instant: true,
+      onChange: (v) => {
+        const goals = { ...sc.goals };
+        const n = Number(v.replace(/[\s,]/g, ''));
+        if (v === '') delete goals[def.id];
+        else if (Number.isSafeInteger(n) && n >= 0) goals[def.id] = n;
+        input.value = goals[def.id] !== undefined ? String(goals[def.id]) : '';
+        updateStatCounter({ goals });
+      },
+    });
+    goalRows.set(def.id, row);
+    statGroup.appendChild(row);
   }
 
-  const nukeGroup = createGroup(body, 'Nuke Counter');
-  const nukeSubRows: HTMLElement[] = [];
-  const syncNukeRows = (): void => {
-    for (const r of nukeSubRows) r.classList.toggle('kcc-row-hidden', !nc.enabled);
-  };
-
-  nukeGroup.appendChild(createToggleRow({
-    label: 'Nuke Counter Overlay',
-    desc: 'Show your career nuke total in-game. Updates when a match ends.',
-    checked: nc.enabled, instant: true,
-    onChange: (v) => { nc.enabled = v; saveNuke(); syncNukeRows(); },
+  addStatRow(createSelectRow({
+    label: 'Layout',
+    desc: 'Stacked keeps every counter in one box. Separate lets you place each one on its own.',
+    options: [{ value: 'stacked', label: 'Stacked' }, { value: 'separate', label: 'Separate' }],
+    value: sc.layout, instant: true,
+    onChange: (v) => updateStatCounter({ layout: v === 'separate' ? 'separate' : 'stacked' }),
   }));
 
-  nukeSubRows.push(createNumberRow({
-    label: 'Nuke Goal',
-    desc: 'Target total shown next to the counter (1,833 / 2,500). 0 hides it.',
-    min: 0, max: 50000, value: nc.goal, instant: true,
-    onChange: (v) => { nc.goal = v; saveNuke(); },
+  addStatRow(createToggleRow({
+    label: 'Session Gain',
+    desc: 'Show how much each counter has grown since the client started (+12)',
+    checked: sc.session, instant: true,
+    onChange: (v) => updateStatCounter({ session: v }),
   }));
 
-  nukeSubRows.push(createToggleRow({
+  addStatRow(createToggleRow({
     label: 'Background',
-    desc: 'Dark backdrop behind the counter',
-    checked: nc.background, instant: true,
-    onChange: (v) => { nc.background = v; saveNuke(); },
+    desc: 'Dark backdrop behind the counters',
+    checked: sc.background, instant: true,
+    onChange: (v) => updateStatCounter({ background: v }),
   }));
 
-  nukeSubRows.push(createNumberRow({
+  addStatRow(createNumberRow({
     label: 'Scale',
-    desc: 'Visual size of the counter',
-    min: 0.5, max: 2, step: 0.05, value: nc.scale, instant: true,
-    onChange: (v) => { nc.scale = v; saveNuke(); },
+    desc: 'Visual size of the counters',
+    min: 0.5, max: 2, step: 0.05, value: sc.scale, instant: true,
+    onChange: (v) => updateStatCounter({ scale: v }),
   }));
 
-  nukeSubRows.push(createNumberRow({
-    label: 'X Position',
-    desc: 'Percent of screen width (50 = centered)',
-    min: 0, max: 100, step: 0.5, value: nc.x, instant: true,
-    onChange: (v) => { nc.x = v; saveNuke(); },
-  }));
+  addStatRow(createButtonRow({
+    label: 'Position',
+    desc: 'Drag the counters into place over the in-game HUD. Double-click one to reset it.',
+    buttons: [{ icon: 'open_with', label: 'Move', onClick: openStatCounterEditor }],
+  }).row);
 
-  nukeSubRows.push(createNumberRow({
-    label: 'Y Position',
-    desc: 'Percent of screen height (50 = centered)',
-    min: 0, max: 100, step: 0.5, value: nc.y, instant: true,
-    onChange: (v) => { nc.y = v; saveNuke(); },
-  }));
-
-  for (const r of nukeSubRows) nukeGroup.appendChild(r);
-  syncNukeRows();
+  syncStatRows();
 
   // ── Menu Music ──
   const musicGroup = createGroup(body, 'Menu Music');

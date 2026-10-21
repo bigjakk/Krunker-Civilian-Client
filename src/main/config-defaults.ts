@@ -77,13 +77,18 @@ export interface AppConfig {
     showAuxKeys: boolean;
     mouseEnabled: boolean;
   };
+  // Named before it counted more than nukes; renaming would orphan saved settings
   nukeCounter: {
     enabled: boolean;
-    goal: number;
+    stats: string[];
+    goals: Record<string, number>;
+    layout: 'stacked' | 'separate';
+    session: boolean;
     background: boolean;
     scale: number;
     x: number;
     y: number;
+    positions: Record<string, { x: number; y: number }>;
   };
   swapper: {
     enabled: boolean;
@@ -232,11 +237,15 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   nukeCounter: {
     enabled: false,
-    goal: 0,
+    stats: ['nukes', 'kills', 'wins'],
+    goals: {},
+    layout: 'stacked',
+    session: false,
     background: true,
     scale: 1,
-    x: 94,
+    x: 85,
     y: 50,
+    positions: {},
   },
   swapper: {
     enabled: false,
