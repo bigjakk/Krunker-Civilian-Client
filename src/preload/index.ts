@@ -148,6 +148,7 @@ ipcRenderer.on('matchmaker-find', (_e, mmConfig: MatchmakerConfig) => {
 ipcRenderer.on('kcc-toast', (_e, msg: string) => showToast(msg));
 
 
+
 // ── Wait for main process to signal page load, then poll for settings window ──
 ipcRenderer.on('main_did-finish-load', () => {
   _console.log('[KCC] did-finish-load received, waiting to hook settings...');

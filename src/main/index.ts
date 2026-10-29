@@ -517,8 +517,7 @@ async function launchApp(): Promise<void> {
   const ses = session.fromPartition('persist:krunker');
 
   // ── Resource swapper ──
-  const swapperConfig = config.get('swapper');
-  const swapDir = swapperConfig.path || join(app.getPath('userData'), 'Krunker Civilian Client', 'swapper');
+  const swapDir = config.get('swapper').path || join(app.getPath('userData'), 'Krunker Civilian Client', 'swapper');
   // Ensure swap subdirectories exist (themes/, backgrounds/, socialthemes/, skies/)
   for (const sub of [GAME_THEMES_DIR, 'backgrounds', SOCIAL_THEMES_DIR, SKIES_DIR]) {
     const dir = join(swapDir, sub);
@@ -527,8 +526,8 @@ async function launchApp(): Promise<void> {
 
   registerSwapperFileProtocol(ses, swapDir);
 
-  const swapper = swapperConfig.enabled ? new ResourceSwapper(swapDir) : null;
-  electronLog.log(`[KCC] Resource swapper: ${swapper ? 'enabled' : 'disabled'} (${swapDir})`);
+  const swapper = new ResourceSwapper(swapDir);
+  electronLog.log(`[KCC] Resource swapper: ${swapDir}`);
 
   // ── Userscript manager ──
   const usConfig = config.get('userscripts') || { enabled: true, path: '' };
@@ -579,10 +578,8 @@ async function launchApp(): Promise<void> {
       if (skyFile) return callback({ redirectURL: filePathToSwapURL(skyFile) });
     }
     // Check swapper next — redirect matching assets to local files
-    if (swapper) {
-      const redirect = swapper.getRedirect(details.url);
-      if (redirect) return callback({ redirectURL: redirect });
-    }
+    const redirect = swapper.getRedirect(details.url);
+    if (redirect) return callback({ redirectURL: redirect });
     // Determine if this URL is a krunker.io request (matched by the broad swapper pattern)
     // vs an ad-block pattern. krunker.io requests that weren't swapped pass through normally.
     try {
@@ -592,31 +589,9 @@ async function launchApp(): Promise<void> {
     callback({ cancel: true });
   });
 
-  if (swapper) {
-    swapper.waitForReady().then(() => {
-      electronLog.log(`[KCC] Swapper ready: ${swapper.patterns.length} pattern(s)`);
-    });
-  }
-
-  // ── CORS fix for swapped resources ──
-  if (swapper) {
-    ses.webRequest.onHeadersReceived(({ responseHeaders }, callback) => {
-      if (!responseHeaders) return callback({});
-      for (const key in responseHeaders) {
-        const lowercase = key.toLowerCase();
-        if (lowercase === 'access-control-allow-credentials' && responseHeaders[key][0] === 'true') {
-          return callback({ responseHeaders });
-        }
-        if (lowercase === 'access-control-allow-origin') {
-          delete responseHeaders[key];
-          break;
-        }
-      }
-      return callback({
-        responseHeaders: { ...responseHeaders, 'access-control-allow-origin': ['*'] },
-      });
-    });
-  }
+  swapper.waitForReady().then(() => {
+    electronLog.log(`[KCC] Swapper ready: ${swapper.patterns.length} pattern(s)`);
+  });
 
   // ── Restore saved window bounds ──
   const savedWindow = config.get('window');
@@ -859,7 +834,7 @@ async function launchApp(): Promise<void> {
   win.webContents.on('did-finish-load', () => {
     electronLog.log(`[KCC] Page loaded: ${win.webContents.getURL()}`);
     // Rescan swap directory so new/changed files are picked up on refresh
-    if (swapper) swapper.rescan().catch((err) => electronLog.warn('[KCC] Swapper rescan failed:', err));
+    swapper.rescan().catch((err) => electronLog.warn('[KCC] Swapper rescan failed:', err));
 
     const cssInjections = [
       win.webContents.insertCSS(HIDE_ADS_CSS),
@@ -906,7 +881,7 @@ async function launchApp(): Promise<void> {
   // The renderer must go through the dedicated alt-* handlers (alt-list returns
   // labels only), never the generic config getter, so page JS can't read it.
   const ALLOWED_CONFIG_KEYS = new Set<string>([
-    'window', 'performance', 'game', 'swapper', 'matchmaker',
+    'window', 'performance', 'game', 'matchmaker',
     'keybinds', 'userscripts', 'ui', 'discord', 'translator',
     'advanced', 'tabWindow', 'keystrokes', 'nukeCounter',
   ]);
@@ -916,7 +891,7 @@ async function launchApp(): Promise<void> {
   //   window/tabWindow  — machine-specific window geometry
   //   savedTabs         — transient last-open tabs
   const EXPORT_CONFIG_KEYS = [
-    'performance', 'game', 'keystrokes', 'nukeCounter', 'swapper', 'matchmaker',
+    'performance', 'game', 'keystrokes', 'nukeCounter', 'matchmaker',
     'keybinds', 'userscripts', 'ui', 'discord', 'translator', 'advanced',
   ] as const;
 

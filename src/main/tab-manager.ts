@@ -348,7 +348,7 @@ export class TabManager {
         return view;
     }
 
-    // ── Social CSS theme (swap/socialthemes/) ──
+    // ── Social CSS theme (swapper/socialthemes/) ──
     // Injected as a <style> tag rather than insertCSS so @import rules work.
     private applySocialTheme(wc: Electron.WebContents, css: string = this.getSocialThemeCSS()): void {
         wc.executeJavaScript(`(() => {

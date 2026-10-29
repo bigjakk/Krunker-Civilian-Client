@@ -244,6 +244,9 @@ ${THEME_CSS}
 .kcc-row-block { flex-direction: column; align-items: stretch; }
 .kcc-row-block .kcc-row-control { margin-top: 6px; }
 .kcc-row-info { color: var(--kcc-text-muted); }
+.kcc-row-warn { background: rgba(255,152,0,0.12); box-shadow: inset 3px 0 0 var(--kcc-orange); border-radius: 6px; }
+.kcc-row-warn:hover { background: rgba(255,152,0,0.16); }
+.kcc-row-warn .kcc-row-title { color: var(--kcc-orange); }
 .kcc-row-hidden { display: none; }
 .kcc-row-dim { opacity: 0.55; }
 

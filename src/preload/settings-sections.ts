@@ -603,8 +603,7 @@ export function buildPerformanceSection(
   }));
 }
 
-export function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfRaw: any): void {
-  const swapEnabled = swapperConf ? swapperConf.enabled : DEFAULT_CONFIG.swapper.enabled;
+export function buildSwapperSection(body: HTMLElement, uiConfRaw: any): void {
   const ui = uiConfRaw;
 
   function saveUI(): void {
@@ -613,21 +612,9 @@ export function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfR
 
   const group = createGroup(body);
 
-  group.appendChild(createToggleRow({
-    label: 'Resource Swapper',
-    desc: 'Replace game textures, sounds, and models with local files',
-    checked: swapEnabled,
-    restart: true,
-    onChange: (v) => {
-      ipcRenderer.invoke('get-config', 'swapper').then((conf: any) => {
-        ipcRenderer.invoke('set-config', 'swapper', { enabled: v, path: conf ? conf.path : '' });
-      });
-    },
-  }));
-
   group.appendChild(createButtonRow({
     label: 'Swapper Folder',
-    desc: 'Place replacement assets here (textures/, sound/, models/)',
+    desc: 'Replace game files with your own, in the same folders Krunker uses (textures/, sound/, models/). Custom CSS goes in css/main_custom.css',
     buttons: [{ icon: 'folder', label: 'Swapper', title: 'Open Folder', onClick: () => ipcRenderer.invoke('open-swap-folder') }],
   }).row);
 
@@ -662,9 +649,9 @@ export function buildSwapperSection(body: HTMLElement, swapperConf: any, uiConfR
     onChange: (v) => { ui.skyHorizon = v; saveUI(); },
   }));
 
-  // ── Sky Image (populated from swap/skies/) ──
+  // ── Sky Image (populated from swapper/skies/) ──
   // The image is wrapped around a dome, so flat photos distort badly.
-  const skyImgR = createRowShell('Sky Image', 'Use an image instead of the gradient — browse for one, or drop files into swap/skies/. Panoramic (equirectangular) images work best — ordinary photos will stretch');
+  const skyImgR = createRowShell('Sky Image', 'Use an image instead of the gradient — browse for one, or drop files into swapper/skies/. Panoramic (equirectangular) images work best — ordinary photos will stretch');
   const skyImgSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
   skyImgR.control.appendChild(skyImgSelect);
 
@@ -719,8 +706,8 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any, ncConf
 
   const themeGroup = createGroup(body, 'Theme');
 
-  // ── CSS Theme selector (populated from swap/themes/) ──
-  const themeRowR = createRowShell('CSS Theme', 'Load a custom CSS theme from swap/themes/');
+  // ── CSS Theme selector (populated from swapper/themes/) ──
+  const themeRowR = createRowShell('CSS Theme', 'Drop .css files into swapper/themes/, then pick one here');
   const themeSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
   themeRowR.control.appendChild(themeSelect);
   themeRowR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Themes Folder', onClick: () => ipcRenderer.invoke('open-themes-folder') }));
@@ -743,8 +730,8 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any, ncConf
     onSettingChanged('refresh');
   });
 
-  // ── Social CSS Theme selector (populated from swap/socialthemes/) ──
-  const socialThemeRowR = createRowShell('Social CSS Theme', 'Load a custom CSS theme for social/hub tabs from swap/socialthemes/');
+  // ── Social CSS Theme selector (populated from swapper/socialthemes/) ──
+  const socialThemeRowR = createRowShell('Social CSS Theme', 'CSS theme for social/hub tabs — drop .css files into swapper/socialthemes/, then pick one here');
   const socialThemeSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
   socialThemeRowR.control.appendChild(socialThemeSelect);
   socialThemeRowR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Social Themes Folder', onClick: () => ipcRenderer.invoke('open-social-themes-folder') }));
@@ -932,7 +919,7 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any, ncConf
   const loadingGroup = createGroup(body, 'Loading Screen');
 
   // ── Loading Screen Background ──
-  const bgRowR = createRowShell('Loading Background', 'Custom background image for the loading screen (swap/backgrounds/)');
+  const bgRowR = createRowShell('Loading Background', 'Custom background image for the loading screen (swapper/backgrounds/)');
   const bgSelect = createSelect([{ value: 'disabled', label: 'Loading...' }], 'disabled');
   bgRowR.control.appendChild(bgSelect);
   bgRowR.control.appendChild(makeButton({ icon: 'folder', title: 'Open Backgrounds Folder', onClick: () => ipcRenderer.invoke('open-backgrounds-folder') }));

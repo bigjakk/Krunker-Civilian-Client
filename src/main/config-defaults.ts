@@ -90,8 +90,8 @@ export interface AppConfig {
     y: number;
     positions: Record<string, { x: number; y: number }>;
   };
+  // Saved configs may still carry a retired `enabled` flag — don't reuse the name
   swapper: {
-    enabled: boolean;
     path: string;
   };
   matchmaker: {
@@ -248,7 +248,6 @@ export const DEFAULT_CONFIG: AppConfig = {
     positions: {},
   },
   swapper: {
-    enabled: false,
     path: '',
   },
   matchmaker: {

@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, promises as fsp } from 'fs';
-import { join, resolve, sep } from 'path';
+import { existsSync, mkdirSync, watch, promises as fsp } from 'fs';
+import { dirname, join, resolve, sep } from 'path';
 import { pathToFileURL } from 'url';
 import { protocol, net, Session } from 'electron';
 import { electronLog } from './logger';
@@ -77,11 +77,43 @@ export class ResourceSwapper {
   private swapFiles = new Map<string, string>();
   private ready = false;
   private scanPromise: Promise<void>;
+  private scanGen = 0;
+  /** False when the folder watcher couldn't start or has stopped; callers then rescan on their own */
+  watching = false;
 
   constructor(swapDir: string) {
     this.swapDir = swapDir;
     if (!existsSync(this.swapDir)) mkdirSync(this.swapDir, { recursive: true });
-    this.scanPromise = this.scanAsync('');
+    this.scanPromise = this.buildMap().then((m) => { this.swapFiles = m; });
+    // Krunker requests css/main_custom.css from the page head, before any on-navigation
+    // rescan can finish — so keep the map current as files change instead
+    let timer: NodeJS.Timeout | null = null;
+    let changed = new Set<string>();
+    let unknown = false;
+    try {
+      watch(this.swapDir, { recursive: true }, (_event, filename) => {
+        if (filename) changed.add('/' + filename.toString().replace(/\\/g, '/'));
+        else unknown = true;
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          timer = null;
+          const paths = changed;
+          const all = unknown;
+          changed = new Set();
+          unknown = false;
+          const before = all ? this.cssPaths() : [];
+          this.rescan()
+            .then(() => this.onFilesChange?.(all ? [...new Set([...before, ...this.cssPaths()])] : [...paths]))
+            .catch((err) => electronLog.warn('[KCC] Swapper rescan failed:', err));
+        }, 300);
+      }).on('error', (err) => {
+        this.watching = false;
+        electronLog.warn('[KCC] Swap folder watcher stopped:', err);
+      });
+      this.watching = true;
+    } catch (err) {
+      electronLog.warn('[KCC] Swap folder watcher unavailable:', err);
+    }
   }
 
   /** Wait for the async directory scan to complete */
@@ -90,11 +122,82 @@ export class ResourceSwapper {
     this.ready = true;
   }
 
+  /** Called after a folder change with the changed paths, relative to the swap dir with a leading slash */
+  onFilesChange: ((paths: string[]) => void) | null = null;
+
+  cssPaths(): string[] {
+    return [...this.swapFiles.keys()].filter((k) => k.toLowerCase().endsWith('.css'));
+  }
+
   /** Rescan the swap directory to pick up added/removed/changed files */
   async rescan(): Promise<void> {
-    this.swapFiles.clear();
-    await this.scanAsync('');
+    // Overlapping rescans (watcher, navigation, Move It) — only the newest may install its map
+    const gen = ++this.scanGen;
+    const files = await this.buildMap();
+    if (gen !== this.scanGen) return;
+    this.swapFiles = files;
     this.ready = true;
+  }
+
+  private async buildMap(): Promise<Map<string, string>> {
+    const files = new Map<string, string>();
+    await this.scanAsync('', files);
+    return files;
+  }
+
+  /** Files Krunker will never request where they sit: a loose main_custom.css, or a copied-in swapper/ folder */
+  private misplacedFiles(): Array<{ from: string; to: string }> {
+    const out: Array<{ from: string; to: string }> = [];
+    for (const name of this.swapFiles.keys()) {
+      const lower = name.toLowerCase();
+      if (lower === '/main_custom.css' || lower === '/swapper/main_custom.css') out.push({ from: name, to: '/css/main_custom.css' });
+      else if (lower.startsWith('/swapper/')) out.push({ from: name, to: name.slice('/swapper'.length) });
+    }
+    return out;
+  }
+
+  /** One entry per mistake for the settings notice; `blocked` counts files whose right place is already taken */
+  misplaced(): Array<{ from: string; to: string; files: number; blocked: number }> {
+    const groups = new Map<string, { from: string; to: string; files: number; blocked: number }>();
+    const taken = new Set([...this.swapFiles.keys()].map((k) => k.toLowerCase()));
+    for (const f of this.misplacedFiles()) {
+      const key = f.from.toLowerCase() === '/main_custom.css' ? 'loose' : 'nested';
+      const g = groups.get(key) || (key === 'loose'
+        ? { from: 'main_custom.css', to: 'css/main_custom.css', files: 0, blocked: 0 }
+        : { from: 'swapper/swapper/', to: 'swapper/', files: 0, blocked: 0 });
+      g.files++;
+      if (taken.has(f.to.toLowerCase())) g.blocked++;
+      groups.set(key, g);
+    }
+    return [...groups.values()];
+  }
+
+  /** Move misplaced files to where Krunker requests them, never overwriting a file already there */
+  async fixMisplaced(): Promise<{ moved: number; skipped: number }> {
+    let moved = 0;
+    let skipped = 0;
+    for (const f of this.misplacedFiles()) {
+      const dest = join(this.swapDir, f.to);
+      if (existsSync(dest)) { skipped++; continue; }
+      try {
+        await fsp.mkdir(dirname(dest), { recursive: true });
+        await fsp.rename(join(this.swapDir, f.from), dest);
+        moved++;
+      } catch (err) {
+        electronLog.warn(`[KCC] Could not move ${f.from} to ${f.to}:`, err);
+        skipped++;
+      }
+    }
+    await this.removeEmptyDirs(join(this.swapDir, 'swapper'));
+    await this.rescan();
+    return { moved, skipped };
+  }
+
+  private async removeEmptyDirs(dir: string): Promise<void> {
+    let entries;
+    try { entries = await fsp.readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) if (e.isDirectory()) await this.removeEmptyDirs(join(dir, e.name));
+    try { await fsp.rmdir(dir); } catch { /* not empty — something was skipped */ }
   }
 
   /** URL filter patterns for webRequest.onBeforeRequest — single broad pattern */
@@ -126,15 +229,15 @@ export class ResourceSwapper {
   }
 
   /** Recursively scan the swap directory and build the file map (async) */
-  private async scanAsync(prefix: string): Promise<void> {
+  private async scanAsync(prefix: string, files: Map<string, string>): Promise<void> {
     try {
       const entries = await fsp.readdir(join(this.swapDir, prefix), { withFileTypes: true });
       for (const dirent of entries) {
         const name = `${prefix}/${dirent.name}`;
         if (dirent.isDirectory()) {
-          await this.scanAsync(name);
+          await this.scanAsync(name, files);
         } else {
-          this.swapFiles.set(name, join(this.swapDir, name));
+          files.set(name, join(this.swapDir, name));
         }
       }
     } catch (err) {

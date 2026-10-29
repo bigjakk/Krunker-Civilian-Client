@@ -21,11 +21,11 @@ Was AI used in the creation of this client? Yes, if you came across this client 
 - unlimited FPS with no aim freeze (custom Electron build, see [below](#custom-electron-build))
 - unobtrusive — nearly all features can be disabled
 - hides ads by default
-- resource swapper (textures, sounds, models)
-- CSS swapper (drop `.css` files in `swap/themes/`)
-- separate CSS themes for social/hub tabs (`swap/socialthemes/`)
-- custom loading screen backgrounds (`swap/backgrounds/`)
-- sky swapper — recolour the in-game sky, or replace it with an image (`swap/skies/`)
+- resource swapper (textures, sounds, models, and custom CSS in `swapper/css/main_custom.css`)
+- CSS themes (drop `.css` files in `swapper/themes/`, then pick one in Settings → Appearance)
+- separate CSS themes for social/hub tabs (`swapper/socialthemes/`)
+- custom loading screen backgrounds (`swapper/backgrounds/`)
+- sky swapper — recolour the in-game sky, or replace it with an image (`swapper/skies/`)
 - customizable matchmaker with lobby scan animation
   - filter by region, gamemode, map, player count, remaining time
   - auto-join with server capacity verification

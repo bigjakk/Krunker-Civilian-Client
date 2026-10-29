@@ -284,7 +284,7 @@ export function setWatermark(enabled: boolean, version?: string): void {
 const TOAST_ID = 'kcc-toast';
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
-export function showToast(msg: string): void {
+export function showToast(msg: string, durationMs = 1800): void {
     let el = document.getElementById(TOAST_ID) as HTMLDivElement | null;
     if (!el) {
         el = document.createElement('div');
@@ -300,6 +300,6 @@ export function showToast(msg: string): void {
     void el.offsetWidth; // force reflow so re-shows re-trigger the fade
     el.style.opacity = '1';
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { if (el) el.style.opacity = '0'; }, 1800);
+    toastTimer = setTimeout(() => { if (el) el.style.opacity = '0'; }, durationMs);
 }
 
