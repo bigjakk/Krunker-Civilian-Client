@@ -147,6 +147,24 @@ ipcRenderer.on('matchmaker-find', (_e, mmConfig: MatchmakerConfig) => {
 // ── Toast from main (e.g. screenshot confirmation) ──
 ipcRenderer.on('kcc-toast', (_e, msg: string) => showToast(msg));
 
+// Re-link swapped krunker.io stylesheets under a fresh URL: the memory cache would otherwise keep the old copy.
+// The swapper ignores the query string, so the new URL still resolves to the swap file.
+ipcRenderer.on('swap-css-reload', (_e, paths: string[]) => {
+  const wanted = new Set(paths.map((p) => p.toLowerCase()));
+  for (const link of document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')) {
+    if (!link.href || link.dataset.kccStale) continue;
+    const url = new URL(link.href);
+    if (!/(^|\.)krunker\.io$/.test(url.hostname) || !wanted.has(url.pathname.toLowerCase())) continue;
+    url.searchParams.set('kccSwap', String(Date.now()));
+    const fresh = link.cloneNode() as HTMLLinkElement;
+    fresh.href = url.href;
+    link.dataset.kccStale = '1';
+    // Keep the old sheet until the new one applies, so there's no unstyled flash
+    fresh.addEventListener('load', () => link.remove(), { once: true });
+    fresh.addEventListener('error', () => { fresh.remove(); delete link.dataset.kccStale; }, { once: true });
+    link.after(fresh);
+  }
+});
 
 
 // ── Wait for main process to signal page load, then poll for settings window ──

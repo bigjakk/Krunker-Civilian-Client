@@ -832,11 +832,15 @@ async function launchApp(): Promise<void> {
     if (items.length) Menu.buildFromTemplate(items).popup();
   });
 
+  // Fallback for when the swap folder watcher couldn't start or has stopped
+  win.webContents.on('did-start-navigation', (details) => {
+    if (swapper.watching || !details.isMainFrame || details.isSameDocument) return;
+    swapper.rescan().catch((err) => electronLog.warn('[KCC] Swapper rescan failed:', err));
+  });
+
   // ── Inject scripts after page loads ──
   win.webContents.on('did-finish-load', () => {
     electronLog.log(`[KCC] Page loaded: ${win.webContents.getURL()}`);
-    // Rescan swap directory so new/changed files are picked up on refresh
-    swapper.rescan().catch((err) => electronLog.warn('[KCC] Swapper rescan failed:', err));
 
     const cssInjections = [
       win.webContents.insertCSS(HIDE_ADS_CSS),
@@ -868,7 +872,16 @@ async function launchApp(): Promise<void> {
     win.webContents.executeJavaScript(CONSENT_DISMISS_JS).catch((err) => electronLog.warn('[KCC] Consent dismiss inject failed:', err));
     // Notify preload to start hooking settings (matches Crankshaft's timing)
     win.webContents.send('main_did-finish-load');
+    // The renderer memory cache serves F5 the stylesheet it already had, so the request never reaches the swapper
+    const swappedCss = swapper.cssPaths();
+    if (swappedCss.length) win.webContents.send('swap-css-reload', swappedCss);
   });
+  swapper.onFilesChange = (paths) => {
+    if (win.isDestroyed()) return;
+    const lower = paths.map((p) => p.toLowerCase());
+    const css = paths.filter((_p, i) => lower[i].endsWith('.css'));
+    if (css.length) win.webContents.send('swap-css-reload', css);
+  };
 
   // Window focus gates social-hub music — see social-music.ts. Guarded because
   // blur can arrive while the window is being torn down.

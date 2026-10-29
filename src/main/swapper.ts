@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, watch, promises as fsp } from 'fs';
-import { dirname, join, resolve, sep } from 'path';
+import { join, resolve, sep } from 'path';
 import { pathToFileURL } from 'url';
 import { protocol, net, Session } from 'electron';
 import { electronLog } from './logger';
@@ -143,61 +143,6 @@ export class ResourceSwapper {
     const files = new Map<string, string>();
     await this.scanAsync('', files);
     return files;
-  }
-
-  /** Files Krunker will never request where they sit: a loose main_custom.css, or a copied-in swapper/ folder */
-  private misplacedFiles(): Array<{ from: string; to: string }> {
-    const out: Array<{ from: string; to: string }> = [];
-    for (const name of this.swapFiles.keys()) {
-      const lower = name.toLowerCase();
-      if (lower === '/main_custom.css' || lower === '/swapper/main_custom.css') out.push({ from: name, to: '/css/main_custom.css' });
-      else if (lower.startsWith('/swapper/')) out.push({ from: name, to: name.slice('/swapper'.length) });
-    }
-    return out;
-  }
-
-  /** One entry per mistake for the settings notice; `blocked` counts files whose right place is already taken */
-  misplaced(): Array<{ from: string; to: string; files: number; blocked: number }> {
-    const groups = new Map<string, { from: string; to: string; files: number; blocked: number }>();
-    const taken = new Set([...this.swapFiles.keys()].map((k) => k.toLowerCase()));
-    for (const f of this.misplacedFiles()) {
-      const key = f.from.toLowerCase() === '/main_custom.css' ? 'loose' : 'nested';
-      const g = groups.get(key) || (key === 'loose'
-        ? { from: 'main_custom.css', to: 'css/main_custom.css', files: 0, blocked: 0 }
-        : { from: 'swapper/swapper/', to: 'swapper/', files: 0, blocked: 0 });
-      g.files++;
-      if (taken.has(f.to.toLowerCase())) g.blocked++;
-      groups.set(key, g);
-    }
-    return [...groups.values()];
-  }
-
-  /** Move misplaced files to where Krunker requests them, never overwriting a file already there */
-  async fixMisplaced(): Promise<{ moved: number; skipped: number }> {
-    let moved = 0;
-    let skipped = 0;
-    for (const f of this.misplacedFiles()) {
-      const dest = join(this.swapDir, f.to);
-      if (existsSync(dest)) { skipped++; continue; }
-      try {
-        await fsp.mkdir(dirname(dest), { recursive: true });
-        await fsp.rename(join(this.swapDir, f.from), dest);
-        moved++;
-      } catch (err) {
-        electronLog.warn(`[KCC] Could not move ${f.from} to ${f.to}:`, err);
-        skipped++;
-      }
-    }
-    await this.removeEmptyDirs(join(this.swapDir, 'swapper'));
-    await this.rescan();
-    return { moved, skipped };
-  }
-
-  private async removeEmptyDirs(dir: string): Promise<void> {
-    let entries;
-    try { entries = await fsp.readdir(dir, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) if (e.isDirectory()) await this.removeEmptyDirs(join(dir, e.name));
-    try { await fsp.rmdir(dir); } catch { /* not empty — something was skipped */ }
   }
 
   /** URL filter patterns for webRequest.onBeforeRequest — single broad pattern */
