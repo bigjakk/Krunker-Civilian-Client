@@ -790,6 +790,24 @@ async function launchApp(): Promise<void> {
   let sessionTabs: string[] = [];
   // Tracked separately from config because set-config defers the actual write
   let socialTheme = config.get('ui')?.socialCssTheme || 'disabled';
+  let gameTheme = config.get('ui')?.cssTheme || 'disabled';
+  // A <style> tag rather than insertCSS so @import rules work; updated in place so a theme swaps without a refresh
+  const applyGameTheme = (): void => {
+    if (win.isDestroyed()) return;
+    const css = getThemeCSS(gameTheme, swapDir);
+    electronLog.log(`[KCC] CSS theme: id=${gameTheme}, css=${css ? css.length + ' chars' : 'none'}`);
+    win.webContents.executeJavaScript(`(() => {
+      const css = ${JSON.stringify(css)};
+      let s = document.getElementById('kcc-user-theme');
+      if (!css) { if (s) s.remove(); return; }
+      if (!s) {
+        s = document.createElement('style');
+        s.id = 'kcc-user-theme';
+        (document.head || document.documentElement).appendChild(s);
+      }
+      s.textContent = css;
+    })()`).catch((err) => electronLog.warn('[KCC] Theme inject failed:', err));
+  };
   const socialThemeCSS = () => getThemeCSS(socialTheme, swapDir, SOCIAL_THEMES_DIR);
   let tabManager = new TabManager(
     win, ses, preloadPath, tabMode,
@@ -847,20 +865,8 @@ async function launchApp(): Promise<void> {
       win.webContents.insertCSS(ALL_CLIENT_CSS),
     ];
 
-    // Inject user CSS theme via <style> tag so @import rules work
     const uiConf = config.get('ui');
-    const themeId = uiConf?.cssTheme || 'disabled';
-    const themeCSS = getThemeCSS(themeId, swapDir);
-    electronLog.log(`[KCC] CSS theme: id=${themeId}, css=${themeCSS ? themeCSS.length + ' chars' : 'none'}`);
-    if (themeCSS) {
-      // Use <style> tag via executeJavaScript so @import rules work (insertCSS doesn't support them).
-      win.webContents.executeJavaScript(`(() => {
-        const s = document.createElement('style');
-        s.id = 'kcc-user-theme';
-        s.textContent = ${JSON.stringify(themeCSS)};
-        document.head.appendChild(s);
-      })()`).catch((err) => electronLog.warn('[KCC] Theme inject failed:', err));
-    }
+    applyGameTheme();
 
     // Inject loading screen background
     const loadingCSS = getLoadingScreenCSS(uiConf?.loadingTheme || 'disabled', uiConf?.backgroundUrl || '', swapDir);
@@ -881,6 +887,8 @@ async function launchApp(): Promise<void> {
     const lower = paths.map((p) => p.toLowerCase());
     const css = paths.filter((_p, i) => lower[i].endsWith('.css'));
     if (css.length) win.webContents.send('swap-css-reload', css);
+    if (lower.some((p) => p.startsWith(`/${GAME_THEMES_DIR}/`))) applyGameTheme();
+    if (lower.some((p) => p.startsWith(`/${SOCIAL_THEMES_DIR}/`))) tabManager.refreshSocialTheme();
   };
 
   // Window focus gates social-hub music — see social-music.ts. Guarded because
@@ -1004,6 +1012,11 @@ async function launchApp(): Promise<void> {
       if (next !== socialTheme) {
         socialTheme = next;
         tabManager.refreshSocialTheme();
+      }
+      const nextGame = (value as any)?.cssTheme || 'disabled';
+      if (nextGame !== gameTheme) {
+        gameTheme = nextGame;
+        applyGameTheme();
       }
     }
     pendingConfigWrites.set(key, value);
