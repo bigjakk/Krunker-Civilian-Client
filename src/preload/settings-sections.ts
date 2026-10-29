@@ -610,6 +610,10 @@ export function buildSwapperSection(body: HTMLElement, uiConfRaw: any): void {
     ipcRenderer.invoke('set-config', 'ui', ui);
   }
 
+  // Above everything else: this is where people land when their swaps don't load
+  const misplacedHolder = document.createElement('div');
+  body.appendChild(misplacedHolder);
+
   const group = createGroup(body);
 
   group.appendChild(createButtonRow({
@@ -617,6 +621,34 @@ export function buildSwapperSection(body: HTMLElement, uiConfRaw: any): void {
     desc: 'Replace game files with your own, in the same folders Krunker uses (textures/, sound/, models/). Custom CSS goes in css/main_custom.css',
     buttons: [{ icon: 'folder', label: 'Swapper', title: 'Open Folder', onClick: () => ipcRenderer.invoke('open-swap-folder') }],
   }).row);
+
+  const renderMisplaced = (): void => {
+    ipcRenderer.invoke('swap-misplaced').then((list: Array<{ from: string; to: string; files: number; blocked: number }>) => {
+      misplacedHolder.innerHTML = '';
+      for (const m of list) {
+        let desc = m.from === 'main_custom.css'
+          ? 'main_custom.css is loose in the swapper folder, so Krunker never loads it. It belongs in css/main_custom.css.'
+          : `There's a swapper folder inside your swapper folder (${m.files} file${m.files === 1 ? '' : 's'}), so Krunker never finds them. They belong directly in swapper/.`;
+        if (m.blocked) desc += ` ${m.blocked} already ${m.blocked === 1 ? 'has a file' : 'have files'} in the right place and will be left alone.`;
+        const { row } = createButtonRow({
+          label: 'Files in the Wrong Folder',
+          desc,
+          buttons: [{
+            icon: 'drive_file_move', label: 'Move It', title: `Move to ${m.to}`,
+            onClick: () => {
+              ipcRenderer.invoke('swap-fix-misplaced').then((r: { moved: number; skipped: number }) => {
+                showToast(`Moved ${r.moved} file${r.moved === 1 ? '' : 's'}` + (r.skipped ? `, left ${r.skipped} that would overwrite an existing file` : ''), 5000);
+                renderMisplaced();
+              });
+            },
+          }],
+        });
+        row.classList.add('kcc-row-warn');
+        misplacedHolder.appendChild(row);
+      }
+    });
+  };
+  renderMisplaced();
 
   // ── Sky ──
   // Applies on the next map load; the map being played is already built.
@@ -727,7 +759,6 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any, ncConf
   themeSelect.addEventListener('change', () => {
     ui.cssTheme = themeSelect.value;
     saveUI();
-    onSettingChanged('refresh');
   });
 
   // ── Social CSS Theme selector (populated from swapper/socialthemes/) ──

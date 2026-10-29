@@ -850,6 +850,7 @@ async function launchApp(): Promise<void> {
     if (items.length) Menu.buildFromTemplate(items).popup();
   });
 
+  let misplacedWarned = false;
   // Fallback for when the swap folder watcher couldn't start or has stopped
   win.webContents.on('did-start-navigation', (details) => {
     if (swapper.watching || !details.isMainFrame || details.isSameDocument) return;
@@ -881,6 +882,10 @@ async function launchApp(): Promise<void> {
     // The renderer memory cache serves F5 the stylesheet it already had, so the request never reaches the swapper
     const swappedCss = swapper.cssPaths();
     if (swappedCss.length) win.webContents.send('swap-css-reload', swappedCss);
+    if (!misplacedWarned && isGameURL(win.webContents.getURL()) && swapper.misplaced().length) {
+      misplacedWarned = true;
+      win.webContents.send('kcc-toast', 'Some swapper files are in the wrong folder and won\'t load. See Settings → Client → Swapper', 8000);
+    }
   });
   swapper.onFilesChange = (paths) => {
     if (win.isDestroyed()) return;
@@ -1042,6 +1047,8 @@ async function launchApp(): Promise<void> {
   });
   ipcMain.handle('get-swap-dir', () => swapDir);
   ipcMain.handle('open-swap-folder', () => shell.openPath(swapDir));
+  ipcMain.handle('swap-misplaced', () => swapper.misplaced());
+  ipcMain.handle('swap-fix-misplaced', () => swapper.fixMisplaced());
   ipcMain.handle('open-themes-folder', () => shell.openPath(join(swapDir, GAME_THEMES_DIR)));
   ipcMain.handle('open-social-themes-folder', () => shell.openPath(join(swapDir, SOCIAL_THEMES_DIR)));
   ipcMain.handle('open-backgrounds-folder', () => shell.openPath(join(swapDir, 'backgrounds')));

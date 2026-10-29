@@ -145,7 +145,7 @@ ipcRenderer.on('matchmaker-find', (_e, mmConfig: MatchmakerConfig) => {
 });
 
 // ── Toast from main (e.g. screenshot confirmation) ──
-ipcRenderer.on('kcc-toast', (_e, msg: string) => showToast(msg));
+ipcRenderer.on('kcc-toast', (_e, msg: string, durationMs?: number) => showToast(msg, durationMs));
 
 // Re-link swapped krunker.io stylesheets under a fresh URL: the memory cache would otherwise keep the old copy.
 // The swapper ignores the query string, so the new URL still resolves to the swap file.
