@@ -518,11 +518,13 @@ async function launchApp(): Promise<void> {
 
   // ── Resource swapper ──
   const swapDir = config.get('swapper').path || join(app.getPath('userData'), 'Krunker Civilian Client', 'swapper');
-  // Ensure swap subdirectories exist (themes/, backgrounds/, socialthemes/, skies/)
-  for (const sub of [GAME_THEMES_DIR, 'backgrounds', SOCIAL_THEMES_DIR, SKIES_DIR]) {
-    const dir = join(swapDir, sub);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  }
+  const ensureSwapDirs = (): void => {
+    for (const sub of ['css', 'textures', 'sound', 'models', GAME_THEMES_DIR, 'backgrounds', SOCIAL_THEMES_DIR, SKIES_DIR]) {
+      const dir = join(swapDir, sub);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    }
+  };
+  ensureSwapDirs();
 
   registerSwapperFileProtocol(ses, swapDir);
 
@@ -1210,6 +1212,7 @@ async function launchApp(): Promise<void> {
       for (const entry of entries) {
         await fsp.rm(join(swapDir, entry.name), { recursive: true, force: true });
       }
+      ensureSwapDirs();
       electronLog.log('[KCC] Swapper reset (' + entries.length + ' entries cleared)');
       return true;
     } catch (err) {
