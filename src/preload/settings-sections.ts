@@ -718,7 +718,7 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any, ncConf
     for (const t of themes) {
       const opt = document.createElement('option');
       opt.value = t.id;
-      opt.textContent = t.label;
+      opt.textContent = themes.length === 1 ? 'Disabled (no .css files in themes/)' : t.label;
       if (t.id === ui.cssTheme) opt.selected = true;
       themeSelect.appendChild(opt);
     }
@@ -742,7 +742,7 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any, ncConf
     for (const t of themes) {
       const opt = document.createElement('option');
       opt.value = t.id;
-      opt.textContent = t.label;
+      opt.textContent = themes.length === 1 ? 'Disabled (no .css files in socialthemes/)' : t.label;
       if (t.id === ui.socialCssTheme) opt.selected = true;
       socialThemeSelect.appendChild(opt);
     }
