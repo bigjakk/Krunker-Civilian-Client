@@ -618,7 +618,7 @@ export function buildSwapperSection(body: HTMLElement, uiConfRaw: any): void {
 
   group.appendChild(createButtonRow({
     label: 'Swapper Folder',
-    desc: 'Replace game files with your own, in the same folders Krunker uses (textures/, sound/, models/). Custom CSS goes in css/main_custom.css',
+    desc: 'Replace game files with your own, in the same folders Krunker uses (textures/, sound/, models/). For CSS, KCC themes are recommended (Appearance → CSS Theme)',
     buttons: [{ icon: 'folder', label: 'Swapper', title: 'Open Folder', onClick: () => ipcRenderer.invoke('open-swap-folder') }],
   }).row);
 
