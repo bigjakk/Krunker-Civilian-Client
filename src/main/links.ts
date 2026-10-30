@@ -4,17 +4,24 @@ export function isKrunkerHost(hostname: string): boolean {
   return hostname === 'krunker.io' || hostname.endsWith('.krunker.io');
 }
 
-// Only krunker.io itself gets the game window, tabs and the preload bridge; subdomains also serve user uploads.
-export function isKrunkerPage(url: string): boolean {
+// Only these origins get tabs and the preload bridge; other subdomains also serve user uploads.
+const KRUNKER_PAGE_ORIGINS = new Set(['https://krunker.io', 'https://community.krunker.io']);
+
+function parseURL(url: string): URL | null {
   try {
-    return new URL(url).origin === 'https://krunker.io';
+    return new URL(url);
   } catch {
-    return false;
+    return null;
   }
 }
 
+export function isKrunkerPage(url: string): boolean {
+  return KRUNKER_PAGE_ORIGINS.has(parseURL(url)?.origin ?? '');
+}
+
 export function isGameURL(url: string): boolean {
-  return isKrunkerPage(url) && new URL(url).pathname === '/';
+  const u = parseURL(url);
+  return u?.origin === 'https://krunker.io' && u.pathname === '/';
 }
 
 export function safeOpenExternal(url: string): void {

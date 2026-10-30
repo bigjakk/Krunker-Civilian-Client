@@ -34,8 +34,8 @@ installGameSocketTap();
 // ── Sky override: wrap window.fetch before the map config request goes out ──
 installSkyHook();
 
-// preventDefault on wheel events avoids Chromium 100+ pacing frame production to vsync during scroll gestures (FPS would tank from 1000+ to refresh rate). Skip when target is inside a real scrollable element so menus still scroll.
-window.addEventListener('wheel', (e: WheelEvent) => {
+// preventDefault on wheel events avoids Chromium 100+ pacing frame production to vsync during scroll gestures (FPS would tank from 1000+ to refresh rate). Skip when target is inside a real scrollable element so menus still scroll. krunker.io only: community.krunker.io scrolls the document.
+if (location.origin === 'https://krunker.io') window.addEventListener('wheel', (e: WheelEvent) => {
     // Pointer lock = in-game weapon scroll: nothing is scrollable, and the
     // ancestor walk below forces style+layout (getComputedStyle/scrollHeight)
     // on every wheel tick mid-combat. Block the gesture without walking.

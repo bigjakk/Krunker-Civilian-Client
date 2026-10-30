@@ -735,8 +735,8 @@ async function launchApp(): Promise<void> {
       event.preventDefault();
     } else if (matchesKeybind(input, binds.joinFromClipboard)) {
       const text = clipboard.readText();
-      if (isKrunkerPage(text)) win.loadURL(text);
-      else electronLog.warn('[KCC] Join-from-clipboard: clipboard is not a krunker.io https URL');
+      if (isGameURL(text)) win.loadURL(text);
+      else electronLog.warn('[KCC] Join-from-clipboard: clipboard is not a krunker.io game URL');
       event.preventDefault();
     } else if (matchesKeybind(input, binds.copyGameLink)) {
       clipboard.writeText(win.webContents.getURL());
