@@ -91,6 +91,8 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
   // WebGL is mandatory for Krunker — force it past any GPU blocklist.
   // On Chromium 134+ the blocklist is stricter and silently disables WebGL on many Linux GPUs.
   app.commandLine.appendSwitch('ignore-gpu-blocklist');
+  // Dual-GPU laptops otherwise default to the integrated GPU unless the user sets a per-app preference
+  if (performance.highPerformanceGpu) app.commandLine.appendSwitch('force-high-performance-gpu');
 
   // ── ANGLE backend ──
   // 'default' means platform default: D3D11 on Windows, no override on Linux
@@ -137,8 +139,8 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
 
   // ── Extra performance tweaks ──
   // Force-past-safety switches: GPU rasterization past the driver blocklist,
-  // driver bug workarounds off, no software-rasterizer fallback, discrete GPU
-  // on dual-GPU machines, 1ms Windows timer frequency, no best-effort task
+  // driver bug workarounds off, no software-rasterizer fallback,
+  // 1ms Windows timer frequency, no best-effort task
   // deferral, and no proxy resolution (breaks proxied setups).
   if (advanced.perfTweaks) {
     app.commandLine.appendSwitch('enable-gpu-rasterization');
@@ -149,7 +151,6 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
     // disables them). Windows/Linux keep the switch.
     if (info.os !== 'darwin') app.commandLine.appendSwitch('disable-gpu-driver-bug-workarounds');
     app.commandLine.appendSwitch('disable-software-rasterizer');
-    app.commandLine.appendSwitch('force-high-performance-gpu');
     app.commandLine.appendSwitch('raise-timer-frequency');
     app.commandLine.appendSwitch('disable-best-effort-tasks');
     app.commandLine.appendSwitch('no-proxy-server');

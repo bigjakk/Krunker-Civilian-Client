@@ -552,6 +552,13 @@ export function buildPerformanceSection(
     }));
   }
 
+  sysGroup.appendChild(createToggleRow({
+    label: 'High-Performance GPU',
+    desc: 'On laptops with two GPUs, runs the client on the dedicated GPU instead of the integrated one. More FPS, but more heat and battery use (requires restart)',
+    checked: perf.highPerformanceGpu !== false, restart: true,
+    onChange: (v) => { perf.highPerformanceGpu = v; savePerf(); },
+  }));
+
   const angleOptions: Array<{ value: string; label: string }> = isWindows
     ? [
         { value: 'default', label: 'Default (D3D11)' },
@@ -585,7 +592,7 @@ export function buildPerformanceSection(
 
   flagsGroup.appendChild(createToggleRow({
     label: 'Extra Performance Tweaks',
-    desc: 'Forces GPU rasterization past the driver blocklist, disables driver bug workarounds and the software fallback, prefers the high-performance GPU, and skips proxy resolution (breaks VPN/proxy setups)',
+    desc: 'Forces GPU rasterization past the driver blocklist, disables driver bug workarounds and the software fallback, and skips proxy resolution (breaks VPN/proxy setups)',
     checked: !!adv.perfTweaks, restart: true, safety: 3,
     onChange: (v) => { adv.perfTweaks = v; saveAdv(); },
   }));
