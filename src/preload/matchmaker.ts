@@ -5,59 +5,121 @@
 
 import { ipcRenderer } from 'electron';
 import type { Keybind } from '../main/config';
-import { OFFICIAL_MAPS, mapImageUrl } from '../main/maps';
+import { OFFICIAL_MAPS, mapImageUrl, type OfficialMap } from '../main/maps';
 import { escapeHtml, type SavedConsole } from './utils';
 
 // Full array — indices must match the server's gamemode IDs (game[4].g)
-export const MATCHMAKER_GAMEMODES = ['Free for All', 'Team Deathmatch', 'Hardpoint', 'Capture the Flag', 'Parkour', 'Hide & Seek', 'Infected', 'Race', 'Last Man Standing', 'Simon Says', 'Gun Game', 'Prop Hunt', 'Boss Hunt', 'Classic FFA', 'Deposit', 'Stalker', 'King of the Hill', 'One in the Chamber', 'Trade', 'Kill Confirmed', 'Defuse', 'Sharp Shooter', 'Traitor', 'Raid', 'Blitz', 'Domination', 'Squad Deathmatch', 'Kranked FFA', 'Team Defender', 'Deposit FFA', 'Chaos Snipers', 'Bighead FFA'];
+export const MATCHMAKER_GAMEMODES = ['Free for All', 'Team Deathmatch', 'Hardpoint', 'Capture the Flag', 'Parkour', 'Hide & Seek', 'Infected', 'Race', 'Last Man Standing', 'Simon Says', 'Gun Game', 'Prop Hunt', 'Boss Hunt', 'Classic FFA', 'Deposit', 'Stalker', 'King of the Hill', 'One in the Chamber', 'Trade', 'Kill Confirmed', 'Defuse', 'Sharp Shooter', 'Traitor', 'Raid', 'Blitz', 'Domination', 'Squad Deathmatch', 'Kranked FFA', 'Team Defender', 'Deposit FFA', 'Carrier', 'All or Nothing', 'Mag Dump', 'Chaos Snipers', 'Bighead FFA', 'Zombies', 'Impulsed'];
 
 // Modes shown in matchmaker settings
-export const MATCHMAKER_GAMEMODE_FILTER = [
+const MATCHMAKER_GAMEMODE_FILTER = [
     'Free for All', 'Team Deathmatch', 'Hardpoint', 'Capture the Flag', 'Parkour',
     'Gun Game', 'Classic FFA', 'Deposit', 'Kill Confirmed', 'Sharp Shooter',
     'Domination', 'Kranked FFA', 'Team Defender', 'Deposit FFA', 'Chaos Snipers',
     'Bighead FFA',
 ];
+const PARKOUR_MODE = 4;
+
+let hostableModes: Map<number, string> | null = null;
+// Modes newer than this build that can't be hosted (events), with the maps they're running on
+let eventModeMaps = new Map<number, Set<string>>();
+
+// Krunker's Host Game window lists every mode players can host, so newer modes get their real name here
+function liveHostableModes(): Map<number, string> | null {
+    if (hostableModes) return hostableModes;
+    try {
+        const html = (window as any).windows?.[7]?.gen?.();
+        if (typeof html !== 'string') return null;
+        const modes = new Map<number, string>();
+        new DOMParser().parseFromString(html, 'text/html').querySelectorAll('input[id^="gameMode"]').forEach((input) => {
+            const id = /^gameMode(\d+)$/.exec(input.id)?.[1];
+            const name = input.closest('label')?.querySelector('.optName')?.textContent?.trim();
+            if (id && name) modes.set(Number(id), name);
+        });
+        if (modes.get(0) === MATCHMAKER_GAMEMODES[0]) hostableModes = modes;
+    } catch { /* fall back to the bundled names */ }
+    return hostableModes;
+}
+
+function newerHostableModes(): string[] {
+    return [...hostableModes ?? []].filter(([id]) => id >= MATCHMAKER_GAMEMODES.length).map(([, name]) => name);
+}
+
+// Searched when nothing is picked, so search-all never lands in parkour, raid or event lobbies
+function defaultModes(): Set<string> {
+    return new Set([...MATCHMAKER_GAMEMODE_FILTER.filter((m) => m !== 'Parkour'), ...newerHostableModes()]);
+}
+
+// Known ids keep their bundled names so saved mode filters still match; unnamed events are keyed '#<id>'
+function modeKey(id: number): string {
+    return MATCHMAKER_GAMEMODES[id] ?? hostableModes?.get(id) ?? `#${id}`;
+}
+
+function modeLabel(key: string): string {
+    if (!key.startsWith('#')) return key;
+    const maps = eventModeMaps.get(Number(key.slice(1)));
+    if (!maps) return 'Event (ended)';
+    return `Event: ${[...maps].slice(0, 2).map((m) => m.replace(/_/g, ' ')).join(', ')}`;
+}
+
+function trackEventModes(games: any[][]): void {
+    // Until the host list is readable, a newer mode can't be told apart from an event
+    if (!liveHostableModes()) return;
+    const events = new Map<number, Set<string>>();
+    for (const game of games) {
+        const id: number = game[4].g;
+        if (id < MATCHMAKER_GAMEMODES.length || hostableModes!.has(id)) continue;
+        if (!events.has(id)) events.set(id, new Set());
+        events.get(id)!.add(game[4].i);
+    }
+    eventModeMaps = events;
+}
+
+// Saved picks that are no longer offered stay listed so they can be unticked
+export function matchmakerModeItems(selected: string[]): { value: string; label: string }[] {
+    liveHostableModes();
+    const keys = new Set([...MATCHMAKER_GAMEMODE_FILTER, ...newerHostableModes(), ...[...eventModeMaps.keys()].map((id) => `#${id}`), ...selected]);
+    return [...keys].map((key) => ({ value: key, label: modeLabel(key) }));
+}
+
 export const MATCHMAKER_REGIONS = ['SV', 'TOK', 'FRA', 'MBI', 'SYD', 'SIN', 'DAL', 'BHN', 'BRZ', 'NY'];
 export const MATCHMAKER_REGION_NAMES: Record<string, string> = { SV: 'Silicon Valley', TOK: 'Tokyo', FRA: 'Frankfurt', MBI: 'Mumbai', SYD: 'Sydney', SIN: 'Singapore', DAL: 'Dallas', BHN: 'Bahrain', BRZ: 'Brazil', NY: 'New York' };
 export const MATCHMAKER_MAP_NAMES: Record<string, string> = {
-    SkyTemple: 'Sky Temple', Krunk_Plaza: 'Krunk Plaza', Old_Burg: 'Old Burg',
+    SkyTemple: 'Sky Temple',
 };
 
-// Official maps shown in matchmaker settings
-export const MATCHMAKER_MAP_FILTER = [
-    'Burg', 'Littletown', 'Sandstorm', 'Subzero', 'Undergrowth', 'Freight',
-    'Lostworld', 'Citadel', 'Oasis', 'Kanji', 'Industry', 'Lumber', 'Evacuation',
-    'Site', 'SkyTemple', 'Lagoon', 'Tropicano', 'Habitat', 'Atomic', 'Old_Burg',
-    'Throwback', 'Clockwork', 'Bazaar', 'Erupt', 'HQ', 'Lush', 'Vivo',
-    'Slide Moonlight', 'Eterno Simulator', 'Eterno Jump', 'Frontier',
-    'Piazza', 'Barnyard',
-];
-
-// Normalize a map identifier for comparison: lowercase, strip non-alphanumerics.
-// Live game IDs use different casing/separators than the display names in
-// MATCHMAKER_MAP_FILTER — e.g. the live ID "slide_moonlight" must match the
-// filter entry "Slide Moonlight". Both sides are normalized before comparing.
+// Live map ids differ in case/separators from the official names ("slide_moonlight" vs "Slide Moonlight")
 function normalizeMapId(name: string): string {
     return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-// Krunker hosts a top-down preview image per official map at the map's id.
-// Community maps aren't indexed (no icon). Lookup is normalized so live IDs like
-// "slide_moonlight" still resolve.
-const MAP_ICON_INDEX_BY_NORM = new Map<string, number>(
-    OFFICIAL_MAPS.map((name, i) => [normalizeMapId(name), i]),
-);
-// Normalized IDs of the maps offered in the picker. Used as the default map
-// filter when the user selects no maps, so anything outside the curated list —
-// community maps (e.g. "AIM_Room") and unlisted official maps (e.g. "Shipyard")
-// — is never matched in "search all" mode.
-const DEFAULT_MAP_NORMS = new Set(MATCHMAKER_MAP_FILTER.map(normalizeMapId));
-// Always-on parkour maps that legitimately run with no round timer. An untimed
-// lobby on any other map is a hosted custom game — never matched.
-const PARKOUR_MAP_NORMS = new Set(['Eterno Jump', 'Slide Moonlight'].map(normalizeMapId));
+// Official maps feed the picker and the no-pick default, so community maps (e.g. "AIM_Room") never match
+let officialMaps: OfficialMap[] = OFFICIAL_MAPS.map((name, id) => ({ id, name }));
+let mapIdByNorm = new Map(officialMaps.map((m) => [normalizeMapId(m.name), m.id]));
+
+async function fetchGameList(): Promise<any[][]> {
+    const response = await fetch(`https://matchmaker.krunker.io/game-list?hostname=${window.location.hostname}`);
+    const games = (await response.json()).games;
+    trackEventModes(games);
+    return games;
+}
+
+// Swaps in main's live map list and spots running events, so new maps and modes show up without an update
+export function loadMatchmakerLists(): void {
+    ipcRenderer.invoke('get-official-maps').then((maps: OfficialMap[] | null) => {
+        if (!Array.isArray(maps) || !maps.length) return;
+        officialMaps = maps;
+        mapIdByNorm = new Map(maps.map((m) => [normalizeMapId(m.name), m.id]));
+    }).catch(() => { /* keep the bundled list */ });
+    fetchGameList().catch(() => { /* events show up on the first search instead */ });
+}
+
+export function matchmakerMapNames(): string[] {
+    return officialMaps.map((m) => m.name);
+}
+
 export function mapIconUrl(mapName: string): string | null {
-    const idx = MAP_ICON_INDEX_BY_NORM.get(normalizeMapId(mapName));
+    const idx = mapIdByNorm.get(normalizeMapId(mapName));
     return idx === undefined ? null : mapImageUrl(idx);
 }
 
@@ -298,44 +360,44 @@ async function animateLobbyScan(run: number, lobbies: RawLobby[], finalLobby?: M
 }
 
 async function fetchAllGames(mmConfig: MatchmakerConfig): Promise<{ all: RawLobby[]; filtered: MatchmakerGame[] }> {
-    const response = await fetch(`https://matchmaker.krunker.io/game-list?hostname=${window.location.hostname}`);
-    const result = await response.json();
+    const games = await fetchGameList();
     const all: RawLobby[] = [];
     const filtered: MatchmakerGame[] = [];
 
     // Normalize configured maps once so live IDs (e.g. "slide_moonlight") match
-    // the display names stored in config (e.g. "Slide Moonlight"). When the user
-    // selects no maps, default to the picker's map list instead of "everything" —
-    // this keeps custom/community maps (e.g. "AIM_Room") out of the results.
+    // the display names stored in config (e.g. "Slide Moonlight").
     const mapFilter = mmConfig.maps.length > 0
         ? new Set(mmConfig.maps.map(normalizeMapId))
-        : DEFAULT_MAP_NORMS;
+        : new Set(mapIdByNorm.keys());
+    // Picked maps are opt-in for whatever mode they run (event maps only run their event mode)
+    const modeFilter = mmConfig.gamemodes.length > 0 ? new Set(mmConfig.gamemodes)
+        : mmConfig.maps.length > 0 ? null : defaultModes();
 
-    for (const game of result.games) {
+    for (const game of games) {
         const gameID: string = game[0];
         const region = gameID.split(':')[0];
         const playerCount: number = game[2];
         const playerLimit: number = game[3];
         const map: string = game[4].i;
-        const gamemode = MATCHMAKER_GAMEMODES[game[4].g] ?? 'Unknown Gamemode';
+        const modeId: number = game[4].g;
+        const mode = modeKey(modeId);
         const remainingTime: number = game[5];
-        const mapNorm = normalizeMapId(map);
 
         let passesFilter = true;
         if (mmConfig.regions.length > 0 && !mmConfig.regions.includes(region)) passesFilter = false;
-        else if (mmConfig.gamemodes.length > 0 && !mmConfig.gamemodes.includes(gamemode)) passesFilter = false;
-        else if (!mapFilter.has(mapNorm)) passesFilter = false;
+        else if (modeFilter && !modeFilter.has(mode)) passesFilter = false;
+        else if (!mapFilter.has(normalizeMapId(map))) passesFilter = false;
         else if (playerCount < mmConfig.minPlayers) passesFilter = false;
         else if (playerCount > mmConfig.maxPlayers) passesFilter = false;
         // remainingTime of 0 means "no round timer / unlimited", not "0 seconds left".
-        // Only the always-on parkour maps legitimately run untimed — an untimed lobby
-        // on any other map is a hosted custom game. Timed lobbies honor the minimum.
-        else if (remainingTime <= 0 && !PARKOUR_MAP_NORMS.has(mapNorm)) passesFilter = false;
+        // Only parkour legitimately runs untimed — an untimed lobby in any other mode
+        // is a hosted custom game. Timed lobbies honor the minimum.
+        else if (remainingTime <= 0 && modeId !== PARKOUR_MODE) passesFilter = false;
         else if (remainingTime > 0 && remainingTime < mmConfig.minRemainingTime) passesFilter = false;
         else if (playerCount === playerLimit) passesFilter = false;
         else if (window.location.href.includes(gameID)) passesFilter = false;
 
-        const lobby = { gameID, region, playerCount, playerLimit, map, gamemode, remainingTime, passesFilter };
+        const lobby = { gameID, region, playerCount, playerLimit, map, gamemode: modeLabel(mode), remainingTime, passesFilter };
         all.push(lobby);
         if (passesFilter) filtered.push(lobby);
     }

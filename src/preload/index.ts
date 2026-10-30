@@ -1,5 +1,5 @@
 import { ipcRenderer } from 'electron';
-import { fetchGame } from './matchmaker';
+import { fetchGame, loadMatchmakerLists } from './matchmaker';
 import type { MatchmakerConfig } from './matchmaker';
 import { hookSettings } from './settings-render';
 import { hookNativeImport } from './native-import';
@@ -273,6 +273,9 @@ ipcRenderer.on('main_did-finish-load', () => {
       setHeadshotSoundMode(gameConf?.headshotSound ?? 'off');
       installSoundHook();
     }
+
+    // ── Matchmaker map and mode lists (Krunker's live tables) ──
+    if (isGamePage) loadMatchmakerLists();
 
     // ── Trade request ding ──
     if (isGamePage) {

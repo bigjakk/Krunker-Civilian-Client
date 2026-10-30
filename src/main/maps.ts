@@ -7,6 +7,8 @@ export const OFFICIAL_MAPS: readonly string[] = [
   'Stalk Factory', 'Eterno Jump', 'Frontier', 'Bastion', 'Piazza', 'Barnyard',
 ];
 
+export interface OfficialMap { id: number; name: string }
+
 export function mapImageUrl(id: number): string {
   return `https://assets.krunker.io/img/maps/map_${id}.png`;
 }

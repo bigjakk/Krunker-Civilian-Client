@@ -28,7 +28,7 @@ import { setBetterChat, setAutoHideChat, setChatHistorySize } from './chat';
 import { updateTranslatorConfig } from './translator';
 import { showChangelogNow } from './changelog';
 import { setVerbose } from './saved-console';
-import { MATCHMAKER_GAMEMODE_FILTER, MATCHMAKER_REGIONS, MATCHMAKER_REGION_NAMES, MATCHMAKER_MAP_FILTER, MATCHMAKER_MAP_NAMES, mapIconUrl } from './matchmaker';
+import { MATCHMAKER_REGIONS, MATCHMAKER_REGION_NAMES, MATCHMAKER_MAP_NAMES, mapIconUrl, matchmakerMapNames, matchmakerModeItems } from './matchmaker';
 
 export interface SettingsBag {
   binds: Record<string, Keybind>;
@@ -1067,15 +1067,15 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
   }));
 
   filtersGroup.appendChild(createCheckboxGrid({
-    header: 'Gamemodes (none selected = all)',
-    items: MATCHMAKER_GAMEMODE_FILTER.map(gm => ({ value: gm, label: gm })),
+    header: 'Gamemodes (none selected = any on picked maps, else all but Parkour and events)',
+    items: matchmakerModeItems(mm.gamemodes),
     selected: mm.gamemodes,
     onChange: () => saveMM(),
   }));
 
   filtersGroup.appendChild(createCheckboxGrid({
     header: 'Maps (none selected = all)',
-    items: MATCHMAKER_MAP_FILTER.map(m => ({ value: m, label: MATCHMAKER_MAP_NAMES[m] || m, icon: mapIconUrl(m) ?? undefined })),
+    items: matchmakerMapNames().map(m => ({ value: m, label: MATCHMAKER_MAP_NAMES[m] || m.replace(/_/g, ' '), icon: mapIconUrl(m) ?? undefined })),
     selected: mm.maps,
     onChange: () => saveMM(),
   }));

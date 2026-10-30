@@ -1,8 +1,7 @@
-import { BrowserWindow, net } from 'electron';
+import { BrowserWindow } from 'electron';
 import { QUEUE_NOTIFICATION_AUDIO } from './ranked-queue-audio';
 import { devWindowIcon } from './platform';
-import { electronLog } from './logger';
-import { OFFICIAL_MAPS, mapImageUrl } from './maps';
+import { mapImageUrl, type OfficialMap } from './maps';
 
 export const DEFAULT_RANKED_AUDIO_URL = `data:audio/mpeg;base64,${QUEUE_NOTIFICATION_AUDIO}`;
 
@@ -10,34 +9,13 @@ let queueWindow: BrowserWindow | null = null;
 
 const RANKED_QUEUE_WS = 'wss://gamefrontend.svc.krunker.io/v1/matchmaking/queue';
 
-const MAPS_URL = 'https://gapi.svc.krunker.io/maps';
-
 type QueueMaps = Record<string, { number: number; image: string }>;
 
-function toQueueMaps(entries: [number, string][]): QueueMaps {
+// The ranked pool changes every season, so the queue offers (and can name) every official map
+function toQueueMaps(officialMaps: OfficialMap[]): QueueMaps {
     const maps: QueueMaps = {};
-    for (const [id, name] of entries) maps[name.replace(/_/g, ' ')] = { number: id, image: mapImageUrl(id) };
+    for (const { id, name } of officialMaps) maps[name.replace(/_/g, ' ')] = { number: id, image: mapImageUrl(id) };
     return maps;
-}
-
-let liveMaps: Promise<QueueMaps> | null = null;
-
-// The ranked pool changes every season, so queue for (and name) every official map, read live from Krunker
-export function loadQueueMaps(): Promise<QueueMaps> {
-    liveMaps ??= net.fetch(MAPS_URL, { signal: AbortSignal.timeout(4000) })
-        .then((res) => res.json())
-        .then((body: { data?: { id?: unknown; name?: unknown }[] }) => {
-            const entries = (body.data ?? []).filter((m): m is { id: number; name: string } =>
-                Number.isInteger(m.id) && (m.id as number) >= 0 && typeof m.name === 'string');
-            if (!entries.length) throw new Error('empty map table');
-            return toQueueMaps(entries.map((m) => [m.id, m.name]));
-        })
-        .catch((err) => {
-            electronLog.warn('[KCC-Ranked] Live map list unavailable, using the bundled one:', err);
-            liveMaps = null;
-            return toQueueMaps(OFFICIAL_MAPS.map((name, i) => [i, name]));
-        });
-    return liveMaps;
 }
 
 const RANKED_REGIONS: Record<string, string> = {
@@ -633,7 +611,7 @@ export function openRankedQueue(
     allRegions: boolean,
     audioUrl: string,
     showHeader: boolean,
-    maps: QueueMaps,
+    officialMaps: OfficialMap[],
 ): void {
     if (queueWindow && !queueWindow.isDestroyed()) {
         queueWindow.focus();
@@ -659,6 +637,6 @@ export function openRankedQueue(
     queueWindow = win;
     win.on('closed', () => { queueWindow = null; });
 
-    const html = buildQueueHtml(token, region, allRegions, audioUrl, showHeader, maps);
+    const html = buildQueueHtml(token, region, allRegions, audioUrl, showHeader, toQueueMaps(officialMaps));
     win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 }
