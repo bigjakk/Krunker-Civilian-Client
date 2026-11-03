@@ -11,6 +11,7 @@ import { initHPCounter, initRankProgress } from './competitive';
 import { initKeystrokes } from './keystrokes';
 import type { KeystrokesConfig } from './keystrokes';
 import { initStatCounter } from './stat-counter';
+import { initHudPositions } from './hud-editor';
 import { checkChangelog } from './changelog';
 import { DEFAULT_CONFIG } from '../main/config-defaults';
 import { savedConsole as _console, setVerbose } from './saved-console';
@@ -176,7 +177,7 @@ ipcRenderer.on('main_did-finish-load', () => {
   // ── Batch all config reads into a single IPC call ──
   (window as any).closeClient = () => window.close();
   Promise.all([
-    ipcRenderer.invoke('get-all-config', ['ui', 'userscripts', 'game', 'translator', 'keybinds', 'discord', 'advanced', 'performance']),
+    ipcRenderer.invoke('get-all-config', ['ui', 'userscripts', 'game', 'translator', 'keybinds', 'discord', 'advanced', 'performance', 'hudPositions']),
     ipcRenderer.invoke('get-platform'),
     ipcRenderer.invoke('get-version'),
   ]).then(([allConf, _platformInfo, currentVersion]: [any, any, string]) => {
@@ -189,6 +190,9 @@ ipcRenderer.on('main_did-finish-load', () => {
 
     // ── Verbose logging toggle ──
     setVerbose(advConf?.verboseLogging ?? false);
+
+    // ── Overlay positions (before any overlay is built) ──
+    initHudPositions(allConf.hudPositions);
 
     // ── Exit button + UI toggles ──
     const showExit = uiConf ? (uiConf.showExitButton !== false) : true;

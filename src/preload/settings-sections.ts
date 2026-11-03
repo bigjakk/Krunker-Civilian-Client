@@ -23,7 +23,8 @@ import type { HeadshotSoundMode } from './headshot-sound';
 import { setTradeDing } from './trade-ding';
 import { updateKeystrokes } from './keystrokes';
 import type { KeystrokesConfig } from './keystrokes';
-import { STATS, statCounterConfig, updateStatCounter, openStatCounterEditor } from './stat-counter';
+import { STATS, statCounterConfig, updateStatCounter } from './stat-counter';
+import { openHudEditor } from './hud-editor';
 import { setBetterChat, setAutoHideChat, setChatHistorySize } from './chat';
 import { updateTranslatorConfig } from './translator';
 import { showChangelogNow } from './changelog';
@@ -195,15 +196,24 @@ export function buildGameSection(
     onChange: (v) => { ui.directServerPing = v; saveUI(); },
   }));
 
+  const hpPosRow = createButtonRow({
+    label: 'Hardpoint Counter Position',
+    desc: 'Drag the counter anywhere over the in-game HUD. Double-click it to put it back with the other counters.',
+    buttons: [{ icon: 'open_with', label: 'Move', onClick: openHudEditor }],
+  }).row;
+  const syncHpPosRow = (): void => { hpPosRow.classList.toggle('kcc-row-hidden', !(game.hpEnemyCounter ?? true)); };
+
   inputGroup.appendChild(createToggleRow({
     label: 'Hardpoint Enemy Counter',
     desc: 'Show enemy capture points in Hardpoint mode',
     checked: game.hpEnemyCounter ?? true, refreshOnly: true,
     onChange: (v) => {
-      game.hpEnemyCounter = v; saveGame();
+      game.hpEnemyCounter = v; saveGame(); syncHpPosRow();
       if (v) initHPCounter(); else destroyHPCounter();
     },
   }));
+  inputGroup.appendChild(hpPosRow);
+  syncHpPosRow();
 
   inputGroup.appendChild(createSelectRow({
     label: 'Headshot Sound',
@@ -872,7 +882,7 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any, ncConf
   addStatRow(createButtonRow({
     label: 'Position',
     desc: 'Drag the counters into place over the in-game HUD. Double-click one to reset it.',
-    buttons: [{ icon: 'open_with', label: 'Move', onClick: openStatCounterEditor }],
+    buttons: [{ icon: 'open_with', label: 'Move', onClick: openHudEditor }],
   }).row);
 
   syncStatRows();

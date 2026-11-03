@@ -6,6 +6,7 @@ import type { AppConfig } from '../main/config-defaults';
 import { savedConsole as _console } from './saved-console';
 import { LIVE_KEYS, trackMatchStats } from './match-stats';
 import type { MatchStatListener } from './match-stats';
+import { HUD_EDIT_CLASS, registerHudOwner } from './hud-editor';
 
 type StatCounterConfig = AppConfig['nukeCounter'];
 
@@ -62,7 +63,7 @@ const BOX_PITCH_PX = 64;
 
 const STYLE_ID = 'kcc-stat-counter-css';
 const LAYER_ID = 'kcc-stat-counter';
-const EDIT_CLASS = 'kcc-stat-editing';
+const HUD_KEY = 'stats';
 
 const CSS = `
 #${LAYER_ID} { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
@@ -86,25 +87,13 @@ const CSS = `
 .kcc-stat-goal { color: rgba(255, 255, 255, 0.6); }
 .kcc-stat-gain { color: #9eeb56; font-size: 18px; }
 .kcc-stat-met .kcc-stat-num { color: #9eeb56; }
-html.${EDIT_CLASS} #inGameUI { display: block !important; }
-html.${EDIT_CLASS} #menuHolder { display: none !important; }
-html.${EDIT_CLASS} #instructionHolder { visibility: hidden !important; }
-html.${EDIT_CLASS} #${LAYER_ID} { z-index: 2147483645; }
-html.${EDIT_CLASS} .kcc-stat-box { pointer-events: auto; cursor: move; outline: 2px dashed rgba(255, 255, 255, 0.7); outline-offset: 4px; }
-#kcc-stat-dim { position: absolute; inset: 0; z-index: 9; background: rgba(0, 0, 0, 0.3); pointer-events: none; }
-#kcc-stat-hint {
-  position: absolute; left: 50%; top: 14%; transform: translateX(-50%); z-index: 2147483646;
-  display: flex; align-items: center; gap: 24px; padding: 14px 28px; border-radius: 8px;
-  background: rgba(0, 0, 0, 0.8); color: #fff; font-size: 26px; white-space: nowrap; pointer-events: auto;
-}
-#kcc-stat-done { padding: 8px 24px; border-radius: 6px; background: #ffc107; color: #000; cursor: pointer; }
+html.${HUD_EDIT_CLASS} #${LAYER_ID} { z-index: 2147483645; }
 `;
 
 type Pos = { x: number; y: number };
 
 const clampPct = (v: number): number => Math.min(100, Math.max(0, Number(v) || 0));
 const clampScale = (v: number): number => Math.min(3, Math.max(0.25, Number(v) || 1));
-const round2 = (v: number): number => Math.round(v * 100) / 100;
 
 const LEGACY_DEFAULTS: Record<string, unknown> = { goal: 0, background: true, scale: 1, x: 94, y: 50 };
 
@@ -151,9 +140,7 @@ let fetching = false;
 let lastAttempt = 0;
 let endWasVisible = false;
 
-let editing = false;
 let dragging = false;
-let editorEls: HTMLElement[] = [];
 
 function myName(): string {
   try { return window.localStorage.getItem('krunker_username') || ''; } catch { return ''; }
@@ -292,7 +279,7 @@ function boxPos(id: string, i: number, n: number): Pos {
 }
 
 function boxHtml(key: string, pos: Pos, rows: string): string {
-  return '<div class="kcc-stat-box' + (cfg.background ? ' kcc-stat-bg' : '') + '" data-key="' + key + '"' +
+  return '<div class="kcc-stat-box' + (cfg.background ? ' kcc-stat-bg' : '') + '" data-kcc-hud="' + HUD_KEY + '" data-key="' + key + '"' +
     ' style="left:' + pos.x + '%;top:' + pos.y + '%;--kcc-stat-scale:' + cfg.scale + '">' + rows + '</div>';
 }
 
@@ -375,7 +362,6 @@ function save(): void {
 
 function apply(): void {
   if (!cfg.enabled) {
-    closeEditor(false);
     trackMatchStats(null);
     if (tick) { clearInterval(tick); tick = null; }
     if (commitTimer) { clearTimeout(commitTimer); commitTimer = null; }
@@ -421,9 +407,6 @@ export function updateStatCounter(patch: Partial<StatCounterConfig>): void {
 }
 
 // ── Move mode ──
-// The HUD is hidden on the menu, so editing shows it in place of the menu and makes the counters draggable.
-
-const EDIT_MOUSE_EVENTS = ['mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu'] as const;
 
 function setPos(key: string, pos: Pos | null): void {
   const d = DEFAULT_CONFIG.nukeCounter;
@@ -439,90 +422,17 @@ function setPos(key: string, pos: Pos | null): void {
   render();
 }
 
-function startDrag(e: MouseEvent, box: HTMLElement, key: string): void {
-  const base = document.getElementById('uiBase')!.getBoundingClientRect();
-  const rect = box.getBoundingClientRect();
-  const offX = e.clientX - (rect.left + rect.width / 2);
-  const offY = e.clientY - (rect.top + rect.height / 2);
-  const halfX = rect.width / 2 / base.width * 100;
-  const halfY = rect.height / 2 / base.height * 100;
-  const fit = (v: number, half: number): number => round2(Math.min(100 - half, Math.max(half, v)));
-  let pos: Pos | null = null;
-  dragging = true;
-  const move = (ev: MouseEvent): void => {
-    // The mouseup is lost if focus leaves mid-drag (Alt-Tab with the button held)
-    if (!(ev.buttons & 1)) return up();
-    pos = {
-      x: fit((ev.clientX - offX - base.left) / base.width * 100, halfX),
-      y: fit((ev.clientY - offY - base.top) / base.height * 100, halfY),
-    };
+registerHudOwner(HUD_KEY, {
+  open: () => { if (cfg.enabled) inject(); },
+  grab: () => { dragging = true; },
+  move: (box, pos) => {
     box.style.left = pos.x + '%';
     box.style.top = pos.y + '%';
-  };
-  const up = (): void => {
-    document.removeEventListener('mousemove', move, true);
-    document.removeEventListener('mouseup', up, true);
+  },
+  drop: (box, pos) => {
     dragging = false;
-    if (pos) setPos(key, pos);
+    if (pos) setPos(box.dataset.key!, pos);
     else render();
-  };
-  document.addEventListener('mousemove', move, true);
-  document.addEventListener('mouseup', up, true);
-}
-
-// Every press is swallowed while editing so none reaches Krunker's click-to-play
-function onEditMouse(e: MouseEvent): void {
-  e.preventDefault();
-  e.stopPropagation();
-  const target = e.target as Element | null;
-  if (target?.closest?.('#kcc-stat-done')) {
-    if (e.type === 'click') closeEditor(true);
-    return;
-  }
-  const box = target?.closest?.('.kcc-stat-box') as HTMLElement | null;
-  const key = box?.dataset.key;
-  if (!box || !key) return;
-  if (e.type === 'dblclick') setPos(key, null);
-  else if (e.type === 'mousedown' && e.button === 0) startDrag(e, box, key);
-}
-
-function onEditKey(e: KeyboardEvent): void {
-  e.preventDefault();
-  e.stopPropagation();
-  if (e.key === 'Escape') closeEditor(true);
-}
-
-function onEditLock(): void {
-  if (document.pointerLockElement) closeEditor(false);
-}
-
-function closeEditor(reopenSettings: boolean): void {
-  if (!editing) return;
-  editing = false;
-  for (const type of EDIT_MOUSE_EVENTS) document.removeEventListener(type, onEditMouse, true);
-  document.removeEventListener('keydown', onEditKey, true);
-  document.removeEventListener('pointerlockchange', onEditLock);
-  for (const el of editorEls) el.remove();
-  editorEls = [];
-  document.documentElement.classList.remove(EDIT_CLASS);
-  if (reopenSettings) (window as any).showWindow?.(1);
-}
-
-export function openStatCounterEditor(): void {
-  const base = document.getElementById('uiBase');
-  if (editing || !cfg.enabled || !cfg.stats.length || !base) return;
-  (window as any).closWind?.();
-  editing = true;
-  document.documentElement.classList.add(EDIT_CLASS);
-  const dim = document.createElement('div');
-  dim.id = 'kcc-stat-dim';
-  const hint = document.createElement('div');
-  hint.id = 'kcc-stat-hint';
-  hint.innerHTML = '<span>Drag to move · Double-click to reset · Esc to finish</span><span id="kcc-stat-done">Done</span>';
-  base.append(dim, hint);
-  editorEls = [dim, hint];
-  for (const type of EDIT_MOUSE_EVENTS) document.addEventListener(type, onEditMouse, true);
-  document.addEventListener('keydown', onEditKey, true);
-  document.addEventListener('pointerlockchange', onEditLock);
-  inject();
-}
+  },
+  reset: (box) => setPos(box.dataset.key!, null),
+});

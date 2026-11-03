@@ -1,8 +1,11 @@
 // ── Competitive features: Hardpoint enemy counter + Rank progress tracker + Ranked queue ──
 import { ipcRenderer } from 'electron';
 import { savedConsole as _console } from './saved-console';
+import { makeMovable, registerHudOwner } from './hud-editor';
 
 // ── Hardpoint Enemy Counter ──
+
+const HP_HUD_KEY = 'hpCounter';
 
 let hpObserver: MutationObserver | null = null;
 let hpCounterEl: HTMLElement | null = null;
@@ -11,6 +14,7 @@ const hpEnemyScores = new Map<string, number>();
 let hpInitialized = false;
 let hpTimeout: ReturnType<typeof setTimeout> | null = null;
 let hpCheckInterval: ReturnType<typeof setInterval> | null = null;
+let hpPreview = false;
 
 // Hardpoint scores 10 pts/sec per enemy on point. Max realistic team size ~8.
 // Anything bigger is a capture bonus, score reset, or stale baseline — ignore.
@@ -79,6 +83,7 @@ function setupHPDisplay(): void {
         '<span style="color:#ffffff;font-size:15px;margin-right:6px;font-weight:600;text-shadow:1px 1px 2px rgba(0,0,0,0.9);">on</span>' +
         '<span class="pointVal" style="color:#ffc107;font-size:22px;font-weight:bold;text-shadow:1px 1px 3px rgba(0,0,0,0.9);">0</span></div>';
     hpPointCounter = hpCounterEl.querySelector('.pointVal');
+    makeMovable(hpCounterEl, HP_HUD_KEY);
     counters.appendChild(hpCounterEl);
 
     const teamScores = document.getElementById('teamScores');
@@ -89,7 +94,7 @@ function setupHPDisplay(): void {
 }
 
 function checkHPMode(): void {
-    if (isHardpoint()) {
+    if (hpPreview || isHardpoint()) {
         const wasHidden = !hpCounterEl || hpCounterEl.style.display === 'none';
         setupHPDisplay();
         if (hpCounterEl) hpCounterEl.style.display = '';
@@ -118,6 +123,14 @@ function stopHPCounter(): void {
 
 export function initHPCounter(): void { startHPCounter(); }
 export function destroyHPCounter(): void { stopHPCounter(); }
+
+// Shown outside Hardpoint while moving the HUD, so it can be placed from the menu
+function previewHP(on: boolean): void {
+    hpPreview = on;
+    if (hpCheckInterval) checkHPMode();
+}
+
+registerHudOwner(HP_HUD_KEY, { open: () => previewHP(true), close: () => previewHP(false) });
 
 // ── Rank Progress Tracker ──
 

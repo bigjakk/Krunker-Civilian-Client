@@ -912,7 +912,7 @@ async function launchApp(): Promise<void> {
   const ALLOWED_CONFIG_KEYS = new Set<string>([
     'window', 'performance', 'game', 'matchmaker',
     'keybinds', 'userscripts', 'ui', 'discord', 'translator',
-    'advanced', 'tabWindow', 'keystrokes', 'nukeCounter',
+    'advanced', 'tabWindow', 'keystrokes', 'nukeCounter', 'hudPositions',
   ]);
 
   // Settings categories included in export/import. Deliberately excludes:
@@ -920,7 +920,7 @@ async function launchApp(): Promise<void> {
   //   window/tabWindow  — machine-specific window geometry
   //   savedTabs         — transient last-open tabs
   const EXPORT_CONFIG_KEYS = [
-    'performance', 'game', 'keystrokes', 'nukeCounter', 'matchmaker',
+    'performance', 'game', 'keystrokes', 'nukeCounter', 'hudPositions', 'matchmaker',
     'keybinds', 'userscripts', 'ui', 'discord', 'translator', 'advanced',
   ] as const;
 

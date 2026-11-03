@@ -91,6 +91,8 @@ export interface AppConfig {
     y: number;
     positions: Record<string, { x: number; y: number }>;
   };
+  // Overlays placed in HUD move mode, by overlay: element centre as a percent of the HUD
+  hudPositions: Record<string, { x: number; y: number }>;
   // Saved configs may still carry a retired `enabled` flag — don't reuse the name
   swapper: {
     path: string;
@@ -249,6 +251,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     y: 50,
     positions: {},
   },
+  hudPositions: {},
   swapper: {
     path: '',
   },
