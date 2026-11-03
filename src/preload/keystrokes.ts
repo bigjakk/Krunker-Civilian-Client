@@ -2,6 +2,8 @@
 // Keyboard layout adapted from KraXen72's Crankshaft userscript
 // (https://gist.github.com/KraXen72/2ea1332440b0c66b83ca9b73afc38269)
 
+import { makeMovable } from './hud-editor';
+
 export interface KeystrokesConfig {
     enabled: boolean;
     size: number;
@@ -16,6 +18,8 @@ const KB_HOLD_CLASS = 'kcc-keystrokes-hold';
 const MS_HOLD_CLASS = 'kcc-mouse-hold';
 const KB_HOLD_ID = 'kcc-keystrokes-hold';
 const MS_HOLD_ID = 'kcc-mouse-hold';
+const KB_HUD_KEY = 'keystrokes';
+const MS_HUD_KEY = 'mouse';
 
 let kbHoldEl: HTMLElement | null = null;
 let msHoldEl: HTMLElement | null = null;
@@ -348,6 +352,7 @@ function injectKbHold(cfg: KeystrokesConfig): void {
     kbHoldEl.id = KB_HOLD_ID;
     kbHoldEl.className = KB_HOLD_CLASS;
     kbHoldEl.innerHTML = buildKbHTML(aux1, aux2);
+    makeMovable(kbHoldEl, KB_HUD_KEY);
     host.appendChild(kbHoldEl);
     keyTargets = buildKeyTargets(kbHoldEl, aux1, aux2);
 }
@@ -361,6 +366,7 @@ function injectMsHold(): void {
     msHoldEl.id = MS_HOLD_ID;
     msHoldEl.className = MS_HOLD_CLASS;
     msHoldEl.innerHTML = buildMsHTML();
+    makeMovable(msHoldEl, MS_HUD_KEY);
     host.appendChild(msHoldEl);
 }
 

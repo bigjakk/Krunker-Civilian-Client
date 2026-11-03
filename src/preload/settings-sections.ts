@@ -381,11 +381,18 @@ export function buildKeystrokesRows(body: HTMLElement): void {
 
   const overlayGroup = createGroup(body, 'Overlay');
 
+  const posRow = createButtonRow({
+    label: 'Position',
+    desc: 'Drag the keystrokes and mouse overlays into place over the in-game HUD. Double-click one to reset it.',
+    buttons: [{ icon: 'open_with', label: 'Move', onClick: openHudEditor }],
+  }).row;
+  const syncPosRow = (): void => { posRow.classList.toggle('kcc-row-hidden', !ks.enabled && !ks.mouseEnabled); };
+
   const enableRow = createToggleRow({
     label: 'Keystrokes Overlay',
     desc: 'Show on-screen WASD/Shift/Space + 2 aux keys (great for streaming)',
     checked: false, instant: true,
-    onChange: (v) => { ks.enabled = v; save(); },
+    onChange: (v) => { ks.enabled = v; save(); syncPosRow(); },
   });
   overlayGroup.appendChild(enableRow);
 
@@ -393,7 +400,7 @@ export function buildKeystrokesRows(body: HTMLElement): void {
     label: 'Mouse Overlay',
     desc: 'Show on-screen mouse buttons (L/M/R) and scroll wheel direction',
     checked: false, instant: true,
-    onChange: (v) => { ks.mouseEnabled = v; save(); },
+    onChange: (v) => { ks.mouseEnabled = v; save(); syncPosRow(); },
   });
   overlayGroup.appendChild(mouseRow);
 
@@ -404,6 +411,8 @@ export function buildKeystrokesRows(body: HTMLElement): void {
     onChange: (v) => { ks.size = v; save(); },
   });
   overlayGroup.appendChild(sizeRow);
+  overlayGroup.appendChild(posRow);
+  syncPosRow();
 
   const auxGroup = createGroup(body, 'Aux Keys');
 
@@ -458,6 +467,7 @@ export function buildKeystrokesRows(body: HTMLElement): void {
     if (aux1KeyEl) aux1KeyEl.textContent = (ks.auxKey1 || 'R').toUpperCase();
     const aux2KeyEl = aux2Row.querySelector('.kcc-keyIcon') as HTMLElement;
     if (aux2KeyEl) aux2KeyEl.textContent = (ks.auxKey2 || 'N').toUpperCase();
+    syncPosRow();
     loaded = true;
   }).catch(() => { loaded = true; });
 }
