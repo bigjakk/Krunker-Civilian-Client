@@ -101,8 +101,8 @@ ${THEME_CSS}
   color: var(--kcc-text-primary);
 }
 .kcc-header-ver { font-size: 11px; color: var(--kcc-text-muted); }
-.kcc-header-issues {
-  margin-left: auto;
+.kcc-header-stats { margin-left: auto; }
+.kcc-header-stats, .kcc-header-issues {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -116,13 +116,14 @@ ${THEME_CSS}
   user-select: none;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
-.kcc-header-issues:hover {
+.kcc-header-stats:hover, .kcc-header-issues:hover {
   background: var(--kcc-surface-hover);
   border-color: var(--kcc-border-medium);
   color: var(--kcc-text-primary);
 }
 .kcc-issues-mark { width: 15px; height: 15px; flex: none; color: var(--kcc-text-muted); }
-.kcc-header-issues:hover .kcc-issues-mark { color: var(--kcc-accent); }
+.kcc-header-stats .material-icons { font-size: 15px; color: var(--kcc-text-muted); }
+.kcc-header-issues:hover .kcc-issues-mark, .kcc-header-stats:hover .material-icons { color: var(--kcc-accent); }
 .kcc-issues-count {
   padding: 1px 7px;
   border-radius: 999px;

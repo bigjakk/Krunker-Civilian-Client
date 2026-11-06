@@ -74,61 +74,73 @@ export function stopHidePopups(): void {
   _hidePopupsObservers.length = 0;
 }
 
-// ── Classic Social ──
-// Injects a second menu item below "Social" that opens the standalone
-// /social.html page in a tab (pre-9.2 behaviour). Hidden by default;
-// the setting toggles its visibility.
-let _classicSocialPoll: number | null = null;
+// ── Sidebar items ──
+// Adds an item to Krunker's main-menu sidebar once the menu exists, after the
+// first anchor found. Returns the setter that shows or removes it.
+export function sidebarItem(opts: {
+  id: string;
+  icon: string;
+  title: string;
+  anchors: string[];
+  onClick: () => void;
+}): (enabled: boolean) => void {
+  let poll: number | null = null;
 
-function injectClassicSocialBtn(): boolean {
-  if (document.getElementById('kccClassicSocialBtn')) return true;
-  const socialItem = document.getElementById('menuBtnSocial')?.closest('.menuItem');
-  if (!socialItem || !socialItem.parentNode) return false;
+  const inject = (): boolean => {
+    if (document.getElementById(opts.id)) return true;
+    const sibling = opts.anchors.map((id) => document.getElementById(id)?.closest('.menuItem')).find(Boolean);
+    if (!sibling || !sibling.parentNode) return false;
 
-  const scoped = Array.from(socialItem.classList).find((c) => c.startsWith('svelte-')) || '';
-  const sfx = scoped ? ' ' + scoped : '';
+    const scoped = Array.from(sibling.classList).find((c) => c.startsWith('svelte-')) || '';
+    const sfx = scoped ? ' ' + scoped : '';
 
-  const btn = document.createElement('div');
-  btn.id = 'kccClassicSocialBtn';
-  btn.className = 'menuItem' + sfx;
-  btn.setAttribute('onmouseenter', 'playTick()');
-  btn.innerHTML =
-    '<span class="material-icons-outlined menuItemIcon' + sfx + '">handshake</span>' +
-    '<div class="menuItemTitle' + sfx + '">Classic Social</div>';
-  btn.addEventListener('click', () => {
-    (window as any).playSelect?.();
-    window.open('https://krunker.io/social.html', '_blank');
-  });
+    const btn = document.createElement('div');
+    btn.id = opts.id;
+    btn.className = 'menuItem' + sfx;
+    btn.setAttribute('onmouseenter', 'playTick()');
+    btn.innerHTML =
+      '<span class="material-icons-outlined menuItemIcon' + sfx + '">' + opts.icon + '</span>' +
+      '<div class="menuItemTitle' + sfx + '">' + opts.title + '</div>';
+    btn.addEventListener('click', () => {
+      (window as any).playSelect?.();
+      opts.onClick();
+    });
 
-  socialItem.parentNode.insertBefore(btn, socialItem.nextSibling);
-  return true;
-}
+    sibling.parentNode.insertBefore(btn, sibling.nextSibling);
+    return true;
+  };
 
-function removeClassicSocialBtn(): void {
-  document.getElementById('kccClassicSocialBtn')?.remove();
-  if (_classicSocialPoll !== null) {
-    clearInterval(_classicSocialPoll);
-    _classicSocialPoll = null;
-  }
-}
-
-export function setClassicSocial(enabled: boolean): void {
-  if (!enabled) {
-    removeClassicSocialBtn();
-    return;
-  }
-  if (injectClassicSocialBtn()) return;
-  if (_classicSocialPoll !== null) return;
-  let attempts = 0;
-  _classicSocialPoll = window.setInterval(() => {
-    if (injectClassicSocialBtn() || ++attempts > 60) {
-      if (_classicSocialPoll !== null) {
-        clearInterval(_classicSocialPoll);
-        _classicSocialPoll = null;
-      }
+  const stopPoll = (): void => {
+    if (poll !== null) {
+      clearInterval(poll);
+      poll = null;
     }
-  }, 500);
+  };
+
+  return (enabled) => {
+    if (!enabled) {
+      document.getElementById(opts.id)?.remove();
+      stopPoll();
+      return;
+    }
+    if (inject() || poll !== null) return;
+    let attempts = 0;
+    poll = window.setInterval(() => {
+      if (inject() || ++attempts > 60) stopPoll();
+    }, 500);
+  };
 }
+
+// ── Classic Social ──
+// A second menu item below "Social" that opens the standalone /social.html page
+// in a tab (pre-9.2 behaviour). Hidden by default; the setting toggles it.
+export const setClassicSocial = sidebarItem({
+  id: 'kccClassicSocialBtn',
+  icon: 'handshake',
+  title: 'Classic Social',
+  anchors: ['menuBtnSocial'],
+  onClick: () => window.open('https://krunker.io/social.html', '_blank'),
+});
 
 // ── Mod Manager button (ranked menu) ──
 // The ranked/comp menu (#mMenuHolComp) has no mod UI. This appends a button to

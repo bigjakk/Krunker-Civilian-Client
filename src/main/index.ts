@@ -21,6 +21,7 @@ import { openRankedQueue, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
 import { loadOfficialMaps } from './official-maps';
 import { takeScreenshot, openScreenshotsFolder } from './screenshot';
 import { blockOffsiteRedirects, isGameURL, isKrunkerHost, isKrunkerPage, safeOpenExternal } from './links';
+import { clientStatsSnapshot, flushClientStats, setClientStatsAccount, setClientStatsMouseFree, startClientStats, stopClientStats } from './client-stats';
 
 const AUDIO_MIME: Record<string, string> = {
   '.mp3': 'audio/mpeg',
@@ -919,6 +920,7 @@ async function launchApp(): Promise<void> {
   //   accounts          — encrypted alt-account credentials (never exported)
   //   window/tabWindow  — machine-specific window geometry
   //   savedTabs         — transient last-open tabs
+  //   clientStats       — names every account used here, and exports get shared
   const EXPORT_CONFIG_KEYS = [
     'performance', 'game', 'keystrokes', 'nukeCounter', 'hudPositions', 'matchmaker',
     'keybinds', 'userscripts', 'ui', 'discord', 'translator', 'advanced',
@@ -1267,6 +1269,7 @@ async function launchApp(): Promise<void> {
     app.quit();
   });
   ipcMain.handle('delete-all-data', async () => {
+    stopClientStats();
     // Stop the page so Krunker can't re-persist anything mid-wipe.
     try { win.webContents.stop(); } catch { /* already gone */ }
     // Clear browsing data: the persistent Krunker partition holds the login token
@@ -1483,6 +1486,16 @@ async function launchApp(): Promise<void> {
     return { success: true };
   });
 
+  // ── Client stats ──
+  startClientStats();
+  // will-quit doesn't fire on Windows shutdown or logoff
+  win.on('session-end', flushClientStats);
+  ipcMain.on('client-stats-account', (_e, name: unknown) => {
+    if (typeof name === 'string') setClientStatsAccount(name);
+  });
+  ipcMain.on('client-stats-mouse-free', (_e, free: unknown) => setClientStatsMouseFree(free === true));
+  ipcMain.handle('client-stats-get', () => clientStatsSnapshot());
+
   // ── Stop page immediately on close to kill audio ──
   win.on('close', () => {
     win.webContents.setAudioMuted(true);
@@ -1493,6 +1506,7 @@ async function launchApp(): Promise<void> {
   // ── Shutdown: disconnect Discord, then close log streams ──
   app.on('will-quit', () => {
     discordRpc?.disconnect();
+    flushClientStats();
     electronLog.log('[KCC] Shutting down');
     closeLogStreams();
   });

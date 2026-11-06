@@ -33,6 +33,13 @@ export interface SavedAccount {
   avatarUrl?: string;
 }
 
+export interface ClientTimeRecord {
+  totalMs: number;
+  activeMs: number;
+  longestSessionMs: number;
+  days: Record<string, number>;
+}
+
 export interface AppConfig {
   window: {
     width: number;
@@ -127,6 +134,7 @@ export interface AppConfig {
   };
   ui: {
     showExitButton: boolean;
+    showClientStats: boolean;
     deathscreenAnimation: boolean;
     gameBrightness: number;
     hideMenuPopups: boolean;
@@ -180,6 +188,12 @@ export interface AppConfig {
     maximized: boolean;
   };
   savedTabs: string[];
+  clientStats: {
+    since: number;
+    client: ClientTimeRecord;
+    guest: ClientTimeRecord;
+    accounts: Record<string, ClientTimeRecord>;
+  };
 }
 
 export const DEFAULT_KEYBINDS: AppConfig['keybinds'] = {
@@ -275,6 +289,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   ui: {
     showExitButton: true,
+    showClientStats: true,
     deathscreenAnimation: true,
     gameBrightness: 100,
     hideMenuPopups: false,
@@ -328,4 +343,10 @@ export const DEFAULT_CONFIG: AppConfig = {
     maximized: true,
   },
   savedTabs: [],
+  clientStats: {
+    since: 0,
+    client: { totalMs: 0, activeMs: 0, longestSessionMs: 0, days: {} },
+    guest: { totalMs: 0, activeMs: 0, longestSessionMs: 0, days: {} },
+    accounts: {},
+  },
 };

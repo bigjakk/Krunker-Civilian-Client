@@ -8,8 +8,7 @@ let electronStream: WriteStream;
 let electronPath: string;
 let ready = false;
 
-function dateStamp(): string {
-  const d = new Date();
+export function dateStamp(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 

@@ -15,6 +15,7 @@ import {
   createGroup, createColorRow,
 } from './settings-controls';
 import { setClassicSocial, startHidePopups, stopHidePopups } from './menu-tweaks';
+import { setClientStatsItem } from './client-stats';
 import { updateSocialMusicConfig } from './social-music';
 import { initHPCounter, destroyHPCounter } from './competitive';
 import { initSuspectPing, destroySuspectPing } from './kpd-call';
@@ -96,6 +97,13 @@ export function buildGeneralSection(
       const btn = document.getElementById('clientExit');
       if (btn) btn.style.display = v ? 'flex' : 'none';
     },
+  }));
+
+  clientGroup.appendChild(createToggleRow({
+    label: 'Show Client Stats',
+    desc: 'Menu item with your time on the client. Still counted while hidden.',
+    checked: ui.showClientStats ?? true, instant: true,
+    onChange: (v) => { ui.showClientStats = v; saveUI(); setClientStatsItem(v); },
   }));
 
   clientGroup.appendChild(createToggleRow({

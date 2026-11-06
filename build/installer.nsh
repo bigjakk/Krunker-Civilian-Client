@@ -27,7 +27,7 @@
       Pop $0
       ${NSD_CreateLabel} 0 0 100% 28u "${PRODUCT_NAME} will be uninstalled. Your settings and files are kept unless selected below."
       Pop $0
-      ${NSD_CreateCheckbox} 0 40u 100% 12u "Delete settings, saved accounts and logs"
+      ${NSD_CreateCheckbox} 0 40u 100% 12u "Delete settings, client stats, saved accounts and logs"
       Pop $unDeleteSettingsBox
       ${NSD_CreateCheckbox} 0 56u 100% 12u "Delete swapper files, userscripts and screenshots"
       Pop $unDeleteContentBox

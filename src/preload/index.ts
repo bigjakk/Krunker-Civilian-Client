@@ -17,6 +17,7 @@ import { DEFAULT_CONFIG } from '../main/config-defaults';
 import { savedConsole as _console, setVerbose } from './saved-console';
 import { initAltManagerButton } from './alt-manager';
 import { startHidePopups, setClassicSocial, initModManagerButton } from './menu-tweaks';
+import { initClientStats } from './client-stats';
 import { initSocialMusic } from './social-music';
 import { initBanlog } from './banlog';
 import { installGameSocketTap } from './game-socket';
@@ -217,6 +218,7 @@ ipcRenderer.on('main_did-finish-load', () => {
     if (uiConf?.hideMenuPopups) startHidePopups();
     if (uiConf?.menuTimer ?? true) setMenuTimer(true);
     if (isGamePage && uiConf?.classicSocial) setClassicSocial(true);
+    if (isGamePage) initClientStats(uiConf?.showClientStats ?? true);
     if (isGamePage) initModManagerButton();
 
     if (isGamePage) {

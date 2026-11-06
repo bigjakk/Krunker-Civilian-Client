@@ -26,6 +26,7 @@ import {
   buildChatSection, stopMusicPreview,
 } from './settings-sections';
 import { buildAccountsSection } from './alt-manager';
+import { openStatsWindow } from './client-stats';
 import { getInstances, setScriptEnabled } from './userscripts';
 import type { UserscriptInstance } from './userscripts';
 
@@ -311,10 +312,10 @@ function buildManageSection(body: HTMLElement): void {
         confirmLabel: 'Reset', danger: true,
       }).then((ok) => { if (ok) ipcRenderer.invoke('reset-options'); });
     }},
-    { title: 'Delete All Data', desc: 'Clears config, logs, and all Krunker site data including logins and in-game settings. Userscripts and swapper files are kept.', button: 'Delete', action: () => {
+    { title: 'Delete All Data', desc: 'Clears config, client stats, logs, and all Krunker site data including logins and in-game settings. Userscripts and swapper files are kept.', button: 'Delete', action: () => {
       showConfirm({
         title: 'Delete All Data',
-        message: 'Clears your config, logs, and all Krunker site data — including your logins and in-game settings. Your userscripts and swapper files are kept. The client will restart.',
+        message: 'Clears your config, client stats, logs, and all Krunker site data — including your logins and in-game settings. Your userscripts and swapper files are kept. The client will restart.',
         confirmLabel: 'Delete', danger: true,
       }).then((ok) => { if (ok) ipcRenderer.invoke('delete-all-data'); });
     }},
@@ -384,11 +385,20 @@ function renderSettings(searchQuery?: string): void {
       '<div class="kcc-header-name">Civilian Client</div>' +
       '<div class="kcc-header-ver">v' + escapeHtml(version || '') + '</div>' +
     '</div>' +
+    '<div class="kcc-header-stats" title="Shows your time on the client">' +
+      '<span class="material-icons">schedule</span>' +
+      '<span>Client Stats</span>' +
+    '</div>' +
     '<div class="kcc-header-issues" title="Opens the GitHub issue tracker in your browser">' +
       GITHUB_MARK_SVG +
       '<span>Report an Issue</span>' +
       '<span class="kcc-issues-count"></span>' +
     '</div>';
+  header.querySelector('.kcc-header-stats')!.addEventListener('click', () => {
+    // Swapping windows keeps the holder open, so the watcher that stops the preview doesn't fire
+    stopMusicPreview();
+    void openStatsWindow();
+  });
   const issuesBadge = header.querySelector('.kcc-header-issues') as HTMLElement;
   const issuesCount = issuesBadge.querySelector('.kcc-issues-count') as HTMLElement;
   issuesBadge.addEventListener('click', () => ipcRenderer.invoke('open-external', GITHUB_ISSUES_URL));
