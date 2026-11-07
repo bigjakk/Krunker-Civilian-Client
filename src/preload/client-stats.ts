@@ -1,8 +1,9 @@
 // ── Client Stats ── the sidebar item and window for time on the client, and telling main who's signed in and when a save is safe
 
 import { ipcRenderer } from 'electron';
-import type { ClientStatsRow, ClientStatsSnapshot } from '../main/client-stats';
+import type { ClientStatsImport, ClientStatsRow, ClientStatsSnapshot } from '../main/client-stats';
 import { dateStamp } from '../shared/date-stamp';
+import { showConfirm } from './confirm-dialog';
 import { sidebarItem } from './menu-tweaks';
 import { escapeHtml } from './utils';
 
@@ -318,6 +319,18 @@ export async function openStatsWindow(): Promise<void> {
   document.getElementById('menuWindow')?.addEventListener('click', onWindowClick);
   w.showWindow(w.windows.indexOf(statsWindow) + 1);
   if (refreshTimer === null) refreshTimer = window.setInterval(refresh, REFRESH_MS);
+}
+
+export function confirmStatsImport({ totalMs, names }: ClientStatsImport): Promise<boolean> {
+  const listed = names.slice(0, 12);
+  if (names.length > 12) listed.push((names.length - 12) + ' more');
+  const who = listed.length ? ' on ' + new Intl.ListFormat('en').format(listed) : '';
+  return showConfirm({
+    title: 'Import Client Stats',
+    message: 'Add the time in this file to your client stats? It has ' + fmtHours(totalMs) + who + '. Only add it if it\'s your own backup, because it can\'t be undone without deleting all data.',
+    confirmLabel: 'Add',
+    cancelLabel: 'Skip',
+  });
 }
 
 export const setClientStatsItem = sidebarItem({

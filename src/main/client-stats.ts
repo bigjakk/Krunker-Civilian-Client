@@ -26,6 +26,11 @@ export interface ClientStatsSnapshot {
   accounts: Array<ClientStatsRow & { name: string }>;
 }
 
+export interface ClientStatsImport {
+  totalMs: number;
+  names: string[];
+}
+
 const newRecord = (): ClientTimeRecord => ({ totalMs: 0, activeMs: 0, longestSessionMs: 0, days: {} });
 
 let since = Date.now();
@@ -39,8 +44,12 @@ let lastAccrual = 0;
 let mouseFree = false;
 let lastSave = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
+// Kept here so the page can only say yes or no, never supply the numbers
+let pendingImport: any = null;
 
 const validMs = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
+// A key like "constructor" would merge against the method every object inherits
+const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
 // Not navigator.language: that's the UI language and ignores the region. firstDay runs 1 (Mon) to 7 (Sun); getDay counts from 0 (Sun).
 function systemWeekStart(): number {
@@ -53,7 +62,7 @@ function toRecord(raw: any): ClientTimeRecord {
   rec.activeMs = validMs(raw?.activeMs);
   rec.longestSessionMs = validMs(raw?.longestSessionMs);
   for (const [day, ms] of Object.entries(raw?.days ?? {})) {
-    if (validMs(ms)) rec.days[day] = validMs(ms);
+    if (DAY_KEY.test(day) && validMs(ms)) rec.days[day] = validMs(ms);
   }
   return rec;
 }
@@ -161,6 +170,46 @@ export function flushClientStats(): void {
   accrue();
   // Also what keeps stats through Reset Options: its config.clear() runs just before this
   save();
+}
+
+// The higher value wins instead of adding up, so a second import or an old backup changes nothing
+function mergeRecord(into: ClientTimeRecord, raw: unknown): void {
+  const from = toRecord(raw);
+  for (const [day, ms] of Object.entries(from.days)) into.days[day] = Math.max(into.days[day] ?? 0, ms);
+  const dayTotal = Object.values(into.days).reduce((sum, ms) => sum + ms, 0);
+  // Infinity would save as null and read back as zero
+  into.totalMs = Math.max(into.totalMs, from.totalMs, validMs(dayTotal));
+  into.activeMs = Math.max(into.activeMs, from.activeMs);
+  into.longestSessionMs = Math.max(into.longestSessionMs, from.longestSessionMs);
+}
+
+function mergeStats(raw: any): void {
+  accrue();
+  since = Math.min(since, validMs(raw.since) || since);
+  mergeRecord(guest, raw.guest);
+  for (const [name, rec] of Object.entries(raw.accounts ?? {})) {
+    const into = accounts.get(name) ?? newRecord();
+    accounts.set(name, into);
+    mergeRecord(into, rec);
+  }
+  // Two accounts on the same day add up, which a per-day maximum on the client row alone would miss
+  const dayParts: Record<string, number> = {};
+  for (const part of [guest, ...accounts.values()]) {
+    for (const [day, ms] of Object.entries(part.days)) dayParts[day] = (dayParts[day] ?? 0) + ms;
+  }
+  mergeRecord(client, { ...raw.client, days: dayParts });
+  save();
+}
+
+export function prepareClientStatsImport(raw: any): ClientStatsImport | null {
+  const totalMs = validMs(raw?.client?.totalMs);
+  pendingImport = timer && totalMs ? raw : null;
+  return pendingImport && { totalMs, names: Object.keys(raw.accounts ?? {}) };
+}
+
+export function applyClientStatsImport(): void {
+  if (pendingImport) mergeStats(pendingImport);
+  pendingImport = null;
 }
 
 export function stopClientStats(): void {

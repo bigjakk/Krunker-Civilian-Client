@@ -7,7 +7,6 @@ import { ipcRenderer } from 'electron';
 
 // `checked` is updated in place, so the caller reads its choices off the same array.
 export interface ConfirmCheckbox {
-  id: string;
   label: string;
   checked: boolean;
 }

@@ -26,7 +26,7 @@ import {
   buildChatSection, stopMusicPreview,
 } from './settings-sections';
 import { buildAccountsSection } from './alt-manager';
-import { openStatsWindow } from './client-stats';
+import { confirmStatsImport, openStatsWindow } from './client-stats';
 import { getInstances, setScriptEnabled } from './userscripts';
 import type { UserscriptInstance } from './userscripts';
 
@@ -256,10 +256,18 @@ function buildManageSection(body: HTMLElement): void {
 
   const backupGrid = makeSection('Backup');
   backupGrid.appendChild(makeActionBtn('file_download', 'Export Settings', () => {
-    const krunker = collectKrunkerSettings();
-    ipcRenderer.invoke('export-settings', krunker).then((res: any) => {
-      if (res && res.success) showToast('Settings exported');
-      else if (res && !res.canceled) showToast('Export failed: ' + (res.error || 'unknown error'));
+    const includeStats = { label: 'Include client stats (your account names and time)', checked: true };
+    showConfirm({
+      title: 'Export Settings',
+      message: 'Save your client and Krunker settings to a file? Saved alt accounts and logins are never included. Untick client stats if you plan to share the file.',
+      confirmLabel: 'Export',
+      checkboxes: [includeStats],
+    }).then((ok) => {
+      if (!ok) return;
+      ipcRenderer.invoke('export-settings', collectKrunkerSettings(), includeStats.checked).then((res: any) => {
+        if (res && res.success) showToast('Settings exported');
+        else if (res && !res.canceled) showToast('Export failed: ' + (res.error || 'unknown error'));
+      });
     });
   }));
   backupGrid.appendChild(makeActionBtn('file_upload', 'Import Settings', () => {
@@ -272,8 +280,9 @@ function buildManageSection(body: HTMLElement): void {
     }).then((ok) => {
       if (!ok) return;
       const skip = skippedGroups(choices);
-      ipcRenderer.invoke('import-settings', [...skip]).then((res: any) => {
+      ipcRenderer.invoke('import-settings', [...skip]).then(async (res: any) => {
         if (res && res.success) {
+          if (res.stats && await confirmStatsImport(res.stats)) await ipcRenderer.invoke('client-stats-import');
           applyKrunkerSettings(res.krunker, skip);
           ipcRenderer.invoke('restart-client');
         } else if (res && !res.canceled) {

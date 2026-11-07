@@ -21,7 +21,7 @@ import { openRankedQueue, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
 import { loadOfficialMaps } from './official-maps';
 import { takeScreenshot, openScreenshotsFolder } from './screenshot';
 import { blockOffsiteRedirects, isGameURL, isKrunkerHost, isKrunkerPage, safeOpenExternal } from './links';
-import { clientStatsSnapshot, flushClientStats, setClientStatsAccount, setClientStatsMouseFree, startClientStats, stopClientStats } from './client-stats';
+import { applyClientStatsImport, clientStatsSnapshot, flushClientStats, prepareClientStatsImport, setClientStatsAccount, setClientStatsMouseFree, startClientStats, stopClientStats } from './client-stats';
 
 const AUDIO_MIME: Record<string, string> = {
   '.mp3': 'audio/mpeg',
@@ -920,7 +920,7 @@ async function launchApp(): Promise<void> {
   //   accounts          — encrypted alt-account credentials (never exported)
   //   window/tabWindow  — machine-specific window geometry
   //   savedTabs         — transient last-open tabs
-  //   clientStats       — names every account used here, and exports get shared
+  //   clientStats       — optional in exports, and merged on import rather than overwritten
   const EXPORT_CONFIG_KEYS = [
     'performance', 'game', 'keystrokes', 'nukeCounter', 'hudPositions', 'matchmaker',
     'keybinds', 'userscripts', 'ui', 'discord', 'translator', 'advanced',
@@ -1299,12 +1299,16 @@ async function launchApp(): Promise<void> {
   // Bundles client settings (allowlisted categories, never alt accounts) plus a
   // snapshot of Krunker's own settings (the s_* localStorage keys, passed in from
   // the renderer) into one JSON file. Import re-filters through the same allowlist.
-  ipcMain.handle('export-settings', async (_e, krunkerSettings: Record<string, string> | undefined) => {
+  ipcMain.handle('export-settings', async (_e, krunkerSettings: Record<string, string> | undefined, includeStats: unknown) => {
     flushPendingConfigWrites();
 
     const clientSettings: Record<string, unknown> = {};
     for (const key of EXPORT_CONFIG_KEYS) {
       clientSettings[key] = config.get(key as keyof typeof config.store);
+    }
+    if (includeStats === true) {
+      flushClientStats();
+      clientSettings.clientStats = config.get('clientStats');
     }
     // Shallow-copy the two categories we trim so we never mutate the live store.
     // Drop transient runtime fields that shouldn't travel between installs.
@@ -1382,13 +1386,15 @@ async function launchApp(): Promise<void> {
       }
     }
 
+    const stats = prepareClientStatsImport(parsed.client.clientStats);
+
     const krunker = parsed.krunker && typeof parsed.krunker === 'object' ? parsed.krunker : {};
-    if (applied === 0 && Object.keys(krunker).length === 0) {
+    if (applied === 0 && !stats && Object.keys(krunker).length === 0) {
       return { success: false, error: 'No recognized settings found in the file.' };
     }
     electronLog.log('[KCC] Settings imported (' + applied + ' client categories, ' + Object.keys(krunker).length + ' Krunker keys) from ' + result.filePaths[0]);
 
-    return { success: true, krunker };
+    return { success: true, krunker, stats };
   });
 
   // ── Alt manager IPC handlers (credentials encrypted via safeStorage) ──
@@ -1495,6 +1501,7 @@ async function launchApp(): Promise<void> {
   });
   ipcMain.on('client-stats-mouse-free', (_e, free: unknown) => setClientStatsMouseFree(free === true));
   ipcMain.handle('client-stats-get', () => clientStatsSnapshot());
+  ipcMain.handle('client-stats-import', () => applyClientStatsImport());
 
   // ── Stop page immediately on close to kill audio ──
   win.on('close', () => {
