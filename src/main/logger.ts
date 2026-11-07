@@ -1,16 +1,13 @@
 import { app } from 'electron';
 import { join } from 'path';
 import { existsSync, mkdirSync, readdirSync, unlinkSync, createWriteStream, WriteStream } from 'fs';
+import { dateStamp } from '../shared/date-stamp';
 
 const LOG_RETENTION_DAYS = 7;
 
 let electronStream: WriteStream;
 let electronPath: string;
 let ready = false;
-
-export function dateStamp(d = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 function pruneOldLogs(logDir: string): void {
   try {

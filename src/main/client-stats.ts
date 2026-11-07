@@ -1,25 +1,25 @@
 // Time on the client, overall and per Krunker account
 
-import { BrowserWindow, powerMonitor } from 'electron';
+import { app, BrowserWindow, powerMonitor } from 'electron';
+import { dateStamp } from '../shared/date-stamp';
 import { ClientTimeRecord, config } from './config';
-import { dateStamp, electronLog } from './logger';
+import { electronLog } from './logger';
 
 const TICK_MS = 60_000;
 // A longer gap between ticks means the PC slept
 const MAX_GAP_MS = 150_000;
 const ACTIVE_IDLE_S = 300;
-const WEEK_DAYS = 7;
-const DAY_MS = 86_400_000;
 
 export interface ClientStatsRow {
   totalMs: number;
   sessionMs: number;
-  weekMs: number;
   longestSessionMs: number;
+  days: Record<string, number>;
 }
 
 export interface ClientStatsSnapshot {
   since: number;
+  weekStart: number;
   currentAccount: string;
   client: ClientStatsRow;
   guest: ClientStatsRow;
@@ -42,24 +42,28 @@ let timer: ReturnType<typeof setInterval> | null = null;
 
 const validMs = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
 
-function toRecord(raw: any, oldestDay: string): ClientTimeRecord {
+// Not navigator.language: that's the UI language and ignores the region. firstDay runs 1 (Mon) to 7 (Sun); getDay counts from 0 (Sun).
+function systemWeekStart(): number {
+  try { return (new Intl.Locale(app.getSystemLocale()) as any).getWeekInfo().firstDay % 7; } catch { return 1; }
+}
+
+function toRecord(raw: any): ClientTimeRecord {
   const rec = newRecord();
   rec.totalMs = validMs(raw?.totalMs);
   rec.activeMs = validMs(raw?.activeMs);
   rec.longestSessionMs = validMs(raw?.longestSessionMs);
   for (const [day, ms] of Object.entries(raw?.days ?? {})) {
-    if (day >= oldestDay && validMs(ms)) rec.days[day] = validMs(ms);
+    if (validMs(ms)) rec.days[day] = validMs(ms);
   }
   return rec;
 }
 
 function load(): void {
   const raw: any = config.get('clientStats');
-  const oldestDay = dateStamp(new Date(Date.now() - WEEK_DAYS * DAY_MS));
   since = validMs(raw?.since) || since;
-  client = toRecord(raw?.client, oldestDay);
-  guest = toRecord(raw?.guest, oldestDay);
-  for (const [name, rec] of Object.entries(raw?.accounts ?? {})) accounts.set(name, toRecord(rec, oldestDay));
+  client = toRecord(raw?.client);
+  guest = toRecord(raw?.guest);
+  for (const [name, rec] of Object.entries(raw?.accounts ?? {})) accounts.set(name, toRecord(rec));
 }
 
 function addTime(rec: ClientTimeRecord, step: number, active: boolean): void {
@@ -97,12 +101,7 @@ function save(): void {
 }
 
 function toRow(rec: ClientTimeRecord): ClientStatsRow {
-  const now = new Date();
-  let weekMs = 0;
-  for (let i = 0; i < WEEK_DAYS; i++) {
-    weekMs += rec.days[dateStamp(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i))] ?? 0;
-  }
-  return { totalMs: rec.totalMs, sessionMs: sessionMs.get(rec) ?? 0, weekMs, longestSessionMs: rec.longestSessionMs };
+  return { totalMs: rec.totalMs, sessionMs: sessionMs.get(rec) ?? 0, longestSessionMs: rec.longestSessionMs, days: rec.days };
 }
 
 export function startClientStats(): void {
@@ -149,6 +148,7 @@ export function clientStatsSnapshot(): ClientStatsSnapshot {
   accrue();
   return {
     since,
+    weekStart: systemWeekStart(),
     currentAccount: currentName,
     client: toRow(client),
     guest: toRow(guest),
