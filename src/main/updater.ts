@@ -13,7 +13,7 @@ export interface UpdateInfo {
   notes: string;
 }
 
-/** Lightweight "an update exists" result for builds that can't self-install (portable, AppImage). */
+/** Lightweight "an update exists" result for builds that can't self-install. */
 export interface UpdateNotice {
   version: string;
   /** Link to the release page, where the user can pick the download for their platform. */
@@ -45,9 +45,10 @@ const UPDATE_CONFIG = {
 
 export const RELEASES_URL = UPDATE_CONFIG.releasesUrl;
 
-// Only Windows self-installs (the NSIS Setup.exe); other platforms use the notice path.
+// Windows runs the NSIS Setup.exe and Linux replaces the AppImage; other platforms use the notice path.
 function updateAssetPattern(): RegExp {
   if (process.platform === 'win32') return /Setup\.exe$/i;
+  if (process.platform === 'linux') return /x86_64\.AppImage$/i;
   return /$^/; // matches nothing
 }
 
@@ -194,7 +195,7 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateInfo
 }
 
 /**
- * Newer-release check for builds that can't self-install (macOS, Linux, portable):
+ * Newer-release check for builds that can't self-install:
  * returns the version plus a link to the release page, without downloading anything.
  */
 export async function checkForUpdateNotice(currentVersion: string): Promise<UpdateNotice | null> {
@@ -271,7 +272,8 @@ export function downloadUpdate(url: string, destPath: string, onProgress: Progre
         const total = parseInt(res.headers['content-length'] || '0', 10);
         let received = 0;
 
-        const file = createWriteStream(tmpPath);
+        // An AppImage is replaced by this file, so it must be executable.
+        const file = createWriteStream(tmpPath, { mode: 0o755 });
         res.on('data', (chunk: Buffer) => {
           received += chunk.length;
           if (total > 0) {
@@ -303,6 +305,7 @@ export function downloadUpdate(url: string, destPath: string, onProgress: Progre
         });
 
         file.on('error', (err) => {
+          req.destroy();
           try { unlinkSync(tmpPath); } catch { /* ignore */ }
           reject(err);
         });
@@ -329,8 +332,10 @@ export function downloadUpdate(url: string, destPath: string, onProgress: Progre
   });
 }
 
+// Not app.relaunch(): its helper sets NO_NEW_PRIVS, so a new AppImage's setuid fusermount can't mount.
 export function installUpdate(installerPath: string): void {
   electronLog.log('[KCC-Update] Launching installer:', installerPath);
+  if (process.platform === 'linux') app.releaseSingleInstanceLock(); // a new AppImage starts before this process exits
   const child = spawn(installerPath, [], {
     detached: true,
     stdio: 'ignore',

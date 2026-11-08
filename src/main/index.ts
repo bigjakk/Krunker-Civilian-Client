@@ -192,6 +192,10 @@ initSwapperProtocol();
 
 app.setAsDefaultProtocolClient('kcc');
 
+// APPIMAGE is inherited by child processes, so confirm this process runs from that mount.
+const { APPIMAGE, APPDIR } = process.env;
+const appImage = APPDIR && process.execPath.startsWith(APPDIR + '/') ? APPIMAGE : undefined;
+
 let pendingProtocolUrl: string | null = null;
 let mainWindowForProtocol: BrowserWindow | null = null;
 
@@ -395,17 +399,15 @@ app.whenReady().then(async () => {
   createSplash(appVersion);
 
   // ── Update check ──
-  // Only Windows NSIS self-installs: the Setup.exe swaps the app while it's closed.
-  // macOS, Linux (AppImage), and Windows-portable can't swap a running app, so they
-  // show a notice linking the release page for a manual download. Dev builds skip.
+  // Windows NSIS and the AppImage self-install; macOS and Windows-portable show a
+  // notice linking the release page for a manual download. Dev builds skip.
   const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR;
-  const isAppImage = !!process.env.APPIMAGE;
   const isDev = !app.isPackaged;
-  const isNsisInstall = !isDev && process.platform === 'win32' && !isPortable && !isAppImage;
+  const isNsisInstall = !isDev && process.platform === 'win32' && !isPortable;
 
   if (isDev) {
     electronLog.log('[KCC] Skipping update check (dev mode)');
-  } else if (isNsisInstall) {
+  } else if (isNsisInstall || appImage) {
     try {
       electronLog.log('[KCC] Checking for updates...');
       splashStatus('Checking for updates...', -1);
@@ -425,9 +427,13 @@ app.whenReady().then(async () => {
             config.set('ui', { ...DEFAULT_CONFIG.ui, ...config.get('ui'), skippedUpdateVersion: update.version });
           }
         } else {
-          const tempDir = join(app.getPath('temp'), 'kcc-update');
-          if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true });
-          const installerPath = join(tempDir, `KCC-${update.version}-Setup.exe`);
+          // The running AppImage keeps its old inode, so the download can replace the file in place.
+          let installerPath = appImage;
+          if (!installerPath) {
+            const tempDir = join(app.getPath('temp'), 'kcc-update');
+            if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true });
+            installerPath = join(tempDir, `KCC-${update.version}-Setup.exe`);
+          }
 
           try {
             splashStatus('Downloading update... 0%', 0);
@@ -471,7 +477,7 @@ app.whenReady().then(async () => {
       electronLog.error('[KCC] Update check failed:', err);
     }
   } else {
-    // macOS (DMG) / Linux (AppImage) / Windows portable: can't self-install — just
+    // macOS (DMG) / Windows portable / Linux outside an AppImage: can't self-install — just
     // notify and link to the release page so the user can grab the right download.
     try {
       electronLog.log('[KCC] Checking for updates (notify-only)...');
