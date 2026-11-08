@@ -196,6 +196,13 @@ app.setAsDefaultProtocolClient('kcc');
 const { APPIMAGE, APPDIR } = process.env;
 const appImage = APPDIR && process.execPath.startsWith(APPDIR + '/') ? APPIMAGE : undefined;
 
+// app.relaunch() can't restart an AppImage, so start a new copy the way an update does.
+function restartClient(): void {
+  if (appImage) return installUpdate(appImage);
+  app.relaunch();
+  app.quit();
+}
+
 let pendingProtocolUrl: string | null = null;
 let mainWindowForProtocol: BrowserWindow | null = null;
 
@@ -1266,13 +1273,11 @@ async function launchApp(): Promise<void> {
   });
   ipcMain.handle('restart-client', () => {
     flushPendingConfigWrites();
-    app.relaunch();
-    app.quit();
+    restartClient();
   });
   ipcMain.handle('reset-options', () => {
     config.clear();
-    app.relaunch();
-    app.quit();
+    restartClient();
   });
   ipcMain.handle('delete-all-data', async () => {
     stopClientStats();
@@ -1297,8 +1302,7 @@ async function launchApp(): Promise<void> {
     }
     // Userscripts and swapper files live under userData/Krunker Civilian Client/
     // and are intentionally left untouched.
-    app.relaunch();
-    app.quit();
+    restartClient();
   });
 
   // ── Settings export/import ──
