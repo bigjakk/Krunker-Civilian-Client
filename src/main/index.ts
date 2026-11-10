@@ -230,7 +230,8 @@ function restartClient(): void {
   app.quit();
 }
 
-let pendingProtocolUrl: string | null = null;
+// On Windows and Linux a link that starts the client arrives in argv
+let pendingProtocolUrl: string | null = process.argv.find((arg) => arg.startsWith('kcc://')) ?? null;
 let mainWindowForProtocol: BrowserWindow | null = null;
 
 if (!app.requestSingleInstanceLock()) {
@@ -704,12 +705,6 @@ async function launchApp(): Promise<void> {
   // state it's in — no minimum hold on an explicit dismiss.
   onSplashUserClosed(revealMainWindow);
 
-  mainWindowForProtocol = win;
-  if (pendingProtocolUrl) {
-    win.webContents.send('kcc-protocol', pendingProtocolUrl);
-    pendingProtocolUrl = null;
-  }
-
   // ── No application menu (prevents Escape/Alt interception) ──
   Menu.setApplicationMenu(null);
 
@@ -928,6 +923,12 @@ async function launchApp(): Promise<void> {
     win.webContents.executeJavaScript(CONSENT_DISMISS_JS).catch((err) => electronLog.warn('[KCC] Consent dismiss inject failed:', err));
     // Notify preload to start hooking settings (matches Crankshaft's timing)
     win.webContents.send('main_did-finish-load');
+    // Links wait here until a page is loaded to receive them
+    mainWindowForProtocol = win;
+    if (pendingProtocolUrl) {
+      win.webContents.send('kcc-protocol', pendingProtocolUrl);
+      pendingProtocolUrl = null;
+    }
     // The renderer memory cache serves F5 the stylesheet it already had, so the request never reaches the swapper
     const swappedCss = swapper.cssPaths();
     if (swappedCss.length) win.webContents.send('swap-css-reload', swappedCss);

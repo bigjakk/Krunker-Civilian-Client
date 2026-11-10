@@ -1,4 +1,5 @@
 import { ipcRenderer } from 'electron';
+import { savedConsole as _console } from './saved-console';
 
 const parseQueryString = (str: string): Record<string, string> => {
 	const query = str.includes("?") ? str.split("?")[1] : str;
@@ -151,23 +152,32 @@ const changeRegion = async (region: string): Promise<void> => {
 	(window as any).showWindow(1);
 };
 
+// Krunker defines its menu functions before the menu they act on exists, and they throw until it does.
+// #uiBase gets its class once the menu is up.
+const gameReady = (): Promise<void> => new Promise((resolve, reject) => {
+	const ready = (): boolean => {
+		const w = window as any;
+		return !!(w.openHostWindow && w.windows?.[7] && w.createPrivateRoom && document.getElementById("uiBase")?.className);
+	};
+	const deadline = Date.now() + 30000;
+	const check = (): void => {
+		if (ready()) resolve();
+		else if (Date.now() > deadline) reject(new Error("game did not finish loading"));
+		else setTimeout(check, 500);
+	};
+	check();
+});
+
 const checkPendingHost = (): void => {
 	const pendingParams = sessionStorage.getItem("pendingCompHost");
 	if (!pendingParams) return;
 	sessionStorage.removeItem("pendingCompHost");
 	try {
 		const params = JSON.parse(pendingParams);
-		console.log('[KCC] Protocol: pending host params found, executing...');
-		const poll = setInterval(() => {
-			const w = window as any;
-			if (w.openHostWindow && w.windows?.[7] && w.createPrivateRoom) {
-				clearInterval(poll);
-				automateCompHost(params).catch((err) => console.error('[KCC] Protocol: auto host failed:', err));
-			}
-		}, 500);
-		setTimeout(() => clearInterval(poll), 30000);
+		_console.log('[KCC] Protocol: pending host params found, executing...');
+		gameReady().then(() => automateCompHost(params)).catch((err) => _console.error('[KCC] Protocol: auto host failed:', err));
 	} catch (err) {
-		console.error('[KCC] Protocol: invalid pending params:', err);
+		_console.error('[KCC] Protocol: invalid pending params:', err);
 	}
 };
 
@@ -191,8 +201,8 @@ export function initKccProtocol(): void {
 	(window as any).kcc.parseArgs = parseArgs;
 
 	ipcRenderer.on("kcc-protocol", (_event, url: string) => {
-		console.log('[KCC] Protocol URL received:', url);
-		parseArgs(url).catch((err) => console.error('[KCC] Protocol: parseArgs failed:', err));
+		_console.log('[KCC] Protocol link received');
+		gameReady().then(() => parseArgs(url)).catch((err) => _console.error('[KCC] Protocol: link failed:', err));
 	});
 
 	ipcRenderer.on("main_did-finish-load", () => {
