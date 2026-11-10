@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, powerSaveBlocker, safeStorage, session, shell, webContents } from 'electron';
+import { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, net, powerSaveBlocker, safeStorage, session, shell, webContents } from 'electron';
 import { join, extname, basename, dirname, resolve as resolvePath } from 'path';
 import { existsSync, mkdirSync, promises as fsp } from 'fs';
 import { get as httpsGet } from 'https';
@@ -89,9 +89,10 @@ const SERVER_MAP: Record<string, string> = {
   'as-mb': 'MBI', 'au-syd': 'SYD', 'sgp': 'SIN',
   'us-tx': 'DAL', 'me-bhn': 'BHN', 'brz': 'BRZ', 'us-nj': 'NY',
 };
-let pingCache: Record<string, number> = {};
+const pingCache: Record<string, number> = {};
 let gamePingCache = { key: '', ms: -1, at: 0 };
 let pingCacheTime = 0;
+let pingRefresh: Promise<void> | null = null;
 
 function osPing(host: string): Promise<number> {
   return new Promise((resolve) => {
@@ -108,6 +109,28 @@ function osPing(host: string): Promise<number> {
       else resolve(-1);
     });
   });
+}
+
+// One round at a time. Regions land in the cache as they answer, and one that fails keeps its last value.
+function refreshRegionPings(): Promise<void> {
+  pingRefresh ??= (async () => {
+    try {
+      const res = await net.fetch('https://matchmaker.krunker.io/ping-list?hostname=krunker.io', { signal: AbortSignal.timeout(4000) });
+      const serverIPs = await res.json() as Record<string, string>;
+      await Promise.allSettled(Object.entries(serverIPs).map(async ([server, ip]) => {
+        const host = ip.split(':')[0];
+        let latency = await osPing(host);
+        if (latency < 0) latency = await osPing(host);
+        if (latency >= 0) pingCache[SERVER_MAP[server] ?? server] = latency;
+      }));
+      pingCacheTime = Date.now();
+    } catch (err) {
+      electronLog.error('[KCC] Ping regions error:', err);
+    } finally {
+      pingRefresh = null;
+    }
+  })();
+  return pingRefresh;
 }
 
 // ── Direct server ping (TCP-connect timing — measures the same TCP path the game's WebSocket uses) ──
@@ -1088,49 +1111,17 @@ async function launchApp(): Promise<void> {
     return ms;
   });
 
-  // ── Ping regions IPC handler (TCP connect timing, cached 60s) ──
+  // ── Ping regions IPC handler (ICMP, refreshed once older than 60s) ──
   ipcMain.handle('ping-regions', async () => {
-    if (Object.keys(pingCache).length > 0 && Date.now() - pingCacheTime < 60000) {
-      return pingCache;
+    if (Date.now() - pingCacheTime >= 60000) {
+      const refresh = refreshRegionPings();
+      // Only a search with no round behind it waits, and not on a region that never answers
+      if (pingCacheTime === 0) await Promise.race([refresh, new Promise((r) => setTimeout(r, 1500))]);
     }
-    try {
-      const data = await new Promise<string>((resolve, reject) => {
-        httpsGet('https://matchmaker.krunker.io/ping-list?hostname=krunker.io', (res) => {
-          let body = '';
-          res.on('data', (chunk: string) => { body += chunk; });
-          res.on('end', () => resolve(body));
-          res.on('error', reject);
-        }).on('error', reject);
-      });
-      const serverIPs: Record<string, string> = JSON.parse(data);
-
-      const results: Record<string, number> = {};
-
-      async function pingWithRetry(host: string): Promise<number> {
-        const latency = await osPing(host);
-        if (latency >= 0) return latency;
-        const retry = await osPing(host);
-        return retry >= 0 ? retry : -1;
-      }
-
-      const promises = Object.entries(serverIPs).map(async ([server, ip]) => {
-        const regionName = SERVER_MAP[server] ?? server;
-        const host = ip.split(':')[0];
-        const latency = await pingWithRetry(host);
-        if (latency >= 0) {
-          results[regionName] = latency;
-        }
-      });
-      await Promise.allSettled(promises);
-      pingCache = results;
-      pingCacheTime = Date.now();
-
-      return results;
-    } catch (err) {
-      electronLog.error('[KCC] Ping regions error:', err);
-      return pingCache;
-    }
+    return pingCache;
   });
+  // Warm the cache so the first search isn't the one that waits
+  if (config.get('matchmaker')?.enabled) void refreshRegionPings();
 
   // ── Ranked queue IPC handler ──
   ipcMain.on('open-ranked-queue', async (_e, token: string, region: string, allRegions: boolean) => {
