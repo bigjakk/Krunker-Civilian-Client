@@ -335,7 +335,19 @@ export function downloadUpdate(url: string, destPath: string, onProgress: Progre
 // Not app.relaunch(): its helper sets NO_NEW_PRIVS, so a new AppImage's setuid fusermount can't mount.
 export function installUpdate(installerPath: string): void {
   electronLog.log('[KCC-Update] Launching installer:', installerPath);
-  if (process.platform === 'linux') app.releaseSingleInstanceLock(); // a new AppImage starts before this process exits
+  if (process.platform === 'linux') {
+    // Start the new AppImage once this process has exited, as app.relaunch() does, so two copies never share the profile.
+    const env = { ...process.env };
+    if (/\/appimage_extracted_[^/]+$/.test(env.APPDIR || '')) env.APPIMAGE_EXTRACT_AND_RUN = '1'; // keep --appimage-extract-and-run (no FUSE)
+    const waitThenRun = 'while kill -0 "$1"; do sleep 0.2; done; exec "$2"';
+    spawn('/bin/sh', ['-c', waitThenRun, 'kcc-relaunch', String(process.pid), installerPath], {
+      detached: true,
+      stdio: 'ignore',
+      env,
+    }).unref();
+    app.quit();
+    return;
+  }
   const child = spawn(installerPath, [], {
     detached: true,
     stdio: 'ignore',
