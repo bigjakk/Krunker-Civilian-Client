@@ -24,6 +24,11 @@ export function isGameURL(url: string): boolean {
   return u?.origin === 'https://krunker.io' && u.pathname === '/';
 }
 
+export function isScriptingURL(url: string): boolean {
+  const u = parseURL(url);
+  return u?.origin === 'https://krunker.io' && u.pathname === '/scripting.html';
+}
+
 export function safeOpenExternal(url: string): void {
   try {
     const parsed = new URL(url);

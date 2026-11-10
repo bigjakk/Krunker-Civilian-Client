@@ -1,6 +1,6 @@
 import { BrowserWindow, WebContentsView, View, Menu, clipboard, ipcMain } from 'electron';
 import { TAB_BAR_DATA_URL } from './tab-bar-html';
-import { blockOffsiteRedirects, isGameURL, isKrunkerPage, safeOpenExternal } from './links';
+import { blockOffsiteRedirects, isGameURL, isKrunkerPage, isScriptingURL, safeOpenExternal } from './links';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog } from './logger';
 import { devWindowIcon } from './platform';
@@ -40,6 +40,7 @@ export class TabManager {
     private ses: Electron.Session;
     private preloadPath: string;
     private titlePolls = new Map<number, ReturnType<typeof setInterval>>();
+    private scriptWindows = new Map<number, BrowserWindow>();
     private recentlyClosed: { url: string; title: string }[] = [];
     private getTabWindowState: () => TabWindowState;
     private saveTabWindowState: (state: TabWindowState) => void;
@@ -110,6 +111,8 @@ export class TabManager {
         this.containerView.setVisible(false);
         this.visible = false;
         this.mainWin.on('resize', () => this.updateLayout());
+        // Tab pages outlive the window they were shown in, so a script window left open would keep the app running
+        this.mainWin.once('closed', () => this.scriptWindows.forEach((w) => w.destroy()));
     }
 
     // ── New Window Mode: create/show the tab window ──
@@ -298,6 +301,14 @@ export class TabManager {
         });
 
         wc.setWindowOpenHandler(({ url: linkUrl }) => {
+            // The map editor drives its script editor through the window.open handle, so it needs a real popup
+            if (isScriptingURL(linkUrl)) {
+                if (this.scriptWindows.has(tabId)) return { action: 'deny' as const };
+                return {
+                    action: 'allow' as const,
+                    overrideBrowserWindowOptions: { backgroundColor: '#000000', icon: devWindowIcon() },
+                };
+            }
             if (isGameURL(linkUrl)) {
                 this.mainWin.loadURL(linkUrl);
                 if (this.mode === 'same') this.hideTabs();
@@ -322,6 +333,23 @@ export class TabManager {
             }
         });
         blockOffsiteRedirects(wc);
+
+        wc.on('did-create-window', (child) => {
+            this.scriptWindows.set(tabId, child);
+            child.once('closed', () => {
+                this.scriptWindows.delete(tabId);
+                const tab = this.tabs.find(t => t.id === tabId);
+                if (tab && this.activeTabId !== tabId) this.freezeTab(tab);
+            });
+            const cwc = child.webContents;
+            // The page cancels every unload to save into the editor first, which would leave the window unclosable
+            cwc.on('will-prevent-unload', (event) => event.preventDefault());
+            cwc.setWindowOpenHandler(() => ({ action: 'deny' as const }));
+            cwc.on('will-navigate', (event, navUrl) => {
+                if (!isScriptingURL(navUrl)) event.preventDefault();
+            });
+            blockOffsiteRedirects(cwc);
+        });
 
         wc.on('context-menu', (_e, params) => {
             if (!params.linkURL) return;
@@ -395,7 +423,8 @@ export class TabManager {
     // ── Freeze/unfreeze background tabs via CDP Page Lifecycle ──
     private freezeTab(tab: TabInfo): void {
         const wc = tab.view.webContents;
-        if (wc.isDestroyed()) return;
+        // An open script window calls into its editor tab, so that tab has to keep running
+        if (wc.isDestroyed() || this.scriptWindows.has(tab.id)) return;
         this.stopTitleWatcher(tab.id);
         try { if (!wc.debugger.isAttached()) wc.debugger.attach('1.3'); } catch { /* DevTools open */ }
         if (!wc.debugger.isAttached()) return;
