@@ -373,8 +373,9 @@ function getIssueCount(): Promise<number | null> {
 
 // ── Keybind matching ──
 function matchesKeybind(input: { key: string; control: boolean; shift: boolean; alt: boolean }, bind: Keybind | undefined): boolean {
-  if (!bind) return false;
-  return input.key === bind.key
+  // Caps Lock flips the case of letter keys. Stored binds aren't validated, hence the typeof.
+  if (typeof bind?.key !== 'string') return false;
+  return input.key.toLowerCase() === bind.key.toLowerCase()
     && input.control === bind.ctrl
     && input.shift === bind.shift
     && input.alt === bind.alt;
@@ -806,10 +807,10 @@ async function launchApp(): Promise<void> {
     } else if (matchesKeybind(input, binds.screenshot)) {
       void takeScreenshot(win);
       event.preventDefault();
-    } else if (input.key === 't' && input.control && !input.shift && !input.alt) {
+    } else if (input.key.toLowerCase() === 't' && input.control && !input.shift && !input.alt) {
       tabManager.openTab('https://krunker.io/social.html');
       event.preventDefault();
-    } else if (input.key === 'T' && input.control && input.shift && !input.alt) {
+    } else if (input.key.toLowerCase() === 't' && input.control && input.shift && !input.alt) {
       tabManager.reopenTab();
       event.preventDefault();
     }

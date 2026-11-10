@@ -568,7 +568,7 @@ export class TabManager {
             else this.mainWin.focus();
             event.preventDefault();
             return true;
-        } else if (input.key === 'w' && input.control && !input.shift && !input.alt) {
+        } else if (input.key.toLowerCase() === 'w' && input.control && !input.shift && !input.alt) {
             this.closeCurrentTab();
             event.preventDefault();
             return true;
@@ -580,11 +580,11 @@ export class TabManager {
             this.prevTab();
             event.preventDefault();
             return true;
-        } else if (input.key === 't' && input.control && !input.shift && !input.alt) {
+        } else if (input.key.toLowerCase() === 't' && input.control && !input.shift && !input.alt) {
             this.openTab(KRUNKER_SOCIAL);
             event.preventDefault();
             return true;
-        } else if (input.key === 'T' && input.control && input.shift && !input.alt) {
+        } else if (input.key.toLowerCase() === 't' && input.control && input.shift && !input.alt) {
             this.reopenTab();
             event.preventDefault();
             return true;
