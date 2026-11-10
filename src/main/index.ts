@@ -13,6 +13,7 @@ import { UserscriptManager } from './userscripts';
 import { ALL_CLIENT_CSS, HIDE_ADS_CSS, CONSENT_DISMISS_JS } from './client-ui';
 import { electronLog, getLogPath, closeLogStreams } from './logger';
 import { checkForUpdate, downloadUpdate, installUpdate, checkForUpdateNotice, RELEASES_URL } from './updater';
+import { macCanSelfUpdate, runMacSelfUpdate } from './mac-updater';
 import { createSplash, splashStatus, splashPrompt, splashAlive, splashElapsed, getSplash, onSplashUserClosed, closeSplash } from './splash';
 import { DiscordRPC } from './discord-rpc';
 import { listThemes, getThemeCSS, listLoadingThemes, getLoadingScreenCSS, GAME_THEMES_DIR, SOCIAL_THEMES_DIR } from './css-themes';
@@ -192,9 +193,10 @@ initSwapperProtocol();
 
 app.setAsDefaultProtocolClient('kcc');
 
-// APPIMAGE is inherited by child processes, so confirm this process runs from that mount.
+// AppImages are Linux-only, and APPIMAGE is inherited by child processes, so confirm this
+// process runs from that mount.
 const { APPIMAGE, APPDIR } = process.env;
-const appImage = APPDIR && process.execPath.startsWith(APPDIR + '/') ? APPIMAGE : undefined;
+const appImage = process.platform === 'linux' && APPDIR && process.execPath.startsWith(APPDIR + '/') ? APPIMAGE : undefined;
 
 // app.relaunch() can't restart an AppImage, so start a new copy the way an update does.
 function restartClient(): void {
@@ -406,8 +408,11 @@ app.whenReady().then(async () => {
   createSplash(appVersion);
 
   // ── Update check ──
-  // Windows NSIS and the AppImage self-install; macOS and Windows-portable show a
-  // notice linking the release page for a manual download. Dev builds skip.
+  // Windows NSIS, the AppImage and macOS self-install: the Setup.exe swaps the app while
+  // it's closed, the AppImage file is replaced in place, and Squirrel.Mac swaps the signed
+  // bundle. Windows-portable, Linux outside an AppImage, and macOS copies that can't
+  // replace themselves show a notice linking the release page for a manual download.
+  // Dev builds skip.
   const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR;
   const isDev = !app.isPackaged;
   const isNsisInstall = !isDev && process.platform === 'win32' && !isPortable;
@@ -483,6 +488,9 @@ app.whenReady().then(async () => {
     } catch (err) {
       electronLog.error('[KCC] Update check failed:', err);
     }
+  } else if (macCanSelfUpdate()) {
+    // macOS replaces its own bundle through Squirrel.Mac (mac-updater.ts).
+    if ((await runMacSelfUpdate(appVersion)) === 'quit') return;
   } else {
     // macOS (DMG) / Windows portable / Linux outside an AppImage: can't self-install — just
     // notify and link to the release page so the user can grab the right download.

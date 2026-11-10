@@ -45,8 +45,10 @@ const UPDATE_CONFIG = {
 
 export const RELEASES_URL = UPDATE_CONFIG.releasesUrl;
 
-// Windows runs the NSIS Setup.exe and Linux replaces the AppImage; other platforms use the notice path.
+// Windows runs the NSIS Setup.exe, macOS installs the app zip through Squirrel.Mac
+// (mac-updater.ts) and Linux replaces the AppImage; other platforms use the notice path.
 function updateAssetPattern(): RegExp {
+  if (process.platform === 'darwin') return /mac-arm64\.zip$/i;
   if (process.platform === 'win32') return /Setup\.exe$/i;
   if (process.platform === 'linux') return /x86_64\.AppImage$/i;
   return /$^/; // matches nothing
