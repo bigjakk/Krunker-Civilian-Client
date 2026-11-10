@@ -50,7 +50,7 @@ export class DiscordRPC {
     private nonce = 0;
     private destroyed = false;
     private recvBuf = Buffer.alloc(0);
-    private pendingActivity: ActivityPayload | null = null;
+    private activity: ActivityPayload | null = null;
     private flushTimer: ReturnType<typeof setTimeout> | null = null;
 
     get isConnected(): boolean {
@@ -142,11 +142,8 @@ export class DiscordRPC {
             if (payload.cmd === 'DISPATCH' && payload.evt === 'READY') {
                 this.connected = true;
                 electronLog.log('[KCC-Discord] Connected to Discord');
-                // Flush any activity that was set before connection completed
-                if (this.pendingActivity) {
-                    this.sendActivity(this.pendingActivity);
-                    this.pendingActivity = null;
-                }
+                // Discord drops the activity when it restarts, so every new connection gets the current one
+                if (this.activity) this.sendActivity(this.activity);
             }
         } else if (opcode === OP_CLOSE) {
             electronLog.warn('[KCC-Discord] Discord closed connection:', payload.message || '');
@@ -183,8 +180,7 @@ export class DiscordRPC {
     setActivity(activity: ActivityPayload): void {
         if (this.destroyed) return;
 
-        // Always store latest activity so it can be sent on (re)connect
-        this.pendingActivity = activity;
+        this.activity = activity;
 
         if (!this.connected || !this.socket) return;
 
@@ -195,17 +191,13 @@ export class DiscordRPC {
             if (!this.flushTimer) {
                 this.flushTimer = setTimeout(() => {
                     this.flushTimer = null;
-                    if (this.pendingActivity && this.connected && this.socket) {
-                        this.sendActivity(this.pendingActivity);
-                        this.pendingActivity = null;
-                    }
+                    if (this.activity && this.connected && this.socket) this.sendActivity(this.activity);
                 }, RATE_LIMIT_MS - elapsed);
             }
             return;
         }
 
         this.sendActivity(activity);
-        this.pendingActivity = null;
     }
 
     private sendActivity(activity: ActivityPayload): void {
