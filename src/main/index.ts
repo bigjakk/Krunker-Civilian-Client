@@ -22,6 +22,7 @@ import { openRankedQueue, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
 import { loadOfficialMaps } from './official-maps';
 import { takeScreenshot, openScreenshotsFolder } from './screenshot';
 import { blockOffsiteRedirects, isGameURL, isKrunkerHost, isKrunkerPage, safeOpenExternal } from './links';
+import { logProcessCrashes } from './crash-log';
 import { applyClientStatsImport, clientStatsSnapshot, flushClientStats, prepareClientStatsImport, setClientStatsAccount, setClientStatsMouseFree, startClientStats, stopClientStats } from './client-stats';
 
 const AUDIO_MIME: Record<string, string> = {
@@ -193,6 +194,7 @@ if (advancedConfig.angleBackend && !validBackends.includes(advancedConfig.angleB
 }
 
 applyPlatformFlags(platformInfo, advancedConfig, perfConfig);
+logProcessCrashes();
 
 // Live frame-cap changes are safe only in sessions launched without
 // CustomMaxPendingFrames (cap and deeper frame queue are mutually exclusive —
