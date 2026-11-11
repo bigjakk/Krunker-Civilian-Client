@@ -1136,6 +1136,7 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
     if (previewAudio) { previewAudio.pause(); resetPlayBtn(); return; }
     const url: string = await ipcRenderer.invoke('resolve-ranked-sound', soundInput.value.trim());
     previewAudio = new Audio(url);
+    previewAudio.volume = Math.min(1, Math.max(0, (mm.rankedMatchVolume ?? 100) / 100));
     soundPlayBtn.innerHTML = '<span class="material-icons">stop</span>';
     previewAudio.onended = () => resetPlayBtn();
     previewAudio.onerror = () => resetPlayBtn(true);
@@ -1144,6 +1145,12 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
   soundControl.appendChild(soundPlayBtn);
   const rankedGroup = createGroup(body, 'Ranked');
   rankedGroup.appendChild(soundR.row);
+  rankedGroup.appendChild(createNumberRow({
+    label: 'Ranked Match Volume',
+    desc: 'Volume of the Ranked Match Sound (0-100)',
+    min: 0, max: 100, value: mm.rankedMatchVolume ?? 100, instant: true,
+    onChange: (v) => { mm.rankedMatchVolume = v; saveMM(); },
+  }));
   rankedGroup.appendChild(createToggleRow({
     label: 'Flash Taskbar on Ranked Match',
     desc: 'Flashes the client in the taskbar (the Dock icon on macOS) when the external ranked queue finds a match while you are in another window',
