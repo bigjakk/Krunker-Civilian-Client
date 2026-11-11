@@ -116,6 +116,7 @@ export interface AppConfig {
     sortByPlayers: boolean;
     hideSearchOverlay: boolean;
     rankedMatchSound: string;
+    rankedMatchFlash: boolean;
   };
   keybinds: {
     reload: Keybind;
@@ -281,6 +282,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     sortByPlayers: false,
     hideSearchOverlay: false,
     rankedMatchSound: '',
+    rankedMatchFlash: true,
   },
   keybinds: DEFAULT_KEYBINDS,
   userscripts: {

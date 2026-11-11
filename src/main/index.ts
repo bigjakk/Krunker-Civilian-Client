@@ -1132,7 +1132,15 @@ async function launchApp(): Promise<void> {
     const mm = config.get('matchmaker');
     const [audioUrl, maps] = await Promise.all([resolveRankedAudioUrl(mm?.rankedMatchSound || ''), loadOfficialMaps()]);
     const showHeader = config.get('ui')?.watermark ?? true;
-    openRankedQueue(token, region, allRegions, audioUrl, showHeader, maps);
+    openRankedQueue(token, region, allRegions, audioUrl, showHeader, maps, () => {
+      // The queue window can outlive the game window
+      if (win.isDestroyed() || !(config.get('matchmaker')?.rankedMatchFlash ?? true)) return;
+      const focused = win.isFocused();
+      electronLog.log(`[KCC] Ranked match found, client ${focused ? 'focused' : 'not focused'}`);
+      if (focused) return;
+      win.flashFrame(true);
+      win.once('focus', () => win.flashFrame(false));
+    });
   });
 
   ipcMain.handle('get-official-maps', () => loadOfficialMaps());

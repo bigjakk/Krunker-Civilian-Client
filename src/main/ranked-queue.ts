@@ -9,6 +9,10 @@ let queueWindow: BrowserWindow | null = null;
 
 const RANKED_QUEUE_WS = 'wss://gamefrontend.svc.krunker.io/v1/matchmaking/queue';
 
+// The queue page has no preload, so its title is how it tells main about a match
+const QUEUE_TITLE = 'Ranked Queue';
+const MATCH_TITLE = 'Match Found';
+
 type QueueMaps = Record<string, { number: number; image: string }>;
 
 // The ranked pool changes every season, so the queue offers (and can name) every official map
@@ -477,6 +481,7 @@ function startQueue() {
 
 function matchFound(map, region) {
     playNotificationSound();
+    document.title = ${JSON.stringify(MATCH_TITLE)};
     matchPopupOverlay.classList.add('active');
     region = region.slice(2);
     const regionName = regions[region] || region;
@@ -502,6 +507,7 @@ function matchFound(map, region) {
         if (remaining <= 0) {
             clearInterval(countdownInterval);
             matchPopupOverlay.classList.remove('active');
+            document.title = ${JSON.stringify(QUEUE_TITLE)};
         }
     }, 1000);
 
@@ -533,6 +539,7 @@ queueButton.onclick = async () => {
 // Close match popup
 closeButton.onclick = () => {
     matchPopupOverlay.classList.remove('active');
+    document.title = ${JSON.stringify(QUEUE_TITLE)};
     stopNotificationSound();
     if (countdownInterval) clearInterval(countdownInterval);
 };
@@ -567,7 +574,7 @@ function buildQueueHtml(token: string, region: string, allRegions: boolean, audi
 <html lang="en-US">
 <head>
 <meta charset="utf-8">
-<title>Ranked Queue</title>
+<title>${QUEUE_TITLE}</title>
 <style>${QUEUE_CSS}</style>
 </head>
 <body>
@@ -612,6 +619,7 @@ export function openRankedQueue(
     audioUrl: string,
     showHeader: boolean,
     officialMaps: OfficialMap[],
+    onMatch: () => void,
 ): void {
     if (queueWindow && !queueWindow.isDestroyed()) {
         queueWindow.focus();
@@ -624,7 +632,7 @@ export function openRankedQueue(
         resizable: false,
         autoHideMenuBar: true,
         backgroundColor: '#141414',
-        title: 'Ranked Queue',
+        title: QUEUE_TITLE,
         icon: devWindowIcon(),
         webPreferences: {
             nodeIntegration: false,
@@ -636,6 +644,7 @@ export function openRankedQueue(
 
     queueWindow = win;
     win.on('closed', () => { queueWindow = null; });
+    win.on('page-title-updated', (_e, title) => { if (title === MATCH_TITLE) onMatch(); });
 
     const html = buildQueueHtml(token, region, allRegions, audioUrl, showHeader, toQueueMaps(officialMaps));
     win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));

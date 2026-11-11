@@ -1111,7 +1111,7 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
   // ── Ranked Match Sound (URL or local file path; empty = default) ──
   const soundR = createTextRow({
     label: 'Ranked Match Sound',
-    desc: 'Plays when a ranked match is found. Use a direct audio file link ending in .mp3, .ogg, or .wav — page links (Pixabay, YouTube, etc.) will not work. The easiest way is to download the file and pick it with the browse button. Leave blank for the default.',
+    desc: 'Plays when the external ranked queue finds a match. Use a direct audio file link ending in .mp3, .ogg, or .wav — page links (Pixabay, YouTube, etc.) will not work. The easiest way is to download the file and pick it with the browse button. Leave blank for the default.',
     value: mm.rankedMatchSound || '',
     placeholder: 'https://example.com/sound.mp3  or  C:\\path\\to\\file.mp3',
     onChange: (v) => { mm.rankedMatchSound = v; saveMM(); },
@@ -1144,6 +1144,12 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
   soundControl.appendChild(soundPlayBtn);
   const rankedGroup = createGroup(body, 'Ranked');
   rankedGroup.appendChild(soundR.row);
+  rankedGroup.appendChild(createToggleRow({
+    label: 'Flash Taskbar on Ranked Match',
+    desc: 'Flashes the client in the taskbar (the Dock icon on macOS) when the external ranked queue finds a match while you are in another window',
+    checked: mm.rankedMatchFlash ?? true, instant: true,
+    onChange: (v) => { mm.rankedMatchFlash = v; saveMM(); },
+  }));
 }
 
 export function buildDiscordSection(body: HTMLElement, discordConf: any): void {
