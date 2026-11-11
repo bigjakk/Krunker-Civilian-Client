@@ -530,10 +530,23 @@ export function buildPerformanceSection(
     onChange: (v) => { perf.higherMaxFps = v; savePerf(); },
   });
 
+  // Same clamp as main, so a hand-edited value is listed as what is applied
+  const storedMenuCap = Math.round(Number(perf.menuFrameCap)) || 0;
+  perf.menuFrameCap = storedMenuCap > 0 ? Math.min(1000, Math.max(30, storedMenuCap)) : 0;
+  const menuCaps = [...new Set([0, 30, 60, 120, 144, 240, perf.menuFrameCap])].sort((a, b) => a - b);
+  const menuCapRow = createSelectRow({
+    label: 'Menu FPS Cap',
+    desc: 'Limits the frame rate while Krunker\'s menu is showing, which includes the client being in the background. Does not apply while Higher Max FPS is on',
+    options: menuCaps.map((fps) => ({ value: String(fps), label: fps ? String(fps) : 'Off' })),
+    value: String(perf.menuFrameCap), instant: true,
+    onChange: (v) => { perf.menuFrameCap = Number(v); savePerf(); },
+  });
+
   const higherMaxCheckbox = higherMaxRow.querySelector('input[type="checkbox"]') as HTMLInputElement;
   const syncFrameRows = (): void => {
     const mode = frameMode();
     capRow.classList.toggle('kcc-row-hidden', mode !== 'custom');
+    menuCapRow.classList.toggle('kcc-row-hidden', mode === 'vsync');
     higherMaxRow.classList.toggle('kcc-row-dim', mode !== 'unlimited');
     higherMaxCheckbox.disabled = mode !== 'unlimited';
   };
@@ -558,6 +571,7 @@ export function buildPerformanceSection(
     },
   }));
   fpsGroup.appendChild(capRow);
+  fpsGroup.appendChild(menuCapRow);
   fpsGroup.appendChild(higherMaxRow);
   syncFrameRows();
 

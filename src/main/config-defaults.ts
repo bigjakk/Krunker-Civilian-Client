@@ -53,6 +53,7 @@ export interface AppConfig {
     fpsUnlocked: boolean;
     higherMaxFps: boolean;
     frameCap: number;
+    menuFrameCap: number;
     processPriority: string;
     highPerformanceGpu: boolean;
   };
@@ -223,6 +224,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     fpsUnlocked: true,
     higherMaxFps: false,
     frameCap: 0,
+    menuFrameCap: 0,
     processPriority: 'Normal',
     highPerformanceGpu: true,
   },

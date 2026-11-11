@@ -1018,6 +1018,23 @@ async function launchApp(): Promise<void> {
 
   app.on('before-quit', flushPendingConfigWrites);
 
+  // setFrameCap only exists on the frameCap-patched Electron builds
+  const capWin = win as BrowserWindow & { setFrameCap?: (fps: number) => void };
+  const canSetCapLive = capLiveAvailable && typeof capWin.setFrameCap === 'function';
+  let gameCap = launchFrameCap;
+  let menuCap = clampFrameCap(perfConfig.menuFrameCap);
+  let menuShowing = false;
+  // The menu cap only ever lowers the frame rate, so a lower game cap wins
+  const applyFrameCap = (): void => {
+    if (!canSetCapLive || win.isDestroyed()) return;
+    const useMenuCap = menuShowing && menuCap > 0 && (gameCap <= 0 || menuCap < gameCap);
+    capWin.setFrameCap?.(useMenuCap ? menuCap : gameCap);
+  };
+  ipcMain.on('menu-showing', (_e, showing: unknown) => {
+    menuShowing = showing === true;
+    applyFrameCap();
+  });
+
   ipcMain.handle('set-config', (_e, key: string, value: unknown) => {
     if (!ALLOWED_CONFIG_KEYS.has(key)) return;
     value = keepFolderPath(key, value);
@@ -1029,11 +1046,11 @@ async function launchApp(): Promise<void> {
     }
     let frameCapNeedsRestart = false;
     if (key === 'performance') {
-      // setFrameCap only exists on the frameCap-patched Electron builds
-      const capWin = win as BrowserWindow & { setFrameCap?: (fps: number) => void };
       const capped = clampFrameCap((value as any)?.frameCap);
-      if (capLiveAvailable && typeof capWin.setFrameCap === 'function') {
-        capWin.setFrameCap(capped);
+      if (canSetCapLive) {
+        gameCap = capped;
+        menuCap = clampFrameCap((value as any)?.menuFrameCap);
+        applyFrameCap();
       } else if (capped !== launchFrameCap && (value as any)?.fpsUnlocked) {
         frameCapNeedsRestart = true;
       }
