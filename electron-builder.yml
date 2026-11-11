@@ -67,7 +67,7 @@ linux:
       arch: [x64]
   icon: build/icon.png
   category: Game
-  artifactName: "${productName}-${version}-linux-${arch}.${ext}"
+  artifactName: "Krunker-Civilian-Client-${arch}.${ext}"
   desktop:
     entry:
       Name: Krunker Civilian Client
