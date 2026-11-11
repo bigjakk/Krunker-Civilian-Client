@@ -1024,14 +1024,30 @@ async function launchApp(): Promise<void> {
   let gameCap = launchFrameCap;
   let menuCap = clampFrameCap(perfConfig.menuFrameCap);
   let menuShowing = false;
+  let pageLeaving = false;
   // The menu cap only ever lowers the frame rate, so a lower game cap wins
   const applyFrameCap = (): void => {
     if (!canSetCapLive || win.isDestroyed()) return;
     const useMenuCap = menuShowing && menuCap > 0 && (gameCap <= 0 || menuCap < gameCap);
-    capWin.setFrameCap?.(useMenuCap ? menuCap : gameCap);
+    capWin.setFrameCap?.(pageLeaving ? 0 : useMenuCap ? menuCap : gameCap);
   };
   ipcMain.on('menu-showing', (_e, showing: unknown) => {
     menuShowing = showing === true;
+    applyFrameCap();
+  });
+  // On Windows a cap left on while a page unloads shows its canvases white until the next page paints
+  win.webContents.on('did-start-navigation', (details) => {
+    if (!details.isMainFrame || details.isSameDocument) return;
+    pageLeaving = true;
+    applyFrameCap();
+  });
+  // Not at did-start-navigation: a blocked navigation keeps its page, which won't report again
+  win.webContents.on('did-navigate', () => {
+    menuShowing = false;
+  });
+  win.webContents.on('did-stop-loading', () => {
+    if (!pageLeaving) return;
+    pageLeaving = false;
     applyFrameCap();
   });
 
