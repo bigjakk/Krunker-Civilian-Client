@@ -27,6 +27,7 @@ import { installSoundHook, setHeadshotSoundMode } from './headshot-sound';
 import { initTradeDing } from './trade-ding';
 import { initKccProtocol } from './protocol';
 import { initSuspectPing } from './kpd-call';
+import { setFontMetricsFix } from './font-metrics';
 
 
 _console.log('[KCC] Preload script loaded');
@@ -215,6 +216,7 @@ ipcRenderer.on('main_did-finish-load', () => {
 
     if (isGamePage) installCompositorAnimFix();
     if (uiConf?.deathscreenAnimation) setDeathAnimBlock(true);
+    setFontMetricsFix(uiConf?.fixSquishedText ?? true);
     if (isGamePage) setGameBrightness(clampBrightness(uiConf?.gameBrightness));
     if (uiConf?.hideMenuPopups) startHidePopups();
     if (uiConf?.menuTimer ?? true) setMenuTimer(true);
@@ -514,4 +516,7 @@ ipcRenderer.on('main_did-finish-load', () => {
 ipcRenderer.on('main_did-finish-load-tab', () => {
   _console.log('[KCC] Tab page loaded');
   (window as any).closeClient = () => window.close();
+  ipcRenderer.invoke('get-all-config', ['ui'])
+    .then((conf: any) => setFontMetricsFix(conf?.ui?.fixSquishedText ?? true))
+    .catch(() => {});
 });

@@ -30,6 +30,7 @@ import { setBetterChat, setAutoHideChat, setChatHistorySize } from './chat';
 import { updateTranslatorConfig } from './translator';
 import { showChangelogNow } from './changelog';
 import { setVerbose } from './saved-console';
+import { FONT_FIX_SUPPORTED, setFontMetricsFix } from './font-metrics';
 import { MATCHMAKER_REGIONS, MATCHMAKER_REGION_NAMES, MATCHMAKER_MAP_NAMES, mapIconUrl, matchmakerMapNames, matchmakerModeItems } from './matchmaker';
 
 export interface SettingsBag {
@@ -833,6 +834,15 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any, ncConf
     ui.socialCssTheme = socialThemeSelect.value;
     saveUI();
   });
+
+  if (FONT_FIX_SUPPORTED) {
+    themeGroup.appendChild(createToggleRow({
+      label: 'Fix Squished Text',
+      desc: "Use the line spacing Krunker's font gets on Windows, so the tops of letters aren't cut off and lines don't crowd together. Also stops the font being drawn fake-bold",
+      checked: ui.fixSquishedText ?? true, instant: true,
+      onChange: (v) => { ui.fixSquishedText = v; saveUI(); setFontMetricsFix(v); },
+    }));
+  }
 
   const sc = statCounterConfig(ncConf);
   const statGroup = createGroup(body, 'Stat Counters');

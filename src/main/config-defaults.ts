@@ -139,6 +139,7 @@ export interface AppConfig {
     showExitButton: boolean;
     showClientStats: boolean;
     deathscreenAnimation: boolean;
+    fixSquishedText: boolean;
     gameBrightness: number;
     hideMenuPopups: boolean;
     menuTimer: boolean;
@@ -297,6 +298,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     showExitButton: true,
     showClientStats: true,
     deathscreenAnimation: true,
+    fixSquishedText: true,
     gameBrightness: 100,
     hideMenuPopups: false,
     menuTimer: true,
