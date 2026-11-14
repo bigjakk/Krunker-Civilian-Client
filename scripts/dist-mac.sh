@@ -1,5 +1,5 @@
 #!/bin/sh
-# Build a macOS arm64 DMG.
+# Build a macOS arm64 DMG, plus the zip the app's self-update downloads.
 # With a "Developer ID Application" identity in the keychain: electron-builder signs
 # the app (hardened runtime + build/entitlements.mac.plist), then the DMG is signed,
 # notarized (notarytool) and stapled — Gatekeeper-clean for distribution.
@@ -144,4 +144,21 @@ elif [ -n "$IDENTITY" ]; then
     echo "[dist-mac] KCC_SKIP_NOTARIZE set — signed but NOT notarized (do not distribute)"
 fi
 
-echo "[dist-mac] done: $DMG ($(du -h "$DMG" | cut -f1))"
+# Self-update payload (src/main/mac-updater.ts downloads it from the release): the same
+# signed app, zipped with ditto so its symlinks and extended attributes survive and the
+# unzipped copy still passes Squirrel.Mac's signature check.
+ZIP="out/Krunker-Civilian-Client-mac-arm64.zip"
+rm -f "$ZIP"
+ditto -c -k --sequesterRsrc --keepParent "$OUTAPP" "$ZIP"
+# Check the zip the way Squirrel.Mac unpacks it: the extracted app must pass a strict
+# signature check and carry this release's version.
+ZIPCHECK="$(mktemp -d)"
+ZIPVER=""
+if ditto -x -k "$ZIP" "$ZIPCHECK" && codesign --verify --deep --strict "$ZIPCHECK/$APPNAME.app"; then
+    ZIPVER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ZIPCHECK/$APPNAME.app/Contents/Info.plist" 2>/dev/null || true)"
+fi
+rm -rf "$ZIPCHECK"
+[ "$ZIPVER" = "$VERSION" ] || { echo "[dist-mac] ERROR: self-update zip check failed (extracted app version: ${ZIPVER:-none}, expected $VERSION)"; exit 1; }
+echo "[dist-mac] self-update zip unpacks to a valid v$VERSION app"
+
+echo "[dist-mac] done: $DMG ($(du -h "$DMG" | cut -f1)) + $ZIP ($(du -h "$ZIP" | cut -f1))"

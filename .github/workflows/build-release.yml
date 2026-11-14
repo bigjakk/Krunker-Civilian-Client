@@ -192,13 +192,15 @@ jobs:
         run: npm run dist:mac
 
       - name: Report build size
-        run: ls -lh out/*.dmg 2>/dev/null || true
+        run: ls -lh out/*.dmg out/*.zip 2>/dev/null || true
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v7
         with:
           name: dist-mac
-          path: out/*.dmg
+          path: |
+            out/*.dmg
+            out/Krunker-Civilian-Client-mac-arm64.zip
           if-no-files-found: error
 
   release:
@@ -230,6 +232,7 @@ jobs:
             out/*.exe
             out/*.AppImage
             out/*.dmg
+            out/Krunker-Civilian-Client-mac-arm64.zip
 
       - name: Generate release notes
         run: |
@@ -244,7 +247,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ASSETS=()
-          for file in out/*.exe out/*.AppImage out/*.dmg; do
+          for file in out/*.exe out/*.AppImage out/*.dmg out/Krunker-Civilian-Client-mac-arm64.zip; do
             [ -f "$file" ] || continue
             ASSETS+=("$file")
           done
