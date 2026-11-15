@@ -103,7 +103,7 @@ export function buildGeneralSection(
   clientGroup.appendChild(createToggleRow({
     label: 'Show Client Stats',
     desc: 'Menu item with your time on the client. Still counted while hidden.',
-    checked: ui.showClientStats ?? true, instant: true,
+    checked: ui.showClientStats ?? false, instant: true,
     onChange: (v) => { ui.showClientStats = v; saveUI(); setClientStatsItem(v); },
   }));
 

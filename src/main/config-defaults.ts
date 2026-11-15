@@ -296,7 +296,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   ui: {
     showExitButton: true,
-    showClientStats: true,
+    showClientStats: false,
     deathscreenAnimation: true,
     fixSquishedText: true,
     gameBrightness: 100,

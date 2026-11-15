@@ -221,7 +221,7 @@ ipcRenderer.on('main_did-finish-load', () => {
     if (uiConf?.hideMenuPopups) startHidePopups();
     if (uiConf?.menuTimer ?? true) setMenuTimer(true);
     if (isGamePage && uiConf?.classicSocial) setClassicSocial(true);
-    if (isGamePage) initClientStats(uiConf?.showClientStats ?? true);
+    if (isGamePage) initClientStats(uiConf?.showClientStats ?? false);
     if (isGamePage) initModManagerButton();
     if (isGamePage) reportMenuShowing();
 
