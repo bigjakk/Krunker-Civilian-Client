@@ -9,6 +9,10 @@ let queueWindow: BrowserWindow | null = null;
 
 const RANKED_QUEUE_WS = 'wss://gamefrontend.svc.krunker.io/v1/matchmaking/queue';
 
+// The queue page has no preload, so its title is how it tells main about a match
+const QUEUE_TITLE = 'Ranked Queue';
+const MATCH_TITLE = 'Match Found';
+
 type QueueMaps = Record<string, { number: number; image: string }>;
 
 // The ranked pool changes every season, so the queue offers (and can name) every official map
@@ -266,7 +270,7 @@ function jsLiteral(value: unknown): string {
         .replace(/>/g, '\\u003e');
 }
 
-function buildQueueScript(token: string, region: string, allRegions: boolean, audioUrl: string, maps: QueueMaps): string {
+function buildQueueScript(token: string, region: string, allRegions: boolean, audioUrl: string, volume: number, maps: QueueMaps): string {
     return `
 let isQueued = false;
 let queueStartTime = null;
@@ -283,6 +287,7 @@ const INIT_TOKEN = ${jsLiteral(token)};
 const INIT_REGION = ${jsLiteral(region)};
 const INIT_ALL_REGIONS = ${jsLiteral(allRegions)};
 const AUDIO_URL = ${jsLiteral(audioUrl)};
+const AUDIO_VOLUME = ${jsLiteral(volume)};
 const FALLBACK_AUDIO_URL = ${JSON.stringify(DEFAULT_RANKED_AUDIO_URL)};
 const maps = ${jsLiteral(maps)};
 const regions = ${buildRegionsJson()};
@@ -321,6 +326,7 @@ function loadSettings() {
 
 function loadNotificationAudio(url) {
     const audio = new Audio(url);
+    audio.volume = AUDIO_VOLUME;
     audio.preload = 'auto';
     audio.load();
     return audio;
@@ -477,6 +483,7 @@ function startQueue() {
 
 function matchFound(map, region) {
     playNotificationSound();
+    document.title = ${JSON.stringify(MATCH_TITLE)};
     matchPopupOverlay.classList.add('active');
     region = region.slice(2);
     const regionName = regions[region] || region;
@@ -502,6 +509,7 @@ function matchFound(map, region) {
         if (remaining <= 0) {
             clearInterval(countdownInterval);
             matchPopupOverlay.classList.remove('active');
+            document.title = ${JSON.stringify(QUEUE_TITLE)};
         }
     }, 1000);
 
@@ -533,6 +541,7 @@ queueButton.onclick = async () => {
 // Close match popup
 closeButton.onclick = () => {
     matchPopupOverlay.classList.remove('active');
+    document.title = ${JSON.stringify(QUEUE_TITLE)};
     stopNotificationSound();
     if (countdownInterval) clearInterval(countdownInterval);
 };
@@ -554,7 +563,7 @@ loadSettings();
 `;
 }
 
-function buildQueueHtml(token: string, region: string, allRegions: boolean, audioUrl: string, showHeader: boolean, maps: QueueMaps): string {
+function buildQueueHtml(token: string, region: string, allRegions: boolean, audioUrl: string, volume: number, showHeader: boolean, maps: QueueMaps): string {
     const header = showHeader ? `  <div class="queue-header">
     <div class="queue-mark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V5l-8-3z"/></svg></div>
     <div class="queue-head-text">
@@ -567,7 +576,7 @@ function buildQueueHtml(token: string, region: string, allRegions: boolean, audi
 <html lang="en-US">
 <head>
 <meta charset="utf-8">
-<title>Ranked Queue</title>
+<title>${QUEUE_TITLE}</title>
 <style>${QUEUE_CSS}</style>
 </head>
 <body>
@@ -600,7 +609,7 @@ ${header}  <div class="queue-body">
     </div>
   </div>
 </div>
-<script>${buildQueueScript(token, region, allRegions, audioUrl, maps)}</script>
+<script>${buildQueueScript(token, region, allRegions, audioUrl, volume, maps)}</script>
 </body>
 </html>`;
 }
@@ -610,8 +619,10 @@ export function openRankedQueue(
     region: string,
     allRegions: boolean,
     audioUrl: string,
+    volumePercent: number,
     showHeader: boolean,
     officialMaps: OfficialMap[],
+    onMatch: () => void,
 ): void {
     if (queueWindow && !queueWindow.isDestroyed()) {
         queueWindow.focus();
@@ -624,7 +635,7 @@ export function openRankedQueue(
         resizable: false,
         autoHideMenuBar: true,
         backgroundColor: '#141414',
-        title: 'Ranked Queue',
+        title: QUEUE_TITLE,
         icon: devWindowIcon(),
         webPreferences: {
             nodeIntegration: false,
@@ -636,7 +647,9 @@ export function openRankedQueue(
 
     queueWindow = win;
     win.on('closed', () => { queueWindow = null; });
+    win.on('page-title-updated', (_e, title) => { if (title === MATCH_TITLE) onMatch(); });
 
-    const html = buildQueueHtml(token, region, allRegions, audioUrl, showHeader, toQueueMaps(officialMaps));
+    const volume = Number.isFinite(volumePercent) ? Math.min(100, Math.max(0, volumePercent)) / 100 : 1;
+    const html = buildQueueHtml(token, region, allRegions, audioUrl, volume, showHeader, toQueueMaps(officialMaps));
     win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 }

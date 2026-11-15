@@ -53,6 +53,7 @@ export interface AppConfig {
     fpsUnlocked: boolean;
     higherMaxFps: boolean;
     frameCap: number;
+    menuFrameCap: number;
     processPriority: string;
     highPerformanceGpu: boolean;
   };
@@ -116,6 +117,8 @@ export interface AppConfig {
     sortByPlayers: boolean;
     hideSearchOverlay: boolean;
     rankedMatchSound: string;
+    rankedMatchVolume: number;
+    rankedMatchFlash: boolean;
   };
   keybinds: {
     reload: Keybind;
@@ -136,6 +139,7 @@ export interface AppConfig {
     showExitButton: boolean;
     showClientStats: boolean;
     deathscreenAnimation: boolean;
+    fixSquishedText: boolean;
     gameBrightness: number;
     hideMenuPopups: boolean;
     menuTimer: boolean;
@@ -221,6 +225,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     fpsUnlocked: true,
     higherMaxFps: false,
     frameCap: 0,
+    menuFrameCap: 0,
     processPriority: 'Normal',
     highPerformanceGpu: true,
   },
@@ -281,6 +286,8 @@ export const DEFAULT_CONFIG: AppConfig = {
     sortByPlayers: false,
     hideSearchOverlay: false,
     rankedMatchSound: '',
+    rankedMatchVolume: 100,
+    rankedMatchFlash: true,
   },
   keybinds: DEFAULT_KEYBINDS,
   userscripts: {
@@ -289,8 +296,9 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   ui: {
     showExitButton: true,
-    showClientStats: true,
+    showClientStats: false,
     deathscreenAnimation: true,
+    fixSquishedText: true,
     gameBrightness: 100,
     hideMenuPopups: false,
     menuTimer: true,

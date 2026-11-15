@@ -30,6 +30,7 @@ import { setBetterChat, setAutoHideChat, setChatHistorySize } from './chat';
 import { updateTranslatorConfig } from './translator';
 import { showChangelogNow } from './changelog';
 import { setVerbose } from './saved-console';
+import { FONT_FIX_SUPPORTED, setFontMetricsFix } from './font-metrics';
 import { MATCHMAKER_REGIONS, MATCHMAKER_REGION_NAMES, MATCHMAKER_MAP_NAMES, mapIconUrl, matchmakerMapNames, matchmakerModeItems } from './matchmaker';
 
 export interface SettingsBag {
@@ -102,7 +103,7 @@ export function buildGeneralSection(
   clientGroup.appendChild(createToggleRow({
     label: 'Show Client Stats',
     desc: 'Menu item with your time on the client. Still counted while hidden.',
-    checked: ui.showClientStats ?? true, instant: true,
+    checked: ui.showClientStats ?? false, instant: true,
     onChange: (v) => { ui.showClientStats = v; saveUI(); setClientStatsItem(v); },
   }));
 
@@ -530,10 +531,23 @@ export function buildPerformanceSection(
     onChange: (v) => { perf.higherMaxFps = v; savePerf(); },
   });
 
+  // Same clamp as main, so a hand-edited value is listed as what is applied
+  const storedMenuCap = Math.round(Number(perf.menuFrameCap)) || 0;
+  perf.menuFrameCap = storedMenuCap > 0 ? Math.min(1000, Math.max(30, storedMenuCap)) : 0;
+  const menuCaps = [...new Set([0, 30, 60, 120, 144, 240, perf.menuFrameCap])].sort((a, b) => a - b);
+  const menuCapRow = createSelectRow({
+    label: 'Menu FPS Cap',
+    desc: 'Limits the frame rate while Krunker\'s menu is showing, which includes the client being in the background. Does not apply while Higher Max FPS is on',
+    options: menuCaps.map((fps) => ({ value: String(fps), label: fps ? String(fps) : 'Off' })),
+    value: String(perf.menuFrameCap), instant: true,
+    onChange: (v) => { perf.menuFrameCap = Number(v); savePerf(); },
+  });
+
   const higherMaxCheckbox = higherMaxRow.querySelector('input[type="checkbox"]') as HTMLInputElement;
   const syncFrameRows = (): void => {
     const mode = frameMode();
     capRow.classList.toggle('kcc-row-hidden', mode !== 'custom');
+    menuCapRow.classList.toggle('kcc-row-hidden', mode === 'vsync');
     higherMaxRow.classList.toggle('kcc-row-dim', mode !== 'unlimited');
     higherMaxCheckbox.disabled = mode !== 'unlimited';
   };
@@ -558,6 +572,7 @@ export function buildPerformanceSection(
     },
   }));
   fpsGroup.appendChild(capRow);
+  fpsGroup.appendChild(menuCapRow);
   fpsGroup.appendChild(higherMaxRow);
   syncFrameRows();
 
@@ -819,6 +834,15 @@ export function buildAppearanceSection(body: HTMLElement, uiConfRaw: any, ncConf
     ui.socialCssTheme = socialThemeSelect.value;
     saveUI();
   });
+
+  if (FONT_FIX_SUPPORTED) {
+    themeGroup.appendChild(createToggleRow({
+      label: 'Fix Squished Text',
+      desc: "Use the line spacing Krunker's font gets on Windows, so the tops of letters aren't cut off and lines don't crowd together. Also stops the font being drawn fake-bold",
+      checked: ui.fixSquishedText ?? true, instant: true,
+      onChange: (v) => { ui.fixSquishedText = v; saveUI(); setFontMetricsFix(v); },
+    }));
+  }
 
   const sc = statCounterConfig(ncConf);
   const statGroup = createGroup(body, 'Stat Counters');
@@ -1111,7 +1135,7 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
   // ── Ranked Match Sound (URL or local file path; empty = default) ──
   const soundR = createTextRow({
     label: 'Ranked Match Sound',
-    desc: 'Plays when a ranked match is found. Use a direct audio file link ending in .mp3, .ogg, or .wav — page links (Pixabay, YouTube, etc.) will not work. The easiest way is to download the file and pick it with the browse button. Leave blank for the default.',
+    desc: 'Plays when the external ranked queue finds a match. Use a direct audio file link ending in .mp3, .ogg, or .wav — page links (Pixabay, YouTube, etc.) will not work. The easiest way is to download the file and pick it with the browse button. Leave blank for the default.',
     value: mm.rankedMatchSound || '',
     placeholder: 'https://example.com/sound.mp3  or  C:\\path\\to\\file.mp3',
     onChange: (v) => { mm.rankedMatchSound = v; saveMM(); },
@@ -1136,6 +1160,7 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
     if (previewAudio) { previewAudio.pause(); resetPlayBtn(); return; }
     const url: string = await ipcRenderer.invoke('resolve-ranked-sound', soundInput.value.trim());
     previewAudio = new Audio(url);
+    previewAudio.volume = Math.min(1, Math.max(0, (mm.rankedMatchVolume ?? 100) / 100));
     soundPlayBtn.innerHTML = '<span class="material-icons">stop</span>';
     previewAudio.onended = () => resetPlayBtn();
     previewAudio.onerror = () => resetPlayBtn(true);
@@ -1144,6 +1169,18 @@ export function buildMatchmakerSection(body: HTMLElement, mmConf: any, bag: Sett
   soundControl.appendChild(soundPlayBtn);
   const rankedGroup = createGroup(body, 'Ranked');
   rankedGroup.appendChild(soundR.row);
+  rankedGroup.appendChild(createNumberRow({
+    label: 'Ranked Match Volume',
+    desc: 'Volume of the Ranked Match Sound (0-100)',
+    min: 0, max: 100, value: mm.rankedMatchVolume ?? 100, instant: true,
+    onChange: (v) => { mm.rankedMatchVolume = v; saveMM(); },
+  }));
+  rankedGroup.appendChild(createToggleRow({
+    label: 'Flash Taskbar on Ranked Match',
+    desc: 'Flashes the client in the taskbar (the Dock icon on macOS) when the external ranked queue finds a match while you are in another window',
+    checked: mm.rankedMatchFlash ?? true, instant: true,
+    onChange: (v) => { mm.rankedMatchFlash = v; saveMM(); },
+  }));
 }
 
 export function buildDiscordSection(body: HTMLElement, discordConf: any): void {

@@ -177,7 +177,8 @@ export interface MatchmakerConfig {
 
 function matchesKey(bind: Keybind, event: KeyboardEvent): boolean {
     if ((document.activeElement as HTMLElement)?.tagName === 'INPUT') return false;
-    return event.key === bind.key
+    if (typeof bind?.key !== 'string' || typeof event.key !== 'string') return false;
+    return event.key.toLowerCase() === bind.key.toLowerCase()
         && event.shiftKey === bind.shift
         && event.altKey === bind.alt
         && event.ctrlKey === bind.ctrl;

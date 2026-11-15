@@ -27,6 +27,9 @@ export function installGameSocketTap(): void {
       super(url, protocols);
       try {
         this.addEventListener('message', onMessage);
+        this.addEventListener('close', (ev) => {
+          _console.warn(`[KCC-Socket] closed code=${ev.code} clean=${ev.wasClean} reason="${ev.reason}" host=${new URL(this.url).host}`);
+        });
       } catch (err) {
         _console.warn('[KCC-Socket] listener attach failed:', err);
       }

@@ -341,8 +341,12 @@ export function installUpdate(installerPath: string): void {
     // Start the new AppImage once this process has exited, as app.relaunch() does, so two copies never share the profile.
     const env = { ...process.env };
     if (/\/appimage_extracted_[^/]+$/.test(env.APPDIR || '')) env.APPIMAGE_EXTRACT_AND_RUN = '1'; // keep --appimage-extract-and-run (no FUSE)
-    const waitThenRun = 'while kill -0 "$1"; do sleep 0.2; done; exec "$2"';
-    spawn('/bin/sh', ['-c', waitThenRun, 'kcc-relaunch', String(process.pid), installerPath], {
+    // spawn() hands the shell this process's fds, the old AppImage's FUSE keepalive pipe among them, which would
+    // keep the old mount alive until the new client exits. bash closes them first; dash can't close multi-digit fds.
+    const bash = existsSync('/bin/bash');
+    const closeFds = bash ? 'for fd in /proc/$$/fd/*; do fd=${fd##*/}; [ "$fd" -gt 2 ] && eval "exec $fd>&-"; done; ' : '';
+    const waitThenRun = closeFds + 'while kill -0 "$1"; do sleep 0.2; done; exec "$2"';
+    spawn(bash ? '/bin/bash' : '/bin/sh', ['-c', waitThenRun, 'kcc-relaunch', String(process.pid), installerPath], {
       detached: true,
       stdio: 'ignore',
       env,

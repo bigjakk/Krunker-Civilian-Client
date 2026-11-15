@@ -17,6 +17,7 @@ import { DEFAULT_CONFIG } from '../main/config-defaults';
 import { savedConsole as _console, setVerbose } from './saved-console';
 import { initAltManagerButton } from './alt-manager';
 import { startHidePopups, setClassicSocial, initModManagerButton } from './menu-tweaks';
+import { reportMenuShowing } from './menu-state';
 import { initClientStats } from './client-stats';
 import { initSocialMusic } from './social-music';
 import { initBanlog } from './banlog';
@@ -26,6 +27,7 @@ import { installSoundHook, setHeadshotSoundMode } from './headshot-sound';
 import { initTradeDing } from './trade-ding';
 import { initKccProtocol } from './protocol';
 import { initSuspectPing } from './kpd-call';
+import { setFontMetricsFix } from './font-metrics';
 
 
 _console.log('[KCC] Preload script loaded');
@@ -214,12 +216,14 @@ ipcRenderer.on('main_did-finish-load', () => {
 
     if (isGamePage) installCompositorAnimFix();
     if (uiConf?.deathscreenAnimation) setDeathAnimBlock(true);
+    setFontMetricsFix(uiConf?.fixSquishedText ?? true);
     if (isGamePage) setGameBrightness(clampBrightness(uiConf?.gameBrightness));
     if (uiConf?.hideMenuPopups) startHidePopups();
     if (uiConf?.menuTimer ?? true) setMenuTimer(true);
     if (isGamePage && uiConf?.classicSocial) setClassicSocial(true);
-    if (isGamePage) initClientStats(uiConf?.showClientStats ?? true);
+    if (isGamePage) initClientStats(uiConf?.showClientStats ?? false);
     if (isGamePage) initModManagerButton();
+    if (isGamePage) reportMenuShowing();
 
     if (isGamePage) {
       initSocialMusic({
@@ -512,4 +516,7 @@ ipcRenderer.on('main_did-finish-load', () => {
 ipcRenderer.on('main_did-finish-load-tab', () => {
   _console.log('[KCC] Tab page loaded');
   (window as any).closeClient = () => window.close();
+  ipcRenderer.invoke('get-all-config', ['ui'])
+    .then((conf: any) => setFontMetricsFix(conf?.ui?.fixSquishedText ?? true))
+    .catch(() => {});
 });

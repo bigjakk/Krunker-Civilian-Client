@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, powerSaveBlocker, safeStorage, session, shell, webContents } from 'electron';
+import { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, net, powerSaveBlocker, safeStorage, session, shell, webContents } from 'electron';
 import { join, extname, basename, dirname, resolve as resolvePath } from 'path';
 import { existsSync, mkdirSync, promises as fsp } from 'fs';
 import { get as httpsGet } from 'https';
@@ -22,6 +22,7 @@ import { openRankedQueue, DEFAULT_RANKED_AUDIO_URL } from './ranked-queue';
 import { loadOfficialMaps } from './official-maps';
 import { takeScreenshot, openScreenshotsFolder } from './screenshot';
 import { blockOffsiteRedirects, isGameURL, isKrunkerHost, isKrunkerPage, safeOpenExternal } from './links';
+import { logProcessCrashes } from './crash-log';
 import { applyClientStatsImport, clientStatsSnapshot, flushClientStats, prepareClientStatsImport, setClientStatsAccount, setClientStatsMouseFree, startClientStats, stopClientStats } from './client-stats';
 
 const AUDIO_MIME: Record<string, string> = {
@@ -89,9 +90,10 @@ const SERVER_MAP: Record<string, string> = {
   'as-mb': 'MBI', 'au-syd': 'SYD', 'sgp': 'SIN',
   'us-tx': 'DAL', 'me-bhn': 'BHN', 'brz': 'BRZ', 'us-nj': 'NY',
 };
-let pingCache: Record<string, number> = {};
+const pingCache: Record<string, number> = {};
 let gamePingCache = { key: '', ms: -1, at: 0 };
 let pingCacheTime = 0;
+let pingRefresh: Promise<void> | null = null;
 
 function osPing(host: string): Promise<number> {
   return new Promise((resolve) => {
@@ -108,6 +110,28 @@ function osPing(host: string): Promise<number> {
       else resolve(-1);
     });
   });
+}
+
+// One round at a time. Regions land in the cache as they answer, and one that fails keeps its last value.
+function refreshRegionPings(): Promise<void> {
+  pingRefresh ??= (async () => {
+    try {
+      const res = await net.fetch('https://matchmaker.krunker.io/ping-list?hostname=krunker.io', { signal: AbortSignal.timeout(4000) });
+      const serverIPs = await res.json() as Record<string, string>;
+      await Promise.allSettled(Object.entries(serverIPs).map(async ([server, ip]) => {
+        const host = ip.split(':')[0];
+        let latency = await osPing(host);
+        if (latency < 0) latency = await osPing(host);
+        if (latency >= 0) pingCache[SERVER_MAP[server] ?? server] = latency;
+      }));
+      pingCacheTime = Date.now();
+    } catch (err) {
+      electronLog.error('[KCC] Ping regions error:', err);
+    } finally {
+      pingRefresh = null;
+    }
+  })();
+  return pingRefresh;
 }
 
 // ── Direct server ping (TCP-connect timing — measures the same TCP path the game's WebSocket uses) ──
@@ -170,6 +194,7 @@ if (advancedConfig.angleBackend && !validBackends.includes(advancedConfig.angleB
 }
 
 applyPlatformFlags(platformInfo, advancedConfig, perfConfig);
+logProcessCrashes();
 
 // Live frame-cap changes are safe only in sessions launched without
 // CustomMaxPendingFrames (cap and deeper frame queue are mutually exclusive —
@@ -205,7 +230,8 @@ function restartClient(): void {
   app.quit();
 }
 
-let pendingProtocolUrl: string | null = null;
+// On Windows and Linux a link that starts the client arrives in argv
+let pendingProtocolUrl: string | null = process.argv.find((arg) => arg.startsWith('kcc://')) ?? null;
 let mainWindowForProtocol: BrowserWindow | null = null;
 
 if (!app.requestSingleInstanceLock()) {
@@ -350,8 +376,9 @@ function getIssueCount(): Promise<number | null> {
 
 // ── Keybind matching ──
 function matchesKeybind(input: { key: string; control: boolean; shift: boolean; alt: boolean }, bind: Keybind | undefined): boolean {
-  if (!bind) return false;
-  return input.key === bind.key
+  // Caps Lock flips the case of letter keys. Stored binds aren't validated, hence the typeof.
+  if (typeof bind?.key !== 'string') return false;
+  return input.key.toLowerCase() === bind.key.toLowerCase()
     && input.control === bind.ctrl
     && input.shift === bind.shift
     && input.alt === bind.alt;
@@ -678,12 +705,6 @@ async function launchApp(): Promise<void> {
   // state it's in — no minimum hold on an explicit dismiss.
   onSplashUserClosed(revealMainWindow);
 
-  mainWindowForProtocol = win;
-  if (pendingProtocolUrl) {
-    win.webContents.send('kcc-protocol', pendingProtocolUrl);
-    pendingProtocolUrl = null;
-  }
-
   // ── No application menu (prevents Escape/Alt interception) ──
   Menu.setApplicationMenu(null);
 
@@ -783,10 +804,10 @@ async function launchApp(): Promise<void> {
     } else if (matchesKeybind(input, binds.screenshot)) {
       void takeScreenshot(win);
       event.preventDefault();
-    } else if (input.key === 't' && input.control && !input.shift && !input.alt) {
+    } else if (input.key.toLowerCase() === 't' && input.control && !input.shift && !input.alt) {
       tabManager.openTab('https://krunker.io/social.html');
       event.preventDefault();
-    } else if (input.key === 'T' && input.control && input.shift && !input.alt) {
+    } else if (input.key.toLowerCase() === 't' && input.control && input.shift && !input.alt) {
       tabManager.reopenTab();
       event.preventDefault();
     }
@@ -902,6 +923,12 @@ async function launchApp(): Promise<void> {
     win.webContents.executeJavaScript(CONSENT_DISMISS_JS).catch((err) => electronLog.warn('[KCC] Consent dismiss inject failed:', err));
     // Notify preload to start hooking settings (matches Crankshaft's timing)
     win.webContents.send('main_did-finish-load');
+    // Links wait here until a page is loaded to receive them
+    mainWindowForProtocol = win;
+    if (pendingProtocolUrl) {
+      win.webContents.send('kcc-protocol', pendingProtocolUrl);
+      pendingProtocolUrl = null;
+    }
     // The renderer memory cache serves F5 the stylesheet it already had, so the request never reaches the swapper
     const swappedCss = swapper.cssPaths();
     if (swappedCss.length) win.webContents.send('swap-css-reload', swappedCss);
@@ -991,6 +1018,39 @@ async function launchApp(): Promise<void> {
 
   app.on('before-quit', flushPendingConfigWrites);
 
+  // setFrameCap only exists on the frameCap-patched Electron builds
+  const capWin = win as BrowserWindow & { setFrameCap?: (fps: number) => void };
+  const canSetCapLive = capLiveAvailable && typeof capWin.setFrameCap === 'function';
+  let gameCap = launchFrameCap;
+  let menuCap = clampFrameCap(perfConfig.menuFrameCap);
+  let menuShowing = false;
+  let pageLeaving = false;
+  // The menu cap only ever lowers the frame rate, so a lower game cap wins
+  const applyFrameCap = (): void => {
+    if (!canSetCapLive || win.isDestroyed()) return;
+    const useMenuCap = menuShowing && menuCap > 0 && (gameCap <= 0 || menuCap < gameCap);
+    capWin.setFrameCap?.(pageLeaving ? 0 : useMenuCap ? menuCap : gameCap);
+  };
+  ipcMain.on('menu-showing', (_e, showing: unknown) => {
+    menuShowing = showing === true;
+    applyFrameCap();
+  });
+  // On Windows a cap left on while a page unloads shows its canvases white until the next page paints
+  win.webContents.on('did-start-navigation', (details) => {
+    if (!details.isMainFrame || details.isSameDocument) return;
+    pageLeaving = true;
+    applyFrameCap();
+  });
+  // Not at did-start-navigation: a blocked navigation keeps its page, which won't report again
+  win.webContents.on('did-navigate', () => {
+    menuShowing = false;
+  });
+  win.webContents.on('did-stop-loading', () => {
+    if (!pageLeaving) return;
+    pageLeaving = false;
+    applyFrameCap();
+  });
+
   ipcMain.handle('set-config', (_e, key: string, value: unknown) => {
     if (!ALLOWED_CONFIG_KEYS.has(key)) return;
     value = keepFolderPath(key, value);
@@ -1002,11 +1062,11 @@ async function launchApp(): Promise<void> {
     }
     let frameCapNeedsRestart = false;
     if (key === 'performance') {
-      // setFrameCap only exists on the frameCap-patched Electron builds
-      const capWin = win as BrowserWindow & { setFrameCap?: (fps: number) => void };
       const capped = clampFrameCap((value as any)?.frameCap);
-      if (capLiveAvailable && typeof capWin.setFrameCap === 'function') {
-        capWin.setFrameCap(capped);
+      if (canSetCapLive) {
+        gameCap = capped;
+        menuCap = clampFrameCap((value as any)?.menuFrameCap);
+        applyFrameCap();
       } else if (capped !== launchFrameCap && (value as any)?.fpsUnlocked) {
         frameCapNeedsRestart = true;
       }
@@ -1088,56 +1148,32 @@ async function launchApp(): Promise<void> {
     return ms;
   });
 
-  // ── Ping regions IPC handler (TCP connect timing, cached 60s) ──
+  // ── Ping regions IPC handler (ICMP, refreshed once older than 60s) ──
   ipcMain.handle('ping-regions', async () => {
-    if (Object.keys(pingCache).length > 0 && Date.now() - pingCacheTime < 60000) {
-      return pingCache;
+    if (Date.now() - pingCacheTime >= 60000) {
+      const refresh = refreshRegionPings();
+      // Only a search with no round behind it waits, and not on a region that never answers
+      if (pingCacheTime === 0) await Promise.race([refresh, new Promise((r) => setTimeout(r, 1500))]);
     }
-    try {
-      const data = await new Promise<string>((resolve, reject) => {
-        httpsGet('https://matchmaker.krunker.io/ping-list?hostname=krunker.io', (res) => {
-          let body = '';
-          res.on('data', (chunk: string) => { body += chunk; });
-          res.on('end', () => resolve(body));
-          res.on('error', reject);
-        }).on('error', reject);
-      });
-      const serverIPs: Record<string, string> = JSON.parse(data);
-
-      const results: Record<string, number> = {};
-
-      async function pingWithRetry(host: string): Promise<number> {
-        const latency = await osPing(host);
-        if (latency >= 0) return latency;
-        const retry = await osPing(host);
-        return retry >= 0 ? retry : -1;
-      }
-
-      const promises = Object.entries(serverIPs).map(async ([server, ip]) => {
-        const regionName = SERVER_MAP[server] ?? server;
-        const host = ip.split(':')[0];
-        const latency = await pingWithRetry(host);
-        if (latency >= 0) {
-          results[regionName] = latency;
-        }
-      });
-      await Promise.allSettled(promises);
-      pingCache = results;
-      pingCacheTime = Date.now();
-
-      return results;
-    } catch (err) {
-      electronLog.error('[KCC] Ping regions error:', err);
-      return pingCache;
-    }
+    return pingCache;
   });
+  // Warm the cache so the first search isn't the one that waits
+  if (config.get('matchmaker')?.enabled) void refreshRegionPings();
 
   // ── Ranked queue IPC handler ──
   ipcMain.on('open-ranked-queue', async (_e, token: string, region: string, allRegions: boolean) => {
     const mm = config.get('matchmaker');
     const [audioUrl, maps] = await Promise.all([resolveRankedAudioUrl(mm?.rankedMatchSound || ''), loadOfficialMaps()]);
     const showHeader = config.get('ui')?.watermark ?? true;
-    openRankedQueue(token, region, allRegions, audioUrl, showHeader, maps);
+    openRankedQueue(token, region, allRegions, audioUrl, mm?.rankedMatchVolume ?? 100, showHeader, maps, () => {
+      // The queue window can outlive the game window
+      if (win.isDestroyed() || !(config.get('matchmaker')?.rankedMatchFlash ?? true)) return;
+      const focused = win.isFocused();
+      electronLog.log(`[KCC] Ranked match found, client ${focused ? 'focused' : 'not focused'}`);
+      if (focused) return;
+      win.flashFrame(true);
+      win.once('focus', () => win.flashFrame(false));
+    });
   });
 
   ipcMain.handle('get-official-maps', () => loadOfficialMaps());
