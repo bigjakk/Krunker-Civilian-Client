@@ -516,7 +516,10 @@ ipcRenderer.on('main_did-finish-load', () => {
 ipcRenderer.on('main_did-finish-load-tab', () => {
   _console.log('[KCC] Tab page loaded');
   (window as any).closeClient = () => window.close();
-  ipcRenderer.invoke('get-all-config', ['ui'])
-    .then((conf: any) => setFontMetricsFix(conf?.ui?.fixSquishedText ?? true))
+  ipcRenderer.invoke('get-all-config', ['ui', 'advanced'])
+    .then((conf: any) => {
+      setVerbose(conf?.advanced?.verboseLogging ?? false);
+      setFontMetricsFix(conf?.ui?.fixSquishedText ?? true);
+    })
     .catch(() => {});
 });
