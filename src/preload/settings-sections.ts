@@ -644,7 +644,7 @@ export function buildPerformanceSection(
 
   debugGroup.appendChild(createToggleRow({
     label: 'Verbose Logging',
-    desc: 'Forward all preload console output to the Electron log file',
+    desc: 'Write all preload console output and process crashes to the Electron log file',
     checked: adv.verboseLogging, instant: true,
     onChange: (v) => {
       adv.verboseLogging = v; saveAdv();
