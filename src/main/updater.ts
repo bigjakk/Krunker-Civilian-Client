@@ -354,7 +354,8 @@ export function installUpdate(installerPath: string): void {
     app.quit();
     return;
   }
-  const child = spawn(installerPath, [], {
+  // --updated makes build/installer.nsh skip to the progress page and reopen the client.
+  const child = spawn(installerPath, ['--updated'], {
     detached: true,
     stdio: 'ignore',
   });
