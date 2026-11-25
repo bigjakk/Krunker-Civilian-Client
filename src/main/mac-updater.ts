@@ -1,14 +1,18 @@
 import { app, autoUpdater, dialog, shell } from 'electron';
+import { execFile } from 'child_process';
 import { randomBytes } from 'crypto';
 import { accessSync, constants as fsConstants, createReadStream, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
 import { createServer } from 'http';
 import type { AddressInfo } from 'net';
 import { dirname, join } from 'path';
 import { pipeline } from 'stream';
+import { promisify } from 'util';
 import { config, DEFAULT_CONFIG } from './config';
 import { electronLog } from './logger';
 import { getSplash, splashAlive, splashPrompt, splashStatus } from './splash';
-import { checkForUpdate, checkForUpdateNotice, downloadUpdate, RELEASES_URL } from './updater';
+import { checkForUpdate, checkForUpdateNotice, downloadUpdate, RELEASES_URL, versionLessThan } from './updater';
+
+const execFileAsync = promisify(execFile);
 
 // macOS self-update. The app downloads the release's zip of the app itself (progress bar
 // and a SHA-256 check against GitHub's digest, through the same downloadUpdate as Windows
@@ -23,8 +27,41 @@ import { checkForUpdate, checkForUpdateNotice, downloadUpdate, RELEASES_URL } fr
 // so every update fails with "not a valid version string". Until then only the release's
 // version label is checked, not the app inside the zip: a release that shipped an older,
 // validly signed build would install. Re-enable the key once we ship Electron 44+.
+//
+// Squirrel doesn't check the new app's LSMinimumSystemVersion, and on an older macOS the
+// swapped-in app won't open (Electron 45 needs macOS 13). So the downloaded app's minimum
+// is checked first, and a Mac that's too old keeps the current version.
 
 const TEMP_PREFIX = 'kcc-mac-update-';
+
+// Records an update that needs a newer macOS than this Mac runs, so it isn't downloaded
+// again at every launch. It's offered again once macOS is new enough.
+function unsupportedFile(): string {
+  return join(app.getPath('userData'), 'mac-update-unsupported');
+}
+
+function knownUnsupported(version: string): boolean {
+  try {
+    const rec = JSON.parse(readFileSync(unsupportedFile(), 'utf8'));
+    return rec?.version === version && typeof rec.minimum === 'string'
+      && versionLessThan(process.getSystemVersion(), rec.minimum);
+  } catch {
+    return false;
+  }
+}
+
+/** The LSMinimumSystemVersion of the app in an update zip, or null when the zip holds no app. Rejects when it can't be read. */
+async function zipMinimumMacOS(zipPath: string, workDir: string): Promise<string | null> {
+  const { stdout: names } = await execFileAsync('/usr/bin/unzip', ['-Z1', zipPath], { maxBuffer: 16 * 1024 * 1024 });
+  // The top-level app's plist. unzip reads the name as a pattern, so skip names with wildcards.
+  const entry = names.split('\n').find((n) => /^[^/*?[\]]+\.app\/Contents\/Info\.plist$/.test(n));
+  if (!entry) return null;
+  const { stdout: plist } = await execFileAsync('/usr/bin/unzip', ['-p', zipPath, entry], { encoding: 'buffer', maxBuffer: 16 * 1024 * 1024 });
+  const plistPath = join(workDir, 'Info.plist');
+  writeFileSync(plistPath, plist);
+  const { stdout: minimum } = await execFileAsync('/usr/libexec/PlistBuddy', ['-c', 'Print :LSMinimumSystemVersion', plistPath]);
+  return minimum.trim() || null;
+}
 
 // Records the version we restarted from. A next launch still on that version means ShipIt
 // didn't install the update (any other version means it did, or the user installed one).
@@ -93,6 +130,10 @@ export async function runMacSelfUpdate(appVersion: string): Promise<'quit' | 'co
       electronLog.log(`[KCC] Update v${notice.version} available but skipped by user preference`);
       return 'continue';
     }
+    if (knownUnsupported(notice.version)) {
+      electronLog.log(`[KCC] Update v${notice.version} needs a newer macOS than ${process.getSystemVersion()}, not offering it`);
+      return 'continue';
+    }
 
     electronLog.log(`[KCC] Update available: v${notice.version}`);
     const choice = await splashPrompt('install', notice.version, appVersion, notice.notes);
@@ -123,6 +164,20 @@ export async function runMacSelfUpdate(appVersion: string): Promise<'quit' | 'co
       }, update.sha256);
       // Closing the splash mid-download is the cancel path (the app quits with it).
       if (!splashAlive()) return 'quit';
+      const minimum = await zipMinimumMacOS(zip, work).catch((err) => {
+        electronLog.warn('[KCC-Update] Could not read the update\'s minimum macOS, installing anyway:', err);
+        return null;
+      });
+      const system = process.getSystemVersion();
+      if (minimum && versionLessThan(system, minimum)) {
+        electronLog.log(`[KCC-Update] v${update.version} needs macOS ${minimum} and this Mac runs ${system}; keeping v${appVersion}`);
+        try {
+          writeFileSync(unsupportedFile(), JSON.stringify({ version: update.version, minimum }));
+        } catch (err) {
+          electronLog.warn('[KCC-Update] Could not record the unsupported update:', err);
+        }
+        return await showNeedsNewerMacOS(update.version, minimum, system);
+      }
       splashStatus('Preparing update...', -1);
       await installWithSquirrel(zip, update.version);
       if (!splashAlive()) return 'quit';
@@ -219,6 +274,20 @@ function removeStaleDownloads(): void {
       if (name.startsWith(TEMP_PREFIX)) rmSync(join(tmp, name), { recursive: true, force: true });
     }
   } catch { /* best effort */ }
+}
+
+async function showNeedsNewerMacOS(version: string, minimum: string, system: string): Promise<'quit' | 'continue'> {
+  const splashWin = getSplash();
+  if (!splashWin) return 'quit'; // splash gone — app is quitting
+  splashStatus('Update needs a newer macOS');
+  await dialog.showMessageBox(splashWin, {
+    type: 'info',
+    title: 'Update needs a newer macOS',
+    message: `v${version} needs macOS ${minimum} or later.`,
+    detail: `This Mac runs macOS ${system}. Update macOS to get new versions — the current version keeps working in the meantime.`,
+    buttons: ['Continue'],
+  });
+  return 'continue';
 }
 
 async function showUpdateFailed(version: string, detail: string): Promise<'quit' | 'continue'> {

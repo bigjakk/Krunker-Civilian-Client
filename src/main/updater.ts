@@ -72,7 +72,7 @@ function isAllowedRedirect(url: string): boolean {
   }
 }
 
-function versionLessThan(a: string, b: string): boolean {
+export function versionLessThan(a: string, b: string): boolean {
   const pa = a.split('.').map(Number);
   const pb = b.split('.').map(Number);
   const len = Math.max(pa.length, pb.length);
