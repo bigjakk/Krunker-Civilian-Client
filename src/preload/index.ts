@@ -24,6 +24,7 @@ import { initBanlog } from './banlog';
 import { installGameSocketTap } from './game-socket';
 import { installSkyHook } from './sky';
 import { installSoundHook, setHeadshotSoundMode } from './headshot-sound';
+import { disableHowlerAutoSuspend } from './howler-suspend';
 import { initTradeDing } from './trade-ding';
 import { initKccProtocol } from './protocol';
 import { initSuspectPing } from './kpd-call';
@@ -282,6 +283,7 @@ ipcRenderer.on('main_did-finish-load', () => {
     if (isGamePage) {
       setHeadshotSoundMode(gameConf?.headshotSound ?? 'off');
       installSoundHook();
+      disableHowlerAutoSuspend();
     }
 
     // ── Matchmaker map and mode lists (Krunker's live tables) ──
