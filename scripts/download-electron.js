@@ -1,14 +1,13 @@
 'use strict';
 
 /**
- * Downloads patched Electron 45.0.0-alpha.14 builds for Windows, Linux, and macOS.
+ * Downloads patched Electron 45.4.1 builds for Windows, Linux, and macOS.
  *
  * The patched Electron fixes input starvation ("aim freeze") when --disable-frame-rate-limit
  * is active on modern Chromium. Without this, uncapped FPS causes 50-300ms input delays.
  * This build also bundles thegu5's frame-pacing patch so pending-frame limits are still
  * enforced under --disable-frame-rate-limit, plus the CustomFrameCap feature backing the
- * exact FPS cap. The macOS (arm64) build additionally carries a null-guard for the Chromium
- * mac present-path crash (external_begin_frame_source() null deref).
+ * exact FPS cap.
  *
  * Platform behavior (electron-builder.yml packages from dist/):
  *   Windows:  patched Win   → dist/
@@ -30,12 +29,12 @@ const { execSync } = require('child_process');
 // ── Configuration ──────────────────────────────────────────────────────────
 const GITHUB_BASE = 'https://github.com';
 const REPO = 'bigjakk/Electron-Websocket-Fix';
-const RELEASE_TAG = 'v45.0.0-alpha.14';
+const RELEASE_TAG = 'v45.4.1';
 
 const PLATFORMS = {
-    win32: { asset: 'electron-v45.0.0-alpha.14-ws-frameThrottle-frameCap2-patched-windows-x64.zip' },
-    linux: { asset: 'electron-v45.0.0-alpha.14-ws-frameThrottle-frameCap2-patched-linux-x64.zip' },
-    darwin: { asset: 'electron-v45.0.0-alpha.14-ws-frameThrottle-frameCap2-patched-mac-arm64.zip' },
+    win32: { asset: 'electron-v45.4.1-kcc-patched-windows-x64.zip' },
+    linux: { asset: 'electron-v45.4.1-kcc-patched-linux-x64.zip' },
+    darwin: { asset: 'electron-v45.4.1-kcc-patched-mac-arm64.zip' },
 };
 
 const IS_WIN = process.platform === 'win32';
