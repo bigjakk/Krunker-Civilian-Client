@@ -22,11 +22,11 @@ const execFileAsync = promisify(execFile);
 // swaps the bundle once we quit, then relaunches it. dist-mac.sh builds the zip next to
 // the DMG. Copies that can't replace their own bundle keep the download notice in index.ts.
 //
-// Don't add ElectronSquirrelPreventDowngrades to Info.plist while we ship Electron 43:
-// its Squirrel.Mac rejects every version string (fixed upstream in Squirrel.Mac #314),
-// so every update fails with "not a valid version string". Until then only the release's
-// version label is checked, not the app inside the zip: a release that shipped an older,
-// validly signed build would install. Re-enable the key once we ship Electron 44+.
+// electron-builder.yml sets ElectronSquirrelPreventDowngrades, so Squirrel also refuses a
+// zip whose app is older than this one, even under a newer release tag. It needs Electron
+// 44+: Electron 43's Squirrel.Mac rejected every version string with the key set (fixed
+// upstream in Squirrel.Mac #314). Squirrel reads the key from the running app, so updating
+// from an Electron 43 build isn't affected.
 //
 // Squirrel doesn't check the new app's LSMinimumSystemVersion, and on an older macOS the
 // swapped-in app won't open (Electron 45 needs macOS 13). So the downloaded app's minimum
