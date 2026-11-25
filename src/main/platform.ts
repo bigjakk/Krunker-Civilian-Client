@@ -93,6 +93,16 @@ export function applyPlatformFlags(info: PlatformInfo, advanced: AppConfig['adva
   // Dual-GPU laptops otherwise default to the integrated GPU unless the user sets a per-app preference
   if (performance.highPerformanceGpu) app.commandLine.appendSwitch('force-high-performance-gpu');
 
+  // ── Custom Electron patch switches ──
+  // Opt-in patches in the custom Electron build; a name for another OS is ignored.
+  enableFeatures(
+    'KccNoPointerLockEscCooldown', 'KccPinRawPointerLock', 'KccRawInputKeepWheelMotion', 'KccRawInputFastPath',
+    'KccLeanLockedMouseMove', 'KccSkipUnobservedInputEmits', 'KccSkipCanvasPerfSampling', 'KccLabelTexturesOnce',
+    'KccCacheVsyncInterval', 'KccMacFineGpuBackpressure', 'KccAudioParamCoalesce', 'KccHrtfPannerKRateAngles',
+    'KccX11AllowUnredirect', 'KccX11RawMouse', 'KccFrameCapPreciseRelease',
+  );
+  app.commandLine.appendSwitch('js-flags', '--cppheap-max-incremental-sweep-duration-ms=1');
+
   // ── ANGLE backend ──
   // 'default' means platform default: D3D11 on Windows, no override on Linux
   if (advanced.angleBackend && advanced.angleBackend !== 'default') {
